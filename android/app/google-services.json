@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "999323139941",
+    "project_id": "lumasdang",
+    "storage_bucket": "lumasdang.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:999323139941:android:e464d8a3a41eb780a92b8c",
+        "android_client_info": {
+          "package_name": "com.example.lumasdang"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBOiNXTxWxhoCV0tWmnO_bSiVQJSZW3JoY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
