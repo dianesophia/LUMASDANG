@@ -1,5 +1,6 @@
 // !$*UTF8*$!
 {
+	com.example.lumasdang.ios
 	archiveVersion = 1;
 	classes = {
 	};
