@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'home.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -13,7 +14,9 @@ class _RegisterPageState extends State<RegisterPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmController = TextEditingController();
+
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   bool _isLoading = false;
 
@@ -40,19 +43,34 @@ class _RegisterPageState extends State<RegisterPage> {
     setState(() => _isLoading = true);
 
     try {
+      // ⭐ CREATE AUTH USER
       final userCredential = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
 
-      if (userCredential.user != null) {
+      final user = userCredential.user;
+
+      if (user != null) {
+
+        // ⭐ SAVE USER DATA TO FIRESTORE
+        await _firestore.collection('users').doc(user.uid).set({
+          'email': email,
+          'uid': user.uid,
+          'createdAt': Timestamp.now(),
+        });
+
+        // Navigate to Home
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const HomePage()),
         );
       }
+
     } on FirebaseAuthException catch (e) {
+
       String message = 'Registration failed. Please try again.';
+
       if (e.code == 'weak-password') {
         message = 'The password provided is too weak.';
       } else if (e.code == 'email-already-in-use') {
@@ -60,9 +78,11 @@ class _RegisterPageState extends State<RegisterPage> {
       } else if (e.code == 'invalid-email') {
         message = 'Invalid email address.';
       }
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message)),
       );
+
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -107,26 +127,33 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                   ),
                   const SizedBox(height: 60),
+
                   _buildField(
                     controller: _emailController,
                     hint: 'Email',
                     icon: Icons.email_outlined,
                   ),
+
                   const SizedBox(height: 20),
+
                   _buildField(
                     controller: _passwordController,
                     hint: 'Password',
                     icon: Icons.lock_outline,
                     isPassword: true,
                   ),
+
                   const SizedBox(height: 20),
+
                   _buildField(
                     controller: _confirmController,
                     hint: 'Confirm Password',
                     icon: Icons.lock_outline,
                     isPassword: true,
                   ),
+
                   const SizedBox(height: 40),
+
                   SizedBox(
                     width: 200,
                     child: ElevatedButton(
@@ -144,11 +171,16 @@ class _RegisterPageState extends State<RegisterPage> {
                           ? const CircularProgressIndicator(color: Colors.white)
                           : const Text(
                               'Register',
-                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                     ),
                   ),
+
                   const SizedBox(height: 24),
+
                   TextButton(
                     onPressed: () => Navigator.pop(context),
                     child: const Text(
