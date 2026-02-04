@@ -1,98 +1,206 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
 
-// Screens
-import 'screens/login.dart';
+import '../services/firestore_service.dart';
+import '../services/local_db_service.dart';
+import '../services/connectivity_service.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-  runApp(const MyApp());
-}
-
-
-
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class HomePage extends StatefulWidget {
+  const HomePage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Lumasdang',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2E8B7B)),
-        useMaterial3: true,
-      ),
-      home: const LoginPage(),
-    );
-  }
+  State<HomePage> createState() => _HomePageState();
 }
 
-// ==================== SPLASH/LOADING SCREEN ====================
-class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
+class _HomePageState extends State<HomePage>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  int _selectedNavIndex = 0;
 
-  @override
-  State<SplashScreen> createState() => _SplashScreenState();
-}
+  // Controllers for forms
+  final TextEditingController nameController = TextEditingController();
+  final TextEditingController ageController = TextEditingController();
+  final TextEditingController sexController = TextEditingController();
+  final TextEditingController addressController = TextEditingController();
+  final TextEditingController placeOfBirthController = TextEditingController();
+  final TextEditingController dobController = TextEditingController();
+  final TextEditingController motherController = TextEditingController();
+  final TextEditingController motherContactController = TextEditingController();
+  final TextEditingController fatherController = TextEditingController();
+  final TextEditingController fatherContactController = TextEditingController();
 
-class _SplashScreenState extends State<SplashScreen>
-    with TickerProviderStateMixin {
-  late AnimationController _dotsController;
-  late AnimationController _fadeController;
-  late Animation<double> _fadeAnimation;
+  final TextEditingController measurementDateController = TextEditingController();
+  final TextEditingController weightController = TextEditingController();
+  final TextEditingController heightController = TextEditingController();
+  final TextEditingController muacController = TextEditingController();
+  final TextEditingController weightForAgeController = TextEditingController();
+  final TextEditingController weightForHeightController = TextEditingController();
+  final TextEditingController heightForAgeController = TextEditingController();
+  final TextEditingController bmiController = TextEditingController();
+
+  // Health status booleans
+  bool _diarrhea = false;
+  bool _fever = false;
+  bool _cough = false;
+  bool _other = false;
+  bool _medications = false;
+
+  // Dietary
+  bool? _purelyBreastfed;
+  final TextEditingController cfAgeController = TextEditingController();
+  final TextEditingController cfFreqController = TextEditingController();
+  final TextEditingController cfFoodController = TextEditingController();
+  final TextEditingController mealFreqController = TextEditingController();
+
+  // Deworming data captured from DewormingForm's onSave
+  Map<String, dynamic>? _dewormingData;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 3, vsync: this);
 
-    // Dots animation controller
-    _dotsController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    )..repeat();
+    // Initialize local DB and monitor connectivity for automatic sync
+    LocalDbService.instance.init().then((_) async {
+      final online = await ConnectivityService.instance.checkOnline();
+      if (online) {
+        // Try to sync any pending items when app starts if online
+        final synced = await LocalDbService.instance.syncPending(FirestoreService());
+        if (synced > 0 && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('$synced pending assessment(s) synced.')),
+          );
+        }
+      }
+    });
 
-    // Fade animation controller
-    _fadeController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
-
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _fadeController, curve: Curves.easeIn),
-    );
-
-    _fadeController.forward();
-
-    // Navigate to login screen after delay
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) =>
-                const LoginPage(),
-            transitionsBuilder:
-                (context, animation, secondaryAnimation, child) {
-              return FadeTransition(opacity: animation, child: child);
-            },
-            transitionDuration: const Duration(milliseconds: 500),
-          ),
-        );
+    ConnectivityService.instance.startMonitoring((online) async {
+      if (online) {
+        // When connection restored, try to sync.
+        final synced = await LocalDbService.instance.syncPending(FirestoreService());
+        if (synced > 0 && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('$synced pending assessment(s) synced.')),
+          );
+        }
       }
     });
   }
 
   @override
   void dispose() {
-    _dotsController.dispose();
-    _fadeController.dispose();
+    _tabController.dispose();
+
+    // dispose controllers
+    nameController.dispose();
+    ageController.dispose();
+    sexController.dispose();
+    addressController.dispose();
+    placeOfBirthController.dispose();
+    dobController.dispose();
+    motherController.dispose();
+    motherContactController.dispose();
+    fatherController.dispose();
+    fatherContactController.dispose();
+
+    measurementDateController.dispose();
+    weightController.dispose();
+    heightController.dispose();
+    muacController.dispose();
+    weightForAgeController.dispose();
+    weightForHeightController.dispose();
+    heightForAgeController.dispose();
+    bmiController.dispose();
+
+    cfAgeController.dispose();
+    cfFreqController.dispose();
+    cfFoodController.dispose();
+    mealFreqController.dispose();
+
     super.dispose();
+  }
+
+  Future<void> _saveAllData() async {
+    final data = {
+      'demographic': {
+        'name': nameController.text.trim(),
+        'age': ageController.text.trim(),
+        'sex': sexController.text.trim(),
+        'address': addressController.text.trim(),
+        'placeOfBirth': placeOfBirthController.text.trim(),
+        'dateOfBirth': dobController.text.trim(),
+        'mother': motherController.text.trim(),
+        'motherContact': motherContactController.text.trim(),
+        'father': fatherController.text.trim(),
+        'fatherContact': fatherContactController.text.trim(),
+      },
+      'anthropometric': {
+        'dateOfMeasurement': measurementDateController.text.trim(),
+        'weight': weightController.text.trim(),
+        'height': heightController.text.trim(),
+        'muac': muacController.text.trim(),
+        'weightForAge': weightForAgeController.text.trim(),
+        'weightForHeight': weightForHeightController.text.trim(),
+        'heightForAge': heightForAgeController.text.trim(),
+        'bmi': bmiController.text.trim(),
+      },
+      'healthStatus': {
+        'diarrhea': _diarrhea,
+        'fever': _fever,
+        'cough': _cough,
+        'other': _other,
+        'medications': _medications,
+      },
+      'dietary': {
+        'purelyBreastfed': _purelyBreastfed,
+        'cfAge': cfAgeController.text.trim(),
+        'cfFrequency': cfFreqController.text.trim(),
+        'cfFoods': cfFoodController.text.trim(),
+        'mealFrequency': mealFreqController.text.trim(),
+      },
+      'deworming': _dewormingData,
+    };
+
+    final firestore = FirestoreService();
+
+    // Check current connectivity
+    final online = await ConnectivityService.instance.checkOnline();
+
+    if (online) {
+      // Try to save to Firestore and local DB
+      try {
+        final docId = await firestore.saveHomePageData(data);
+        // Save locally marked as synced
+        await LocalDbService.instance.saveLocalRecord(data, synced: true, firestoreId: docId);
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Assessment saved to server and locally.'),
+            backgroundColor: Color(0xFF2E8B7B),
+          ),
+        );
+      } catch (e) {
+        // If Firestore write fails, fallback to local only and mark unsynced
+        await LocalDbService.instance.saveLocalRecord(data, synced: false);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Saved locally (will sync later). Error: ${e.toString()}'),
+            backgroundColor: Colors.orangeAccent,
+          ),
+        );
+      }
+    } else {
+      // Offline: save locally for later sync
+      await LocalDbService.instance.saveLocalRecord(data, synced: false);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No internet: saved locally and will sync when online.'),
+          backgroundColor: Colors.orangeAccent,
+        ),
+      );
+    }
   }
 
   @override
@@ -101,184 +209,249 @@ class _SplashScreenState extends State<SplashScreen>
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
             colors: [
-              Color(0xFF4A9B8C),
-              Color(0xFF3D998A),
-              Color(0xFF4DAF8B),
-              Color(0xFF5CB88D),
+              Color(0xFF2E8B7B),
+              Color(0xFF5CAA7F),
+              Color(0xFF8BC88A),
             ],
           ),
         ),
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: SafeArea(
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Spacer(flex: 2),
-                  // Logo Container
-                  Container(
-                    width: 160,
-                    height: 160,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFF8E1),
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.2),
-                          blurRadius: 20,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(24),
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          // Background gradient for logo
-                          Container(
-                            decoration: const BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [
-                                  Color(0xFFFFFDE7),
-                                  Color(0xFFFFF8E1),
-                                ],
-                              ),
-                            ),
-                          ),
-                          // Logo content - silhouettes with arrow
-                          Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Expanded(
-                                  child: Stack(
-                                    alignment: Alignment.center,
-                                    children: [
-                                      // Adult silhouette (left)
-                                      Positioned(
-                                        left: 20,
-                                        child: Icon(
-                                          Icons.person,
-                                          size: 70,
-                                          color: const Color(0xFF6B8EAE),
-                                        ),
-                                      ),
-                                      // Child silhouette (right)
-                                      Positioned(
-                                        right: 20,
-                                        bottom: 10,
-                                        child: Icon(
-                                          Icons.child_care,
-                                          size: 50,
-                                          color: const Color(0xFFE57373),
-                                        ),
-                                      ),
-                                      // Growth arrow
-                                      Positioned(
-                                        top: 10,
-                                        child: Transform.rotate(
-                                          angle: -0.5,
-                                          child: Icon(
-                                            Icons.trending_up,
-                                            size: 40,
-                                            color: const Color(0xFF4CAF50),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                // Logo text
-                                const Text(
-                                  'LUMASDANG',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF8B7355),
-                                    letterSpacing: 2,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 60),
-                  // Loading dots animation
-                  AnimatedBuilder(
-                    animation: _dotsController,
-                    builder: (context, child) {
-                      return Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: List.generate(4, (index) {
-                          final delay = index * 0.2;
-                          final animValue =
-                              ((_dotsController.value + delay) % 1.0);
-                          final scale = animValue < 0.5
-                              ? 1.0 + (animValue * 0.6)
-                              : 1.0 + ((1.0 - animValue) * 0.6);
-                          final opacity = animValue < 0.5
-                              ? 0.4 + (animValue * 1.2)
-                              : 0.4 + ((1.0 - animValue) * 1.2);
+        child: SafeArea(
+          child: Column(
+            children: [
+              _buildTabBar(),
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildHomeTab(),
+                    _buildPatientListTab(),
+                    _buildNotificationsTab(),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      bottomNavigationBar: _buildBottomNavigationBar(),
+    );
+  }
 
-                          return Container(
-                            margin: const EdgeInsets.symmetric(horizontal: 6),
-                            child: Transform.scale(
-                              scale: scale,
-                              child: Container(
-                                width: 14,
-                                height: 14,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: Color.fromRGBO(
-                                    45,
-                                    55,
-                                    60,
-                                    opacity.clamp(0.0, 1.0),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        }),
-                      );
-                    },
-                  ),
-                  const Spacer(flex: 2),
-                  // Loading text
-                  const Text(
-                    'Loading',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.white70,
-                      fontWeight: FontWeight.w400,
-                    ),
-                  ),
-                  const SizedBox(height: 40),
-                ],
+  Widget _buildTabBar() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(25),
+      ),
+      child: TabBar(
+        controller: _tabController,
+        indicator: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(25),
+        ),
+        indicatorSize: TabBarIndicatorSize.tab,
+        dividerColor: Colors.transparent,
+        labelColor: const Color(0xFF2E8B7B),
+        unselectedLabelColor: Colors.white,
+        labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+        unselectedLabelStyle: const TextStyle(fontSize: 14),
+        tabs: const [
+          Tab(text: 'Home'),
+          Tab(text: 'Patient List'),
+          Tab(text: 'Notifications'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHomeTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const StatsRow(),
+          const SizedBox(height: 16),
+          const UpcomingEvents(),
+          const SizedBox(height: 20),
+          const Text(
+            'NEW ASSESSMENT',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 12),
+          DemographicDataForm(
+            nameController: nameController,
+            ageController: ageController,
+            sexController: sexController,
+            addressController: addressController,
+            placeOfBirthController: placeOfBirthController,
+            dobController: dobController,
+            motherController: motherController,
+            motherContactController: motherContactController,
+            fatherController: fatherController,
+            fatherContactController: fatherContactController,
+          ),
+          const SizedBox(height: 16),
+          AnthropometricDataForm(
+            dateController: measurementDateController,
+            weightController: weightController,
+            heightController: heightController,
+            muacController: muacController,
+            weightForAgeController: weightForAgeController,
+            weightForHeightController: weightForHeightController,
+            heightForAgeController: heightForAgeController,
+            bmiController: bmiController,
+          ),
+          const SizedBox(height: 16),
+          HealthStatusForm(
+            diarrhea: _diarrhea,
+            onDiarrheaChanged: (v) => setState(() => _diarrhea = v),
+            fever: _fever,
+            onFeverChanged: (v) => setState(() => _fever = v),
+            cough: _cough,
+            onCoughChanged: (v) => setState(() => _cough = v),
+            other: _other,
+            onOtherChanged: (v) => setState(() => _other = v),
+            medications: _medications,
+            onMedicationsChanged: (v) => setState(() => _medications = v),
+          ),
+          const SizedBox(height: 16),
+          DietaryAssessmentForm(
+            purelyBreastfed: _purelyBreastfed,
+            onPurelyBreastfedChanged: (v) => setState(() => _purelyBreastfed = v),
+            ageWhenCfController: cfAgeController,
+            freqCfController: cfFreqController,
+            foodCfController: cfFoodController,
+            mealFrequencyController: mealFreqController,
+          ),
+          const SizedBox(height: 16),
+          const OralAssessmentForm(),
+          const SizedBox(height: 16),
+          const VaccinationForm(),
+          const SizedBox(height: 16),
+          DewormingForm(
+            onSave: (map) => setState(() => _dewormingData = map),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _saveAllData,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2E8B7B),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(25),
+                ),
+                elevation: 3,
+              ),
+              child: const Text(
+                'Save',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
               ),
             ),
           ),
+          const SizedBox(height: 30),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPatientListTab() {
+    return const Center(
+      child: Text(
+        'Patient List',
+        style: TextStyle(
+          fontSize: 24,
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNotificationsTab() {
+    return const Center(
+      child: Text(
+        'Notifications',
+        style: TextStyle(
+          fontSize: 24,
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomNavigationBar() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF5CAA7F), Color(0xFF8BC88A)],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.2),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildNavItem(Icons.calendar_month, 0),
+              _buildNavItem(Icons.assignment, 1),
+              _buildNavItem(Icons.people, 2),
+              _buildNavItem(Icons.settings, 3),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem(IconData icon, int index) {
+    final isSelected = _selectedNavIndex == index;
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _selectedNavIndex = index;
+        });
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? Colors.white.withValues(alpha: 0.3)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Icon(
+          icon,
+          color: Colors.white,
+          size: 28,
         ),
       ),
     );
   }
 }
 
-// Login screen moved to: lib/screens/login.dart
 
-
-// Home screen moved to: lib/screens/home.dart
 // ==================== STATS ROW ====================
 class StatsRow extends StatelessWidget {
   const StatsRow({super.key});
@@ -719,7 +892,30 @@ class _CheckboxFieldRowState extends State<CheckboxFieldRow> {
 
 // ==================== DEMOGRAPHIC DATA FORM ====================
 class DemographicDataForm extends StatelessWidget {
-  const DemographicDataForm({super.key});
+  final TextEditingController nameController;
+  final TextEditingController ageController;
+  final TextEditingController sexController;
+  final TextEditingController addressController;
+  final TextEditingController placeOfBirthController;
+  final TextEditingController dobController;
+  final TextEditingController motherController;
+  final TextEditingController motherContactController;
+  final TextEditingController fatherController;
+  final TextEditingController fatherContactController;
+
+  const DemographicDataForm({
+    super.key,
+    required this.nameController,
+    required this.ageController,
+    required this.sexController,
+    required this.addressController,
+    required this.placeOfBirthController,
+    required this.dobController,
+    required this.motherController,
+    required this.motherContactController,
+    required this.fatherController,
+    required this.fatherContactController,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -727,29 +923,29 @@ class DemographicDataForm extends StatelessWidget {
       title: 'DEMOGRAPHIC DATA',
       child: Column(
         children: [
-          const FormFieldRow(label: 'Name:'),
+          FormFieldRow(label: 'Name:', controller: nameController),
           const SizedBox(height: 12),
           Row(
             children: [
-              const Expanded(child: FormFieldRow(label: 'Age:', labelWidth: 40)),
+              Expanded(child: FormFieldRow(label: 'Age:', labelWidth: 40, controller: ageController)),
               const SizedBox(width: 16),
-              const Expanded(child: FormFieldRow(label: 'Sex:', labelWidth: 40)),
+              Expanded(child: FormFieldRow(label: 'Sex:', labelWidth: 40, controller: sexController)),
             ],
           ),
           const SizedBox(height: 12),
-          const FormFieldRow(label: 'Address:'),
+          FormFieldRow(label: 'Address:', controller: addressController),
           const SizedBox(height: 12),
-          const FormFieldRow(label: 'Place of Birth:'),
+          FormFieldRow(label: 'Place of Birth:', controller: placeOfBirthController),
           const SizedBox(height: 12),
-          const FormFieldRow(label: 'Date of Birth:'),
+          FormFieldRow(label: 'Date of Birth:', controller: dobController),
           const SizedBox(height: 12),
-          const FormFieldRow(label: 'Mother:'),
+          FormFieldRow(label: 'Mother:', controller: motherController),
           const SizedBox(height: 12),
-          const FormFieldRow(label: 'Contact #:'),
+          FormFieldRow(label: 'Contact #:', controller: motherContactController),
           const SizedBox(height: 12),
-          const FormFieldRow(label: 'Father:'),
+          FormFieldRow(label: 'Father:', controller: fatherController),
           const SizedBox(height: 12),
-          const FormFieldRow(label: 'Contact #:'),
+          FormFieldRow(label: 'Contact #:', controller: fatherContactController),
         ],
       ),
     );
@@ -758,7 +954,26 @@ class DemographicDataForm extends StatelessWidget {
 
 // ==================== ANTHROPOMETRIC DATA FORM ====================
 class AnthropometricDataForm extends StatelessWidget {
-  const AnthropometricDataForm({super.key});
+  final TextEditingController dateController;
+  final TextEditingController weightController;
+  final TextEditingController heightController;
+  final TextEditingController muacController;
+  final TextEditingController weightForAgeController;
+  final TextEditingController weightForHeightController;
+  final TextEditingController heightForAgeController;
+  final TextEditingController bmiController;
+
+  const AnthropometricDataForm({
+    super.key,
+    required this.dateController,
+    required this.weightController,
+    required this.heightController,
+    required this.muacController,
+    required this.weightForAgeController,
+    required this.weightForHeightController,
+    required this.heightForAgeController,
+    required this.bmiController,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -767,13 +982,13 @@ class AnthropometricDataForm extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const FormFieldRow(label: 'Date of Measurement:', labelWidth: 140),
+          FormFieldRow(label: 'Date of Measurement:', labelWidth: 140, controller: dateController),
           const SizedBox(height: 12),
-          const FormFieldRow(label: 'Weight:'),
+          FormFieldRow(label: 'Weight:', controller: weightController),
           const SizedBox(height: 12),
-          const FormFieldRow(label: 'Height:'),
+          FormFieldRow(label: 'Height:', controller: heightController),
           const SizedBox(height: 12),
-          const FormFieldRow(label: 'MUAC:'),
+          FormFieldRow(label: 'MUAC:', controller: muacController),
           const SizedBox(height: 16),
           // Auto-calculated fields
           Container(
@@ -782,15 +997,15 @@ class AnthropometricDataForm extends StatelessWidget {
               color: const Color(0xFFE8985A),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Column(
+            child: Column(
               children: [
-                FormFieldRow(label: 'Weight-for-Age:', labelWidth: 140),
-                SizedBox(height: 8),
-                FormFieldRow(label: 'Weight-for-Height/Length:', labelWidth: 160),
-                SizedBox(height: 8),
-                FormFieldRow(label: 'Height-for-Age:', labelWidth: 140),
-                SizedBox(height: 8),
-                FormFieldRow(label: 'BMI:', labelWidth: 140),
+                FormFieldRow(label: 'Weight-for-Age:', labelWidth: 140, controller: weightForAgeController),
+                const SizedBox(height: 8),
+                FormFieldRow(label: 'Weight-for-Height/Length:', labelWidth: 160, controller: weightForHeightController),
+                const SizedBox(height: 8),
+                FormFieldRow(label: 'Height-for-Age:', labelWidth: 140, controller: heightForAgeController),
+                const SizedBox(height: 8),
+                FormFieldRow(label: 'BMI:', labelWidth: 140, controller: bmiController),
               ],
             ),
           ),
@@ -802,7 +1017,30 @@ class AnthropometricDataForm extends StatelessWidget {
 
 // ==================== HEALTH STATUS FORM ====================
 class HealthStatusForm extends StatelessWidget {
-  const HealthStatusForm({super.key});
+  final bool diarrhea;
+  final ValueChanged<bool> onDiarrheaChanged;
+  final bool fever;
+  final ValueChanged<bool> onFeverChanged;
+  final bool cough;
+  final ValueChanged<bool> onCoughChanged;
+  final bool other;
+  final ValueChanged<bool> onOtherChanged;
+  final bool medications;
+  final ValueChanged<bool> onMedicationsChanged;
+
+  const HealthStatusForm({
+    super.key,
+    required this.diarrhea,
+    required this.onDiarrheaChanged,
+    required this.fever,
+    required this.onFeverChanged,
+    required this.cough,
+    required this.onCoughChanged,
+    required this.other,
+    required this.onOtherChanged,
+    required this.medications,
+    required this.onMedicationsChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -810,30 +1048,40 @@ class HealthStatusForm extends StatelessWidget {
       title: 'HEALTH STATUS',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
+        children: [
           CheckboxFieldRow(
             label: 'Diarrhea:',
             hint: '(Date of Occurrence/ Duration)',
+            initialValue: diarrhea,
+            onChanged: onDiarrheaChanged,
           ),
-          SizedBox(height: 10),
+          const SizedBox(height: 10),
           CheckboxFieldRow(
             label: 'Fever:',
             hint: '(Date of Occurrence/ Duration)',
+            initialValue: fever,
+            onChanged: onFeverChanged,
           ),
-          SizedBox(height: 10),
+          const SizedBox(height: 10),
           CheckboxFieldRow(
             label: 'Cough/Pneumonia:',
             hint: '(Date of Occurrence/ Duration)',
+            initialValue: cough,
+            onChanged: onCoughChanged,
           ),
-          SizedBox(height: 10),
+          const SizedBox(height: 10),
           CheckboxFieldRow(
             label: 'Other:',
             hint: '(Date of Occurrence/ Duration)',
+            initialValue: other,
+            onChanged: onOtherChanged,
           ),
-          SizedBox(height: 10),
+          const SizedBox(height: 10),
           CheckboxFieldRow(
             label: 'Medication/s:',
             hint: '(Current/ Taken during illness)',
+            initialValue: medications,
+            onChanged: onMedicationsChanged,
           ),
         ],
       ),
@@ -843,7 +1091,22 @@ class HealthStatusForm extends StatelessWidget {
 
 // ==================== DIETARY ASSESSMENT FORM ====================
 class DietaryAssessmentForm extends StatefulWidget {
-  const DietaryAssessmentForm({super.key});
+  final bool? purelyBreastfed;
+  final ValueChanged<bool?>? onPurelyBreastfedChanged;
+  final TextEditingController ageWhenCfController;
+  final TextEditingController freqCfController;
+  final TextEditingController foodCfController;
+  final TextEditingController mealFrequencyController;
+
+  const DietaryAssessmentForm({
+    super.key,
+    this.purelyBreastfed,
+    this.onPurelyBreastfedChanged,
+    required this.ageWhenCfController,
+    required this.freqCfController,
+    required this.foodCfController,
+    required this.mealFrequencyController,
+  });
 
   @override
   State<DietaryAssessmentForm> createState() => _DietaryAssessmentFormState();
@@ -851,6 +1114,12 @@ class DietaryAssessmentForm extends StatefulWidget {
 
 class _DietaryAssessmentFormState extends State<DietaryAssessmentForm> {
   bool? _purelyBreastfed;
+
+  @override
+  void initState() {
+    super.initState();
+    _purelyBreastfed = widget.purelyBreastfed;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -877,7 +1146,10 @@ class _DietaryAssessmentFormState extends State<DietaryAssessmentForm> {
                   Radio<bool>(
                     value: true,
                     groupValue: _purelyBreastfed,
-                    onChanged: (v) => setState(() => _purelyBreastfed = v),
+                    onChanged: (v) {
+                      setState(() => _purelyBreastfed = v);
+                      widget.onPurelyBreastfedChanged?.call(v);
+                    },
                     activeColor: const Color(0xFF2E8B7B),
                   ),
                 ],
@@ -888,7 +1160,10 @@ class _DietaryAssessmentFormState extends State<DietaryAssessmentForm> {
                   Radio<bool>(
                     value: false,
                     groupValue: _purelyBreastfed,
-                    onChanged: (v) => setState(() => _purelyBreastfed = v),
+                    onChanged: (v) {
+                      setState(() => _purelyBreastfed = v);
+                      widget.onPurelyBreastfedChanged?.call(v);
+                    },
                     activeColor: const Color(0xFF2E8B7B),
                   ),
                 ],
@@ -906,15 +1181,15 @@ class _DietaryAssessmentFormState extends State<DietaryAssessmentForm> {
             ),
           ),
           const SizedBox(height: 8),
-          const Padding(
-            padding: EdgeInsets.only(left: 12),
+          Padding(
+            padding: const EdgeInsets.only(left: 12),
             child: Column(
               children: [
-                FormFieldRow(label: 'Age when CF started:', hint: '(Age in months)', labelWidth: 140),
-                SizedBox(height: 8),
-                FormFieldRow(label: 'Frequency of CF a day:', labelWidth: 140),
-                SizedBox(height: 8),
-                FormFieldRow(label: 'Food/s given on CF:', labelWidth: 140),
+                FormFieldRow(label: 'Age when CF started:', hint: '(Age in months)', labelWidth: 140, controller: widget.ageWhenCfController),
+                const SizedBox(height: 8),
+                FormFieldRow(label: 'Frequency of CF a day:', labelWidth: 140, controller: widget.freqCfController),
+                const SizedBox(height: 8),
+                FormFieldRow(label: 'Food/s given on CF:', labelWidth: 140, controller: widget.foodCfController),
               ],
             ),
           ),
@@ -950,7 +1225,7 @@ class _DietaryAssessmentFormState extends State<DietaryAssessmentForm> {
             ),
           ),
           const SizedBox(height: 12),
-          const FormFieldRow(label: 'Meal frequency in a day:', labelWidth: 160),
+          FormFieldRow(label: 'Meal frequency in a day:', labelWidth: 160, controller: widget.mealFrequencyController),
         ],
       ),
     );
@@ -1328,7 +1603,9 @@ class _VaccineCheckCircleState extends State<VaccineCheckCircle> {
 
 // ==================== DEWORMING FORM ====================
 class DewormingForm extends StatefulWidget {
-  const DewormingForm({super.key});
+  final ValueChanged<Map<String, dynamic>>? onSave;
+
+  const DewormingForm({super.key, this.onSave});
 
   @override
   State<DewormingForm> createState() => _DewormingFormState();
@@ -1337,6 +1614,29 @@ class DewormingForm extends StatefulWidget {
 class _DewormingFormState extends State<DewormingForm> {
   bool _isNA = false;
   String? _drugGiven;
+  final TextEditingController _dateController = TextEditingController();
+  final TextEditingController _adverseController = TextEditingController();
+  final TextEditingController _nextDateController = TextEditingController();
+
+  @override
+  void dispose() {
+    _dateController.dispose();
+    _adverseController.dispose();
+    _nextDateController.dispose();
+    super.dispose();
+  }
+
+  void _onSavePressed() {
+    final map = {
+      'dateOfLastDeworming': _dateController.text.trim(),
+      'isNA': _isNA,
+      'drugGiven': _drugGiven,
+      'adverseReactions': _adverseController.text.trim(),
+      'nextDewormingDate': _nextDateController.text.trim(),
+    };
+
+    widget.onSave?.call(map);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1358,9 +1658,10 @@ class _DewormingFormState extends State<DewormingForm> {
                   decoration: const BoxDecoration(
                     border: Border(bottom: BorderSide(color: Color(0xFF8B6914), width: 1)),
                   ),
-                  child: const TextField(
-                    decoration: InputDecoration(border: InputBorder.none, isDense: true),
-                    style: TextStyle(fontSize: 12, color: Color(0xFF5D4037)),
+                  child: TextField(
+                    controller: _dateController,
+                    decoration: const InputDecoration(border: InputBorder.none, isDense: true),
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF5D4037)),
                   ),
                 ),
               ),
@@ -1400,22 +1701,15 @@ class _DewormingFormState extends State<DewormingForm> {
             ],
           ),
           const SizedBox(height: 12),
-          const FormFieldRow(label: 'Adverse Reactions:', labelWidth: 130),
+          FormFieldRow(label: 'Adverse Reactions:', labelWidth: 130, controller: _adverseController),
           const SizedBox(height: 12),
-          const FormFieldRow(label: 'Next deworming date:', labelWidth: 140),
+          FormFieldRow(label: 'Next deworming date:', labelWidth: 140, controller: _nextDateController),
           const SizedBox(height: 24),
           // Save Button
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Assessment saved successfully!'),
-                    backgroundColor: Color(0xFF2E8B7B),
-                  ),
-                );
-              },
+              onPressed: _onSavePressed,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF2E8B7B),
                 foregroundColor: Colors.white,
@@ -1439,3 +1733,4 @@ class _DewormingFormState extends State<DewormingForm> {
     );
   }
 }
+
