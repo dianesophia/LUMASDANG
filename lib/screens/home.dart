@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../services/firestore_service.dart';
+import '../services/local_db_service.dart';
+import '../services/connectivity_service.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -56,6 +58,32 @@ class _HomePageState extends State<HomePage>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+
+    // Initialize local DB and monitor connectivity for automatic sync
+    LocalDbService.instance.init().then((_) async {
+      final online = await ConnectivityService.instance.checkOnline();
+      if (online) {
+        // Try to sync any pending items when app starts if online
+        final synced = await LocalDbService.instance.syncPending(FirestoreService());
+        if (synced > 0 && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('$synced pending assessment(s) synced.')),
+          );
+        }
+      }
+    });
+
+    ConnectivityService.instance.startMonitoring((online) async {
+      if (online) {
+        // When connection restored, try to sync.
+        final synced = await LocalDbService.instance.syncPending(FirestoreService());
+        if (synced > 0 && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('$synced pending assessment(s) synced.')),
+          );
+        }
+      }
+    });
   }
 
   @override
@@ -132,21 +160,44 @@ class _HomePageState extends State<HomePage>
       'deworming': _dewormingData,
     };
 
-    try {
-      await FirestoreService().saveHomePageData(data);
+    final firestore = FirestoreService();
+
+    // Check current connectivity
+    final online = await ConnectivityService.instance.checkOnline();
+
+    if (online) {
+      // Try to save to Firestore and local DB
+      try {
+        final docId = await firestore.saveHomePageData(data);
+        // Save locally marked as synced
+        await LocalDbService.instance.saveLocalRecord(data, synced: true, firestoreId: docId);
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Assessment saved to server and locally.'),
+            backgroundColor: Color(0xFF2E8B7B),
+          ),
+        );
+      } catch (e) {
+        // If Firestore write fails, fallback to local only and mark unsynced
+        await LocalDbService.instance.saveLocalRecord(data, synced: false);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Saved locally (will sync later). Error: ${e.toString()}'),
+            backgroundColor: Colors.orangeAccent,
+          ),
+        );
+      }
+    } else {
+      // Offline: save locally for later sync
+      await LocalDbService.instance.saveLocalRecord(data, synced: false);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Assessment saved successfully.'),
-          backgroundColor: Color(0xFF2E8B7B),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to save: ${e.toString()}'),
-          backgroundColor: Colors.redAccent,
+          content: Text('No internet: saved locally and will sync when online.'),
+          backgroundColor: Colors.orangeAccent,
         ),
       );
     }
@@ -1657,26 +1708,26 @@ class _DewormingFormState extends State<DewormingForm> {
           // Save Button
           SizedBox(
             width: double.infinity,
-          //  child: ElevatedButton(
-            //  onPressed: _onSavePressed,
-           //   style: ElevatedButton.styleFrom(
-             //   backgroundColor: const Color(0xFF2E8B7B),
-            //    foregroundColor: Colors.white,
-             //   padding: const EdgeInsets.symmetric(vertical: 14),
-             //   shape: RoundedRectangleBorder(
-             //     borderRadius: BorderRadius.circular(25),
-             //   ),
-             //   elevation: 3,
-            //  ),
-             // child: const Text(
-             //   'Save',
-             //   style: TextStyle(
-             //     fontSize: 18,
-             //     fontWeight: FontWeight.w600,
-              //  ),
-             // ),
+            child: ElevatedButton(
+              onPressed: _onSavePressed,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2E8B7B),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(25),
+                ),
+                elevation: 3,
+              ),
+              child: const Text(
+                'Save',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
-          //),
+          ),
         ],
       ),
     );

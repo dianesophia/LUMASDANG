@@ -11,7 +11,8 @@ class FirestoreService {
 
   /// Saves a map containing data from HomePage under:
   /// users/{uid}/homepageData/{autoId}
-  Future<void> saveHomePageData(Map<String, dynamic> data) async {
+  /// Returns the generated document id on success.
+  Future<String> saveHomePageData(Map<String, dynamic> data) async {
     final user = _auth.currentUser;
     if (user == null) {
       throw FirebaseAuthException(
@@ -30,8 +31,12 @@ class FirestoreService {
     final payload = {
       ...data,
       'createdAt': FieldValue.serverTimestamp(),
+      'ownerUid': uid,
     };
 
     await docRef.set(payload);
+    return docRef.id;
   }
+
+  /// Optionally, you can add methods for fetching, deleting, updating data here.
 }
