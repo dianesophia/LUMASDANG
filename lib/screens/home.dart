@@ -405,10 +405,10 @@ class _HomePageState extends State<HomePage>
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildNavItem(Icons.calendar_month, 0),
-              _buildNavItem(Icons.assignment, 1),
-              _buildNavItem(Icons.people, 2),
-              _buildNavItem(Icons.settings, 3),
+              _buildNavItem(Icons.insights, 0),
+              _buildNavItem(Icons.fact_check, 1),
+              _buildNavItem(Icons.contact_page, 2),
+              _buildNavItem(Icons.settings_outlined, 3),
             ],
           ),
         ),
@@ -1225,8 +1225,15 @@ class _DietaryAssessmentFormState extends State<DietaryAssessmentForm> {
 }
 
 // ==================== ORAL ASSESSMENT FORM ====================
-class OralAssessmentForm extends StatelessWidget {
+class OralAssessmentForm extends StatefulWidget {
   const OralAssessmentForm({super.key});
+
+  @override
+  State<OralAssessmentForm> createState() => _OralAssessmentFormState();
+}
+
+class _OralAssessmentFormState extends State<OralAssessmentForm> {
+  String? _selectedOverallRisk;
 
   @override
   Widget build(BuildContext context) {
@@ -1328,7 +1335,7 @@ class OralAssessmentForm extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         _buildYesNoHeader(),
-        ...items.map((item) => _buildYesNoRow(item, indicatorColor)),
+        ...items.map((item) => YesNoRow(text: item, color: indicatorColor)),
       ],
     );
   }
@@ -1353,7 +1360,7 @@ class OralAssessmentForm extends StatelessWidget {
             ),
           ],
         ),
-        ...items.map((item) => _buildYesNoRow(item, const Color(0xFFFF9800))),
+        ...items.map((item) => YesNoRow(text: item, color: const Color(0xFFFF9800))),
       ],
     );
   }
@@ -1378,33 +1385,13 @@ class OralAssessmentForm extends StatelessWidget {
     );
   }
 
-  Widget _buildYesNoRow(String text, Color color) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(fontSize: 11, color: Color(0xFF5D4037)),
-            ),
-          ),
-          RiskCheckbox(color: color),
-          const SizedBox(width: 8),
-          RiskCheckbox(color: color),
-        ],
-      ),
-    );
-  }
-
   Widget _buildDiseaseIndicators() {
     return Column(
       children: [
         _buildYesNoHeader(),
-        _buildYesNoRow('Child has noncavitated (incipient/white spot) caries lesions', const Color(0xFFE53935)),
-        _buildYesNoRow('Child has visible caries lesions', const Color(0xFFE53935)),
-        _buildYesNoRow('Child has recent restorations or missing teeth due to caries', const Color(0xFFE53935)),
+        YesNoRow(text: 'Child has noncavitated (incipient/white spot) caries lesions', color: const Color(0xFFE53935)),
+        YesNoRow(text: 'Child has visible caries lesions', color: const Color(0xFFE53935)),
+        YesNoRow(text: 'Child has recent restorations or missing teeth due to caries', color: const Color(0xFFE53935)),
       ],
     );
   }
@@ -1417,61 +1404,135 @@ class OralAssessmentForm extends StatelessWidget {
           style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF5D4037)),
         ),
         const SizedBox(width: 12),
-        _buildRiskChip('High', const Color(0xFFE53935)),
+        _buildSelectableRiskChip('High', const Color(0xFFE53935)),
         const SizedBox(width: 8),
-        _buildRiskChip('Moderate', const Color(0xFFFF9800)),
+        _buildSelectableRiskChip('Moderate', const Color(0xFFFF9800)),
         const SizedBox(width: 8),
-        _buildRiskChip('Low', const Color(0xFFFFEB3B)),
+        _buildSelectableRiskChip('Low', const Color(0xFFFFEB3B)),
       ],
     );
   }
 
-  Widget _buildRiskChip(String label, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.bold,
-          color: color == const Color(0xFFFFEB3B) ? Colors.black87 : Colors.white,
+  Widget _buildSelectableRiskChip(String label, Color color) {
+    final isSelected = _selectedOverallRisk == label;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedOverallRisk = isSelected ? null : label;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        decoration: BoxDecoration(
+          color: isSelected ? color : color.withValues(alpha: 0.3),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color, width: 2),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 16,
+              height: 16,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isSelected ? Colors.white : Colors.transparent,
+                border: Border.all(
+                  color: color == const Color(0xFFFFEB3B) ? Colors.black54 : Colors.white,
+                  width: 1.5,
+                ),
+              ),
+              child: isSelected
+                  ? Icon(Icons.check, size: 12, color: color)
+                  : null,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: isSelected
+                    ? (color == const Color(0xFFFFEB3B) ? Colors.black87 : Colors.white)
+                    : (color == const Color(0xFFFFEB3B) ? Colors.black54 : color),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-class RiskCheckbox extends StatefulWidget {
+// Yes/No row widget with mutually exclusive selection
+class YesNoRow extends StatefulWidget {
+  final String text;
   final Color color;
 
-  const RiskCheckbox({super.key, required this.color});
+  const YesNoRow({super.key, required this.text, required this.color});
 
   @override
-  State<RiskCheckbox> createState() => _RiskCheckboxState();
+  State<YesNoRow> createState() => _YesNoRowState();
 }
 
-class _RiskCheckboxState extends State<RiskCheckbox> {
-  bool _isChecked = false;
+class _YesNoRowState extends State<YesNoRow> {
+  bool? _selectedValue; // null = none, true = Yes, false = No
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => setState(() => _isChecked = !_isChecked),
-      child: Container(
-        width: 35,
-        height: 20,
-        decoration: BoxDecoration(
-          color: _isChecked ? widget.color : widget.color.withValues(alpha: 0.25),
-          border: Border.all(color: widget.color, width: 1.5),
-          borderRadius: BorderRadius.circular(3),
-        ),
-        child: _isChecked
-            ? const Icon(Icons.check, size: 14, color: Colors.white)
-            : null,
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Text(
+              widget.text,
+              style: const TextStyle(fontSize: 11, color: Color(0xFF5D4037)),
+            ),
+          ),
+          // YES checkbox
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _selectedValue = _selectedValue == true ? null : true;
+              });
+            },
+            child: Container(
+              width: 35,
+              height: 20,
+              decoration: BoxDecoration(
+                color: _selectedValue == true ? widget.color : widget.color.withValues(alpha: 0.25),
+                border: Border.all(color: widget.color, width: 1.5),
+                borderRadius: BorderRadius.circular(3),
+              ),
+              child: _selectedValue == true
+                  ? const Icon(Icons.check, size: 14, color: Colors.white)
+                  : null,
+            ),
+          ),
+          const SizedBox(width: 8),
+          // NO checkbox
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _selectedValue = _selectedValue == false ? null : false;
+              });
+            },
+            child: Container(
+              width: 35,
+              height: 20,
+              decoration: BoxDecoration(
+                color: _selectedValue == false ? widget.color : widget.color.withValues(alpha: 0.25),
+                border: Border.all(color: widget.color, width: 1.5),
+                borderRadius: BorderRadius.circular(3),
+              ),
+              child: _selectedValue == false
+                  ? const Icon(Icons.check, size: 14, color: Colors.white)
+                  : null,
+            ),
+          ),
+        ],
       ),
     );
   }
