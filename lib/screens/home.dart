@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lumasdang/screens/patient_list.dart';
 
 import '../services/firestore_service.dart';
 import '../services/local_db_service.dart';
@@ -368,16 +369,7 @@ class _HomePageState extends State<HomePage>
   }
 
   Widget _buildPatientListTab() {
-    return const Center(
-      child: Text(
-        'Patient List',
-        style: TextStyle(
-          fontSize: 24,
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
+    return const PatientListTab();
   }
 
   Widget _buildNotificationsTab() {
