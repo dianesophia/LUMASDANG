@@ -59,6 +59,129 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+
+//Forgot password function
+  Future<void> _showForgotPasswordDialog() async {
+  final emailController = TextEditingController();
+
+  await showDialog(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+        contentPadding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+
+        title: Row(
+          children: const [
+            Icon(Icons.lock_reset, color: Color(0xFF2E8B7B)),
+            SizedBox(width: 10),
+            Text(
+              "Reset Password",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              "Enter your registered email address and we will send you a password reset link.",
+              style: TextStyle(fontSize: 14, color: Colors.grey),
+            ),
+            const SizedBox(height: 20),
+
+            TextField(
+              controller: emailController,
+              keyboardType: TextInputType.emailAddress,
+              decoration: InputDecoration(
+                prefixIcon: const Icon(Icons.email_outlined),
+                hintText: "Enter your email",
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(
+                    color: Color(0xFF2E8B7B),
+                    width: 2,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              "Cancel",
+              style: TextStyle(color: Colors.grey),
+            ),
+          ),
+
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2E8B7B),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+            onPressed: () async {
+              final email = emailController.text.trim();
+
+              if (email.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Please enter your email")),
+                );
+                return;
+              }
+
+              try {
+                await _auth.sendPasswordResetEmail(email: email);
+
+                Navigator.pop(context);
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      "Password reset email sent. Please check your inbox or spam folder.",
+                    ),
+                  ),
+                );
+              } on FirebaseAuthException catch (e) {
+                String message = "Something went wrong.";
+
+                if (e.code == 'user-not-found') {
+                  message = "No account found with that email.";
+                } else if (e.code == 'invalid-email') {
+                  message = "Invalid email format.";
+                }
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(message)),
+                );
+              }
+            },
+            child: const Text("Send Reset Link"),
+          ),
+        ],
+      );
+    },
+  );
+
+  emailController.dispose();
+}
+
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -139,15 +262,16 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   const SizedBox(height: 24),
                   TextButton(
-                    onPressed: () {},
-                    child: const Text(
-                      'Forgot your password or username?',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                      ),
+                  onPressed: _showForgotPasswordDialog,
+                  child: const Text(
+                    'Forgot your password or username?',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
                     ),
                   ),
+                ),
+
                   TextButton(
                     onPressed: () {
                       Navigator.push(
