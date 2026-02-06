@@ -1,93 +1,141 @@
 import 'package:hive_flutter/hive_flutter.dart';
-
 import 'firestore_service.dart';
 
-/// Local DB service using Hive to cache homepage data for offline support.
 class LocalDbService {
   LocalDbService._private();
   static final LocalDbService instance = LocalDbService._private();
 
   static const String _boxName = 'homepageData';
   late Box _box;
+  bool _initialized = false;
 
+  /// Initialize Hive
   Future<void> init() async {
+    if (_initialized) return;
+
     await Hive.initFlutter();
-    _box = await Hive.openBox(_boxName);
+
+    if (!Hive.isBoxOpen(_boxName)) {
+      _box = await Hive.openBox(_boxName);
+    } else {
+      _box = Hive.box(_boxName);
+    }
+
+    _initialized = true;
   }
 
-  /// Save a local record. Returns the local key (int).
-  /// record example: { 'data': Map<String,dynamic>, 'createdAt': DateTime, 'synced': bool, 'firestoreId': String? }
-  Future<int> saveLocalRecord(Map<String, dynamic> data, {bool synced = false, String? firestoreId}) async {
+  Box get box {
+    if (!_initialized) throw Exception("LocalDbService not initialized. Call init() first.");
+    return _box;
+  }
+
+  /// Save a local record
+  Future<int> saveLocalRecord(Map<String, dynamic> data,
+      {bool synced = false, String? firestoreId}) async {
     final record = {
       'data': data,
       'createdAt': DateTime.now().toIso8601String(),
       'synced': synced,
       'firestoreId': firestoreId,
+      'isDeleted': false, // Soft delete flag
     };
-    return await _box.add(record);
+    return await box.add(record);
   }
 
-  /// Returns list of Map containing local key and value
-  Future<List<Map<String, dynamic>>> getUnsyncedRecords() async {
+  /// Get all records (optionally include deleted)
+  Future<List<Map<String, dynamic>>> getAllRecords({bool includeDeleted = false}) async {
     final results = <Map<String, dynamic>>[];
-    for (var i = 0; i < _box.length; i++) {
-      final value = _box.getAt(i) as Map;
-      if (value['synced'] == false) {
+    for (var i = 0; i < box.length; i++) {
+      final value = box.getAt(i);
+      if (value is Map) {
+        if (!includeDeleted && value['isDeleted'] == true) continue;
         results.add({'key': i, 'value': Map<String, dynamic>.from(value)});
       }
     }
     return results;
   }
 
-  Future<void> markAsSynced(int localKey, String firestoreId) async {
-    final value = _box.getAt(localKey) as Map;
-    final updated = Map<String, dynamic>.from(value);
-    updated['synced'] = true;
-    updated['firestoreId'] = firestoreId;
-    await _box.putAt(localKey, updated);
+  /// Get unsynced records
+  Future<List<Map<String, dynamic>>> getUnsyncedRecords() async {
+    final results = <Map<String, dynamic>>[];
+    for (var i = 0; i < box.length; i++) {
+      final value = box.getAt(i);
+      if (value is Map && value['synced'] == false && value['isDeleted'] == false) {
+        results.add({'key': i, 'value': Map<String, dynamic>.from(value)});
+      }
+    }
+    return results;
   }
 
-  Future<void> saveAndSync(Map<String, dynamic> data, FirestoreService firestoreService) async {
-    // Save locally as pending first
-    final localKey = await saveLocalRecord(data, synced: false);
+  /// Mark a local record as synced
+  Future<void> markAsSynced(int localKey, String firestoreId) async {
+    final value = box.getAt(localKey);
+    if (value is Map) {
+      final updated = Map<String, dynamic>.from(value);
+      updated['synced'] = true;
+      updated['firestoreId'] = firestoreId;
+      await box.putAt(localKey, updated);
+    }
+  }
 
-    // Attempt to push to Firestore
+  /// Save and sync a record to Firestore
+  Future<void> saveAndSync(Map<String, dynamic> data, FirestoreService firestoreService) async {
+    final localKey = await saveLocalRecord(data, synced: false);
     try {
       final docId = await firestoreService.saveHomePageData(data);
       await markAsSynced(localKey, docId);
-    } catch (e) {
-      // keep record as unsynced; caller can notify user
+    } catch (_) {
+      // Keep unsynced if Firestore fails
       rethrow;
     }
   }
 
-  /// Try to sync all unsynced records through the provided FirestoreService
-  /// Returns number of successfully synced records.
+  /// Sync all pending local records
   Future<int> syncPending(FirestoreService firestoreService) async {
     final unsynced = await getUnsyncedRecords();
     int success = 0;
 
     for (final item in unsynced) {
-      final int key = item['key'] as int;
-      final Map<String, dynamic> value = item['value'] as Map<String, dynamic>;
+      final key = item['key'] as int;
+      final value = item['value'] as Map<String, dynamic>;
       final data = Map<String, dynamic>.from(value['data'] as Map);
       try {
         final docId = await firestoreService.saveHomePageData(data);
         await markAsSynced(key, docId);
         success++;
-      } catch (_) {
-        // leave unsynced if error
-      }
+      } catch (_) {}
     }
+
     return success;
   }
 
-  Future<List<Map<String, dynamic>>> getAllRecords() async {
-    final results = <Map<String, dynamic>>[];
-    for (var i = 0; i < _box.length; i++) {
-      final value = _box.getAt(i) as Map;
-      results.add({'key': i, 'value': Map<String, dynamic>.from(value)});
+  /// Soft delete a record by local key
+  Future<void> softDeleteByKey(int key) async {
+    final value = box.getAt(key);
+    if (value is Map) {
+      final updated = Map<String, dynamic>.from(value);
+      updated['isDeleted'] = true;
+      await box.putAt(key, updated);
     }
-    return results;
+  }
+
+  /// Soft delete all records for a user (using uid field in data)
+  Future<void> softDeleteByUserId(String userId) async {
+    for (var i = 0; i < box.length; i++) {
+      final value = box.getAt(i);
+      if (value is Map) {
+        final data = Map<String, dynamic>.from(value['data'] ?? {});
+        if (data['uid'] == userId) {
+          final updated = Map<String, dynamic>.from(value);
+          updated['isDeleted'] = true;
+          await box.putAt(i, updated);
+        }
+      }
+    }
+  }
+
+  /// Permanently remove a record (if you ever need hard delete)
+  Future<void> hardDeleteByKey(int key) async {
+    await box.deleteAt(key);
   }
 }
