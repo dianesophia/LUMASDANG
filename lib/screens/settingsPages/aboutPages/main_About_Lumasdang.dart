@@ -1,8 +1,12 @@
 // lib/screens/settingsPages/aboutPages/main_about_lumasdang.dart
 import 'package:flutter/material.dart';
+import 'about_lumasdang.dart'; // ✅ Import the real About page
 
 class MainAboutLumasdang extends StatelessWidget {
   const MainAboutLumasdang({super.key});
+
+  final Color buttonColor = const Color.fromRGBO(255, 255, 255, 0.3);
+  final Color textColor = Colors.black;
 
   @override
   Widget build(BuildContext context) {
@@ -75,38 +79,62 @@ class MainAboutLumasdang extends StatelessWidget {
   Widget _buildMenuItem(BuildContext context, String title) {
     return InkWell(
       onTap: () {
-        Navigator.of(context).push(
-          PageRouteBuilder(
-            pageBuilder: (_, __, ___) => PlaceholderScreen(title: title),
-            transitionsBuilder: (context, animation, secondaryAnimation, child) {
-              const begin = Offset(0.0, 1.0);
-              const end = Offset.zero;
-              const curve = Curves.ease;
-              final tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-              final fadeTween = Tween<double>(begin: 0.0, end: 1.0);
-              return SlideTransition(
-                position: animation.drive(tween),
-                child: FadeTransition(
-                  opacity: animation.drive(fadeTween),
-                  child: child,
-                ),
-              );
-            },
-          ),
-        );
+        // ✅ Navigate to real About page only for "About Lumasdang"
+        if (title == "About Lumasdang") {
+          Navigator.of(context).push(
+            PageRouteBuilder(
+              pageBuilder: (_, __, ___) => const AboutLumasdang(),
+              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                const begin = Offset(0.0, 1.0);
+                const end = Offset.zero;
+                const curve = Curves.ease;
+                final tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+                final fadeTween = Tween<double>(begin: 0.0, end: 1.0);
+                return SlideTransition(
+                  position: animation.drive(tween),
+                  child: FadeTransition(
+                    opacity: animation.drive(fadeTween),
+                    child: child,
+                  ),
+                );
+              },
+            ),
+          );
+        } else {
+          // For other menu items, you can keep placeholder screens
+          Navigator.of(context).push(
+            PageRouteBuilder(
+              pageBuilder: (_, __, ___) => PlaceholderScreen(title: title),
+              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                const begin = Offset(0.0, 1.0);
+                const end = Offset.zero;
+                const curve = Curves.ease;
+                final tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+                final fadeTween = Tween<double>(begin: 0.0, end: 1.0);
+                return SlideTransition(
+                  position: animation.drive(tween),
+                  child: FadeTransition(
+                    opacity: animation.drive(fadeTween),
+                    child: child,
+                  ),
+                );
+              },
+            ),
+          );
+        }
       },
       borderRadius: BorderRadius.circular(8),
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.3),
+          color: buttonColor,
           borderRadius: BorderRadius.circular(8),
         ),
         child: Text(
           title,
-          style: const TextStyle(
-            color: Colors.black,
+          style: TextStyle(
+            color: textColor,
             fontWeight: FontWeight.bold,
             fontSize: 16,
           ),
@@ -116,7 +144,7 @@ class MainAboutLumasdang extends StatelessWidget {
   }
 }
 
-// Placeholder screen for navigation
+// Placeholder screen for other menu items
 class PlaceholderScreen extends StatelessWidget {
   final String title;
   const PlaceholderScreen({super.key, required this.title});

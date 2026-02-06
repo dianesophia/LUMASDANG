@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:lumasdang/screens/login.dart';// ✅ IMPORT ADDED
-import 'package:lumasdang/screens/settingsPages/aboutPages/mainAboutLumasdang.dart';
+import 'package:lumasdang/screens/settingsPages/aboutPages/main_About_Lumasdang.dart';
 import '../../services/local_db_service.dart';
 import '../../services/firestore_service.dart';
 
