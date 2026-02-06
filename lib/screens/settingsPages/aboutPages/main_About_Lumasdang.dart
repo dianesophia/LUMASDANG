@@ -1,6 +1,9 @@
 // lib/screens/settingsPages/aboutPages/main_about_lumasdang.dart
 import 'package:flutter/material.dart';
-import 'about_lumasdang.dart'; // ✅ Import the real About page
+import 'package:lumasdang/screens/settingsPages/aboutPages/code_of_conduct.dart';
+import 'package:lumasdang/screens/settingsPages/aboutPages/privacy_policy.dart';
+import 'package:lumasdang/screens/settingsPages/aboutPages/terms_of_use.dart';
+import 'about_lumasdang.dart';
 
 class MainAboutLumasdang extends StatelessWidget {
   const MainAboutLumasdang({super.key});
@@ -49,7 +52,6 @@ class MainAboutLumasdang extends StatelessWidget {
                   ],
                 ),
               ),
-
               const SizedBox(height: 20),
 
               // Menu cards
@@ -79,49 +81,25 @@ class MainAboutLumasdang extends StatelessWidget {
   Widget _buildMenuItem(BuildContext context, String title) {
     return InkWell(
       onTap: () {
-        // ✅ Navigate to real About page only for "About Lumasdang"
-        if (title == "About Lumasdang") {
-          Navigator.of(context).push(
-            PageRouteBuilder(
-              pageBuilder: (_, __, ___) => const AboutLumasdang(),
-              transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                const begin = Offset(0.0, 1.0);
-                const end = Offset.zero;
-                const curve = Curves.ease;
-                final tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-                final fadeTween = Tween<double>(begin: 0.0, end: 1.0);
-                return SlideTransition(
-                  position: animation.drive(tween),
-                  child: FadeTransition(
-                    opacity: animation.drive(fadeTween),
-                    child: child,
-                  ),
-                );
-              },
-            ),
-          );
-        } else {
-          // For other menu items, you can keep placeholder screens
-          Navigator.of(context).push(
-            PageRouteBuilder(
-              pageBuilder: (_, __, ___) => PlaceholderScreen(title: title),
-              transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                const begin = Offset(0.0, 1.0);
-                const end = Offset.zero;
-                const curve = Curves.ease;
-                final tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-                final fadeTween = Tween<double>(begin: 0.0, end: 1.0);
-                return SlideTransition(
-                  position: animation.drive(tween),
-                  child: FadeTransition(
-                    opacity: animation.drive(fadeTween),
-                    child: child,
-                  ),
-                );
-              },
-            ),
-          );
+        Widget page;
+        switch (title) {
+          case "About Lumasdang":
+            page = const AboutLumasdang();
+            break;
+          case "Terms of Use":
+            page = const TermsOfUse();
+            break;
+          case "Code of Conduct":
+            page = const CodeOfConduct();
+            break;
+          case "Privacy Policy":
+            page = const PrivacyPolicy(); 
+            break;
+          default:
+            page = PlaceholderScreen(title: title);
         }
+
+        Navigator.of(context).push(_slideFadeRoute(page));
       },
       borderRadius: BorderRadius.circular(8),
       child: Container(
@@ -140,6 +118,29 @@ class MainAboutLumasdang extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  // Helper function for slide + fade transition
+  PageRouteBuilder _slideFadeRoute(Widget page) {
+    return PageRouteBuilder(
+      pageBuilder: (_, __, ___) => page,
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        const begin = Offset(0.0, 1.0);
+        const end = Offset.zero;
+        const curve = Curves.ease;
+
+        final tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+        final fadeTween = Tween<double>(begin: 0.0, end: 1.0);
+
+        return SlideTransition(
+          position: animation.drive(tween),
+          child: FadeTransition(
+            opacity: animation.drive(fadeTween),
+            child: child,
+          ),
+        );
+      },
     );
   }
 }
