@@ -32,26 +32,42 @@ class MainAboutLumasdang extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Header: Back Button + Title
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                child: Row(
+
+                Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16),
+                child: Column(
                   children: [
-                    IconButton(
-                      icon: const Icon(Icons.arrow_back, color: Colors.black),
-                      onPressed: () => Navigator.pop(context),
+                    Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.arrow_back, color: Colors.black),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                        const Expanded(
+                          child: Center(
+                            child: Text(
+                              "About Lumasdang",
+                              style: TextStyle(
+                                color: Colors.black,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 24,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 48),
+                      ],
                     ),
-                    const SizedBox(width: 10),
-                    const Text(
-                      "About Lumasdang",
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 20,
-                        color: Colors.black,
-                      ),
+                    Container(
+                      margin: const EdgeInsets.only(top: 4),
+                      height: 1.5,
+                      width: double.infinity,
+                      color: Colors.white.withOpacity(0.3),
                     ),
                   ],
                 ),
               ),
+             
               const SizedBox(height: 20),
 
               // Menu cards
