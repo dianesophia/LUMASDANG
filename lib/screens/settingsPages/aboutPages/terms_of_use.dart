@@ -45,6 +45,14 @@
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        const Text(
+                        "Terms and Conditions",
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black,
+                        ),
+                      ),
                         const SizedBox(height: 20),
                        RichText(
                         text: const TextSpan(
@@ -54,10 +62,6 @@
                             height: 1.5,
                           ),
                           children: [
-                            TextSpan(
-                              text: "Terms and Conditions\n",
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                            ),
                             TextSpan(
                               text: "By accessing or using this application, you agree to comply with and be bound by the following Terms and Conditions. If you do not agree, please discontinue use of the app.\n\n",
                             ),

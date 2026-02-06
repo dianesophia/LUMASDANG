@@ -45,6 +45,14 @@
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        const Text(
+                        "Privacy Policy",
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black,
+                        ),
+                      ),
                         const SizedBox(height: 20),
                        RichText(
                         text: const TextSpan(
@@ -55,16 +63,12 @@
                           ),
                           children: [
                             TextSpan(
-                              text: "Privacy Policy\n\n",
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                            ),
-                            TextSpan(
                               text: "The application is committed to protecting user privacy and ensuring the confidentiality of all collected data.\n\n",
                             ),
 
                             // Section 1
                             TextSpan(
-                              text: "1. Information Collected\n\n",
+                              text: "1. Information Collected\n",
                               style: TextStyle(fontWeight: FontWeight.bold),
                             ),
                             TextSpan(
@@ -73,7 +77,7 @@
 
                             // Section 2
                             TextSpan(
-                              text: "2. Use of Information\n\n",
+                              text: "2. Use of Information\n",
                               style: TextStyle(fontWeight: FontWeight.bold),
                             ),
                             TextSpan(
@@ -85,7 +89,7 @@
 
                             // Section 3
                             TextSpan(
-                              text: "3. Data Protection\n\n",
+                              text: "3. Data Protection\n",
                               style: TextStyle(fontWeight: FontWeight.bold),
                             ),
                             TextSpan(
@@ -94,7 +98,7 @@
 
                             // Section 4
                             TextSpan(
-                              text: "4. Data Sharing\n\n",
+                              text: "4. Data Sharing\n",
                               style: TextStyle(fontWeight: FontWeight.bold),
                             ),
                             TextSpan(
@@ -103,7 +107,7 @@
 
                             // Section 5
                             TextSpan(
-                              text: "5. User Consent\n\n",
+                              text: "5. User Consent\n",
                               style: TextStyle(fontWeight: FontWeight.bold),
                             ),
                             TextSpan(
