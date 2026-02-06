@@ -38,5 +38,20 @@ class FirestoreService {
     return docRef.id;
   }
 
-  /// Optionally, you can add methods for fetching, deleting, updating data here.
+
+ /// SOFT DELETE USER: marks all user's records as deleted
+  Future<void> softDeleteUser(String uid) async {
+    final userDoc = _firestore.collection('users').doc(uid);
+
+    // Soft delete all documents in "homepageData" subcollection
+    final snapshot = await userDoc.collection('homepageData').get();
+    for (var doc in snapshot.docs) {
+      await doc.reference.update({'isDeleted': true});
+    }
+
+    // Optionally, mark the user document itself as deleted
+    await userDoc.set({'isDeleted': true}, SetOptions(merge: true));
+  }
 }
+  /// Optionally, you can add methods for fetching, deleting, updating data here.
+

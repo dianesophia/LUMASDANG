@@ -5,6 +5,10 @@ import '../services/firestore_service.dart';
 import '../services/local_db_service.dart';
 import '../services/connectivity_service.dart';
 
+import 'package:lumasdang/screens/settingsPages/mainSettings.dart';
+
+
+
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -420,6 +424,17 @@ class _HomePageState extends State<HomePage>
     final isSelected = _selectedNavIndex == index;
     return InkWell(
       onTap: () {
+         if (index == 3) {
+        // 👉 Navigate to Settings Page
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const MainSettings(),
+          ),
+        );
+        return;
+      }
+
         setState(() {
           _selectedNavIndex = index;
         });
@@ -442,6 +457,7 @@ class _HomePageState extends State<HomePage>
     );
   }
 }
+
 
 
 // ==================== STATS ROW ====================
