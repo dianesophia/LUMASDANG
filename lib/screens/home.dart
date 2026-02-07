@@ -5,7 +5,7 @@ import '../services/firestore_service.dart';
 import '../services/local_db_service.dart';
 import '../services/connectivity_service.dart';
 
-import 'package:lumasdang/screens/settingsPages/mainSettings.dart';
+import 'package:lumasdang/screens/settingsPages/main_Settings.dart';
 
 
 
