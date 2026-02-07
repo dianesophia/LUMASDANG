@@ -2,8 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'home.dart';
-import 'register.dart';
+import 'package:lumasdang/screens/home.dart';
+import 'package:lumasdang/screens/authPages/register.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});

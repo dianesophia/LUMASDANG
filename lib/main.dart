@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:lumasdang/screens/authPages/login.dart';
 import 'firebase_options.dart';
 import 'services/local_db_service.dart';
 
 // Screens
-import 'screens/login.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
