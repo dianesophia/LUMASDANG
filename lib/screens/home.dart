@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:lumasdang/screens/patient_list.dart';
+import 'package:lumasdang/screens/settingsPages/main_Settings.dart';
 
 import '../services/firestore_service.dart';
 import '../services/local_db_service.dart';
 import '../services/connectivity_service.dart';
 
-import 'package:lumasdang/screens/settingsPages/mainSettings.dart';
 
 
 

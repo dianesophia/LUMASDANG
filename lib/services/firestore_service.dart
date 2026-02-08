@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 
 class FirestoreService {
   final FirebaseFirestore _firestore;
@@ -38,8 +39,7 @@ class FirestoreService {
     return docRef.id;
   }
 
-
- /// SOFT DELETE USER: marks all user's records as deleted
+  /// SOFT DELETE USER: marks all user's records as deleted
   Future<void> softDeleteUser(String uid) async {
     final userDoc = _firestore.collection('users').doc(uid);
 
@@ -52,6 +52,49 @@ class FirestoreService {
     // Optionally, mark the user document itself as deleted
     await userDoc.set({'isDeleted': true}, SetOptions(merge: true));
   }
-}
-  /// Optionally, you can add methods for fetching, deleting, updating data here.
 
+  /// CHANGE PASSWORD
+  /// Requires re-authentication with current password
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+    required BuildContext context,
+  }) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) throw Exception("No user logged in");
+
+      // Re-authenticate the user
+      final cred = EmailAuthProvider.credential(
+        email: user.email!,
+        password: currentPassword,
+      );
+      await user.reauthenticateWithCredential(cred);
+
+      // Update password
+      await user.updatePassword(newPassword);
+
+      // Show success message
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Password updated successfully")),
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      String msg = "Failed to change password";
+      if (e.code == "wrong-password") msg = "Current password is incorrect";
+      if (e.code == "weak-password") msg = "New password is too weak";
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text("Error: $e")));
+      }
+    }
+  }
+
+  // Optionally, add more fetch/update/delete methods here in the future
+}
