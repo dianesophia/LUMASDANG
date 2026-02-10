@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:lumasdang/screens/authPages/login.dart';
 import '../../../services/firestore_service.dart';
 import '../../../services/auth_service.dart';
+
 
 class ChangePassword extends StatefulWidget {
   const ChangePassword({super.key});
@@ -32,43 +34,76 @@ class _ChangePasswordState extends State<ChangePassword> {
   }
 
   Future<void> _updatePassword() async {
-    debugPrint('Starting password update...');
+    print('========================================');
+    print('STEP 1: _updatePassword called');
+    print('========================================');
+    
     if (!_formKey.currentState!.validate()) {
-      debugPrint('Form validation failed');
+      print('STEP 2: Validation FAILED');
       return;
     }
+    print('STEP 2: Validation PASSED');
 
+    print('STEP 3: Setting loading to TRUE');
     setState(() => _loading = true);
-    debugPrint('Loading state set to true');
 
     try {
-      debugPrint('Calling firestoreService.changePassword...');
-      await _firestoreService.changePassword(
+      print('STEP 4: Calling changePassword...');
+      
+      final success = await _firestoreService.changePassword(
         currentPassword: _currentPasswordController.text.trim(),
         newPassword: _newPasswordController.text.trim(),
         context: context,
       );
-      debugPrint('Password change completed successfully');
 
-      // Clear form on success
-      _currentPasswordController.clear();
-      _newPasswordController.clear();
-      _confirmPasswordController.clear();
+      print('STEP 5: changePassword returned: $success');
 
-      // Show success dialog and navigate back
-      if (mounted) {
+      if (success && mounted) {
+        print('STEP 6: Success! Showing dialog...');
+        
+        // Clear form
+        _currentPasswordController.clear();
+        _newPasswordController.clear();
+        _confirmPasswordController.clear();
+
+        // Show success dialog
         showDialog(
           context: context,
           barrierDismissible: false,
           builder: (context) => AlertDialog(
-            title: const Text("Success"),
-            content: const Text("Your password has been updated successfully."),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: const Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.green, size: 28),
+                SizedBox(width: 10),
+                Text("Success"),
+              ],
+            ),
+            content: const Text(
+              "Your password has been updated successfully. Please log in again with your new password.",
+              style: TextStyle(fontSize: 16),
+            ),
             actions: [
               TextButton(
                 onPressed: () {
                   Navigator.pop(context); // close dialog
-                  Navigator.pop(context); // go back
+                  // Navigate to login screen
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(builder: (_) => const LoginPage()),
+                    (route) => false,
+                  );
                 },
+                style: TextButton.styleFrom(
+                  backgroundColor: const Color(0xFF2E8B7B),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
                 child: const Text(
                   "OK",
                   style: TextStyle(fontWeight: FontWeight.bold),
@@ -78,14 +113,17 @@ class _ChangePasswordState extends State<ChangePassword> {
           ),
         );
       }
-    } catch (e) {
-      debugPrint('Password update failed: $e');
-      // Error handling is done in FirestoreService
+    } catch (e, stackTrace) {
+      print('========================================');
+      print('EXCEPTION CAUGHT IN _updatePassword');
+      print('Error: $e');
+      print('StackTrace: $stackTrace');
+      print('========================================');
     } finally {
-      debugPrint('Finally block - setting loading to false');
+      print('STEP 7: Finally block - setting loading to FALSE');
       if (mounted) {
         setState(() => _loading = false);
-        debugPrint('Loading state set to false');
+        print('STEP 8: Loading is now: $_loading');
       }
     }
   }
@@ -129,12 +167,10 @@ class _ChangePasswordState extends State<ChangePassword> {
         child: SafeArea(
           child: Column(
             children: [
-              // ================= HEADER =================
               _buildHeader(),
               const SizedBox(height: 20),
-              // ================= FORM =================
               Expanded(
-                child: Padding(
+                child: SingleChildScrollView(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Form(
                     key: _formKey,
@@ -171,6 +207,7 @@ class _ChangePasswordState extends State<ChangePassword> {
                         ),
                         const SizedBox(height: 30),
                         _buildUpdateButton(),
+                        const SizedBox(height: 20),
                       ],
                     ),
                   ),
@@ -191,7 +228,7 @@ class _ChangePasswordState extends State<ChangePassword> {
           Row(
             children: [
               IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.black),
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
                 onPressed: () => Navigator.pop(context),
               ),
               const Expanded(
@@ -199,7 +236,7 @@ class _ChangePasswordState extends State<ChangePassword> {
                   child: Text(
                     "Change Password",
                     style: TextStyle(
-                      color: Colors.black,
+                      color: Colors.white,
                       fontWeight: FontWeight.bold,
                       fontSize: 24,
                     ),
@@ -221,47 +258,33 @@ class _ChangePasswordState extends State<ChangePassword> {
   }
 
   Widget _buildUpdateButton() {
-    return GestureDetector(
-      onTap: _loading ? null : _updatePassword,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          color: _loading 
-              ? Colors.grey.withOpacity(0.5)
-              : Colors.white70,
-          borderRadius: BorderRadius.circular(25),
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        onPressed: _loading ? null : _updatePassword,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFFF5A962),
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(25),
+          ),
+          elevation: _loading ? 0 : 3,
         ),
-        alignment: Alignment.center,
         child: _loading
-            ? const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
-                    ),
-                  ),
-                  SizedBox(width: 12),
-                  Text(
-                    "Updating...",
-                    style: TextStyle(
-                      color: Colors.black,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                ],
+            ? const SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
               )
             : const Text(
                 "Update Password",
                 style: TextStyle(
-                  color: Colors.black,
-                  fontWeight: FontWeight.bold,
                   fontSize: 16,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
       ),
@@ -283,20 +306,31 @@ class _ChangePasswordState extends State<ChangePassword> {
       decoration: InputDecoration(
         labelText: label,
         filled: true,
-        fillColor: _loading 
-            ? Colors.grey.withOpacity(0.3)
-            : Colors.white.withOpacity(0.6),
+        fillColor: Colors.white.withOpacity(0.9),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
-        ),
-        enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
+          borderSide: const BorderSide(
+            color: Color(0xFF2E8B7B),
+            width: 2,
+          ),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(
+            color: Colors.red,
+            width: 2,
+          ),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(
+            color: Colors.red,
+            width: 2,
+          ),
         ),
         suffixIcon: IconButton(
           icon: Icon(
