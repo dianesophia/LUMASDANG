@@ -25,19 +25,20 @@ class LocalDbService {
   }
 
   Box get box {
-    if (!_initialized) throw Exception("LocalDbService not initialized. Call init() first.");
+    if (!_initialized) throw Exception("LocalDbService not initialized.");
     return _box;
   }
 
-  /// Save a local record
+  /// Save a local record with username included
   Future<int> saveLocalRecord(Map<String, dynamic> data,
       {bool synced = false, String? firestoreId}) async {
     final record = {
       'data': data,
+      'username': data['username'] ?? '',
       'createdAt': DateTime.now().toIso8601String(),
       'synced': synced,
       'firestoreId': firestoreId,
-      'isDeleted': false, // Soft delete flag
+      'isDeleted': false, // Soft delete
     };
     return await box.add(record);
   }
@@ -85,7 +86,6 @@ class LocalDbService {
       final docId = await firestoreService.saveHomePageData(data);
       await markAsSynced(localKey, docId);
     } catch (_) {
-      // Keep unsynced if Firestore fails
       rethrow;
     }
   }
@@ -119,7 +119,7 @@ class LocalDbService {
     }
   }
 
-  /// Soft delete all records for a user (using uid field in data)
+  /// Soft delete all records for a user (using uid field)
   Future<void> softDeleteByUserId(String userId) async {
     for (var i = 0; i < box.length; i++) {
       final value = box.getAt(i);
@@ -134,7 +134,7 @@ class LocalDbService {
     }
   }
 
-  /// Permanently remove a record (if you ever need hard delete)
+  /// Permanently remove a record
   Future<void> hardDeleteByKey(int key) async {
     await box.deleteAt(key);
   }

@@ -11,6 +11,7 @@ class RegisterPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<RegisterPage> {
+  final _usernameController = TextEditingController(); // NEW
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmController = TextEditingController();
@@ -22,16 +23,39 @@ class _RegisterPageState extends State<RegisterPage> {
 
   @override
   void dispose() {
+    _usernameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmController.dispose();
     super.dispose();
   }
 
+  /// Check if username already exists
+  Future<bool> _isUsernameAvailable(String username) async {
+    final doc = await _firestore.collection('usernames').doc(username.toLowerCase()).get();
+    return !doc.exists;
+  }
+
   Future<void> _register() async {
+    final username = _usernameController.text.trim();
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
     final confirm = _confirmController.text.trim();
+
+    // Validation
+    if (username.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a username')),
+      );
+      return;
+    }
+
+    if (username.length < 3) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Username must be at least 3 characters')),
+      );
+      return;
+    }
 
     if (password != confirm) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -43,7 +67,17 @@ class _RegisterPageState extends State<RegisterPage> {
     setState(() => _isLoading = true);
 
     try {
-      // ⭐ CREATE AUTH USER
+      // Check username availability
+      final available = await _isUsernameAvailable(username);
+      if (!available) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Username already taken')),
+        );
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      // Create auth user
       final userCredential = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
@@ -52,23 +86,35 @@ class _RegisterPageState extends State<RegisterPage> {
       final user = userCredential.user;
 
       if (user != null) {
+        // Use batch write for atomic operation
+        final batch = _firestore.batch();
 
-        // ⭐ SAVE USER DATA TO FIRESTORE
-        await _firestore.collection('users').doc(user.uid).set({
+        // Save user data
+        batch.set(_firestore.collection('users').doc(user.uid), {
           'email': email,
+          'username': username,
           'uid': user.uid,
           'createdAt': Timestamp.now(),
+          'isDeleted': false,
         });
 
+        // Save username mapping (for login lookup)
+        batch.set(_firestore.collection('usernames').doc(username.toLowerCase()), {
+          'email': email,
+          'uid': user.uid,
+        });
+
+        await batch.commit();
+
         // Navigate to Home
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const HomePage()),
-        );
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const HomePage()),
+          );
+        }
       }
-
     } on FirebaseAuthException catch (e) {
-
       String message = 'Registration failed. Please try again.';
 
       if (e.code == 'weak-password') {
@@ -82,7 +128,6 @@ class _RegisterPageState extends State<RegisterPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message)),
       );
-
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -127,6 +172,15 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                   ),
                   const SizedBox(height: 60),
+
+                  // USERNAME FIELD
+                  _buildField(
+                    controller: _usernameController,
+                    hint: 'Username',
+                    icon: Icons.person_outline,
+                  ),
+
+                  const SizedBox(height: 20),
 
                   _buildField(
                     controller: _emailController,
@@ -218,6 +272,7 @@ class _RegisterPageState extends State<RegisterPage> {
           hintStyle: const TextStyle(color: Colors.white70),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(vertical: 12),
+          prefixIcon: Icon(icon, color: Colors.white70),
         ),
       ),
     );
