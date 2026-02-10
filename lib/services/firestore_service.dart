@@ -6,6 +6,9 @@ class FirestoreService {
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
 
+  FirebaseFirestore get firestore => _firestore;
+  FirebaseAuth get auth => _auth;
+
   FirestoreService({FirebaseFirestore? firestore, FirebaseAuth? auth})
       : _firestore = firestore ?? FirebaseFirestore.instance,
         _auth = auth ?? FirebaseAuth.instance;
@@ -201,4 +204,150 @@ class FirestoreService {
       return false;
     }
   }
+
+
+  /// CHANGE USERNAME
+/// Updates username in both users and usernames collections
+Future<bool> changeUsername({
+  required String newUsername,
+  required BuildContext context,
+}) async {
+  print('========================================');
+  print('FirestoreService.changeUsername called');
+  print('========================================');
+  
+  try {
+    final user = _auth.currentUser;
+    
+    if (user == null) {
+      print('No user logged in');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("No user logged in"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return false;
+    }
+
+    final uid = user.uid;
+    print('User UID: $uid');
+    print('New username: $newUsername');
+    
+    // Step 1: Check if new username is available
+    print('Step 1: Checking username availability...');
+    final usernameDoc = await _firestore
+        .collection('usernames')
+        .doc(newUsername.toLowerCase())
+        .get();
+    
+    if (usernameDoc.exists) {
+      print('Username already taken');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Username is already taken"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return false;
+    }
+    print('Username is available');
+    
+    // Step 2: Get current username from user document
+    print('Step 2: Getting current username...');
+    final userDoc = await _firestore
+        .collection('users')
+        .doc(uid)
+        .get();
+    
+    final currentUsername = userDoc.data()?['username'] as String?;
+    print('Current username: $currentUsername');
+    
+    // Step 3: Update using batch write for atomicity
+    print('Step 3: Updating username in Firestore...');
+    final batch = _firestore.batch();
+    
+    // Update username in users collection
+  batch.set(
+  _firestore.collection('users').doc(uid),
+  {
+    'username': newUsername,
+    'updatedAt': FieldValue.serverTimestamp(),
+  },
+  SetOptions(merge: true),
+);
+
+    
+    // Add new username mapping
+    batch.set(
+      _firestore.collection('usernames').doc(newUsername.toLowerCase()),
+      {
+        'email': user.email,
+        'uid': uid,
+        'createdAt': FieldValue.serverTimestamp(),
+      },
+    );
+    
+    // Delete old username mapping if it exists
+    if (currentUsername != null && currentUsername.isNotEmpty) {
+      batch.delete(
+        _firestore.collection('usernames').doc(currentUsername.toLowerCase()),
+      );
+    }
+    
+    await batch.commit();
+    print('Username updated successfully');
+    
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Username updated successfully!"),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+    
+    return true;
+    
+  } on FirebaseException catch (e) {
+    print('========================================');
+    print('FirebaseException: ${e.code}');
+    print('Message: ${e.message}');
+    print('========================================');
+    
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Error: ${e.message}"),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
+    
+    return false;
+    
+  } catch (e) {
+    print('========================================');
+    print('General exception: $e');
+    print('========================================');
+    
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Error: $e"),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
+    
+    return false;
+  }
+}
 }
