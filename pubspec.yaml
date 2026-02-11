@@ -64,6 +64,9 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+  
+  assets:
+    - assets/logo/
 
   # To add assets to your application, add an assets section, like this:
   # assets:
@@ -101,3 +104,4 @@ flutter_icons:
   ios: true
   image_path: "assets/logo/app_logo.jpg"
   remove_alpha_ios: true
+
