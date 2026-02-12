@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:lumasdang/loading.dart';
 import 'package:lumasdang/screens/authPages/login.dart';
 import 'firebase_options.dart';
 import 'services/local_db_service.dart';
@@ -29,7 +30,8 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2E8B7B)),
         useMaterial3: true,
       ),
-      home: const LoginPage(),
+     // home: const LoginPage(),
+     home: const LoadingScreen(),
     );
   }
 

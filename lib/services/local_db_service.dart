@@ -10,19 +10,19 @@ class LocalDbService {
   bool _initialized = false;
 
   /// Initialize Hive
-  Future<void> init() async {
-    if (_initialized) return;
+ Future<void> init() async {
+  if (_initialized) return;
 
-    await Hive.initFlutter();
+  await Hive.initFlutter();
 
-    if (!Hive.isBoxOpen(_boxName)) {
-      _box = await Hive.openBox(_boxName);
-    } else {
-      _box = Hive.box(_boxName);
-    }
-
-    _initialized = true;
+  if (Hive.isBoxOpen(_boxName)) {
+    _box = Hive.box(_boxName); // reuse existing box
+  } else {
+    _box = await Hive.openBox(_boxName);
   }
+
+  _initialized = true;
+}
 
   Box get box {
     if (!_initialized) throw Exception("LocalDbService not initialized.");
