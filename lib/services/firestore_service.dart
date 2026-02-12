@@ -205,6 +205,24 @@ class FirestoreService {
     }
   }
 
+  /// Returns the count of patients screened today (homepageData records with createdAt today)
+  Future<int> getTodayScreenedCount() async {
+    final user = _auth.currentUser;
+    if (user == null) return 0;
+
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
+    final endOfDay = startOfDay.add(const Duration(days: 1));
+
+    final snapshot = await _firestore
+        .collection('users')
+        .doc(user.uid)
+        .collection('homepageData')
+        .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
+        .where('createdAt', isLessThan: Timestamp.fromDate(endOfDay))
+        .get();
+
+    return snapshot.docs.length;
 
   /// CHANGE USERNAME
 /// Updates username in both users and usernames collections
