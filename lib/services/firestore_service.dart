@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'dart:io';
 import 'dart:convert';
 
@@ -585,6 +586,7 @@ Future<Map<String, dynamic>?> getUserProfile() async {
 }
 
 
+
   Future<int> getTodayScreenedCount() async {
     final user = _auth.currentUser;
     if (user == null) return 0;
@@ -603,5 +605,6 @@ Future<Map<String, dynamic>?> getUserProfile() async {
 
     return snapshot.docs.length;
   }
+}
 
 }
