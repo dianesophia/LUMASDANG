@@ -10,19 +10,19 @@ class LocalDbService {
   bool _initialized = false;
 
   /// Initialize Hive
- Future<void> init() async {
-  if (_initialized) return;
+  Future<void> init() async {
+    if (_initialized) return;
 
-  await Hive.initFlutter();
+    await Hive.initFlutter();
 
-  if (Hive.isBoxOpen(_boxName)) {
-    _box = Hive.box(_boxName); // reuse existing box
-  } else {
-    _box = await Hive.openBox(_boxName);
+    if (!Hive.isBoxOpen(_boxName)) {
+      _box = await Hive.openBox(_boxName);
+    } else {
+      _box = Hive.box(_boxName);
+    }
+
+    _initialized = true;
   }
-
-  _initialized = true;
-}
 
   Box get box {
     if (!_initialized) throw Exception("LocalDbService not initialized.");
@@ -137,5 +137,59 @@ class LocalDbService {
   /// Permanently remove a record
   Future<void> hardDeleteByKey(int key) async {
     await box.deleteAt(key);
+  }
+
+  /// Update email for all records belonging to a user
+  Future<void> updateEmailForUser(String userId, String newEmail) async {
+    for (var i = 0; i < box.length; i++) {
+      final value = box.getAt(i);
+      if (value is Map) {
+        final data = Map<String, dynamic>.from(value['data'] ?? {});
+        if (data['uid'] == userId) {
+          final updated = Map<String, dynamic>.from(value);
+          updated['data'] = {
+            ...data,
+            'email': newEmail,
+          };
+          await box.putAt(i, updated);
+        }
+      }
+    }
+  }
+
+  /// Update display name for all records belonging to a user
+  Future<void> updateDisplayNameForUser(String userId, String displayName) async {
+    for (var i = 0; i < box.length; i++) {
+      final value = box.getAt(i);
+      if (value is Map) {
+        final data = Map<String, dynamic>.from(value['data'] ?? {});
+        if (data['uid'] == userId) {
+          final updated = Map<String, dynamic>.from(value);
+          updated['data'] = {
+            ...data,
+            'displayName': displayName,
+          };
+          await box.putAt(i, updated);
+        }
+      }
+    }
+  }
+
+  /// Update profile picture for all records belonging to a user
+  Future<void> updateProfilePictureForUser(String userId, String profilePicture) async {
+    for (var i = 0; i < box.length; i++) {
+      final value = box.getAt(i);
+      if (value is Map) {
+        final data = Map<String, dynamic>.from(value['data'] ?? {});
+        if (data['uid'] == userId) {
+          final updated = Map<String, dynamic>.from(value);
+          updated['data'] = {
+            ...data,
+            'profilePicture': profilePicture,
+          };
+          await box.putAt(i, updated);
+        }
+      }
+    }
   }
 }
