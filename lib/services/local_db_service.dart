@@ -43,6 +43,28 @@ class LocalDbService {
     return await box.add(record);
   }
 
+  /// Get count of patients screened today (records with createdAt date = today)
+  Future<int> getTodayScreenedCount() async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    int count = 0;
+
+    for (var i = 0; i < box.length; i++) {
+      final value = box.getAt(i);
+      if (value is Map && value['isDeleted'] != true) {
+        final createdAtStr = value['createdAt'] as String?;
+        if (createdAtStr != null) {
+          final createdAt = DateTime.tryParse(createdAtStr);
+          if (createdAt != null) {
+            final recordDate = DateTime(createdAt.year, createdAt.month, createdAt.day);
+            if (recordDate == today) count++;
+          }
+        }
+      }
+    }
+    return count;
+  }
+
   /// Get all records (optionally include deleted)
   Future<List<Map<String, dynamic>>> getAllRecords({bool includeDeleted = false}) async {
     final results = <Map<String, dynamic>>[];

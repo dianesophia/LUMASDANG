@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lumasdang/screens/patient_list.dart';
 import 'package:lumasdang/screens/settingsPages/main_Settings.dart';
 
+import '../services/anthropometric_calculator.dart';
 import '../services/firestore_service.dart';
 import '../services/local_db_service.dart';
 import '../services/connectivity_service.dart';
@@ -22,7 +23,8 @@ class _HomePageState extends State<HomePage>
   int _selectedNavIndex = 0;
 
   // Controllers for forms
-  final TextEditingController nameController = TextEditingController();
+  final TextEditingController firstNameController = TextEditingController();
+  final TextEditingController lastNameController = TextEditingController();
   final TextEditingController ageController = TextEditingController();
   final TextEditingController sexController = TextEditingController();
   final TextEditingController addressController = TextEditingController();
@@ -58,6 +60,12 @@ class _HomePageState extends State<HomePage>
 
   // Deworming data captured from DewormingForm's onSave
   Map<String, dynamic>? _dewormingData;
+
+  // Oral assessment data
+  Map<String, dynamic>? _oralData;
+
+  // Refresh key for StatsRow (incremented after save to refresh screened count)
+  int _statsRefreshKey = 0;
 
   @override
   void initState() {
@@ -96,7 +104,8 @@ class _HomePageState extends State<HomePage>
     _tabController.dispose();
 
     // dispose controllers
-    nameController.dispose();
+    firstNameController.dispose();
+    lastNameController.dispose();
     ageController.dispose();
     sexController.dispose();
     addressController.dispose();
@@ -127,7 +136,8 @@ class _HomePageState extends State<HomePage>
   Future<void> _saveAllData() async {
     final data = {
       'demographic': {
-        'name': nameController.text.trim(),
+        'firstName': firstNameController.text.trim(),
+        'lastName': lastNameController.text.trim(),
         'age': ageController.text.trim(),
         'sex': sexController.text.trim(),
         'address': addressController.text.trim(),
@@ -163,6 +173,7 @@ class _HomePageState extends State<HomePage>
         'mealFrequency': mealFreqController.text.trim(),
       },
       'deworming': _dewormingData,
+      'oral': _oralData,
     };
 
     final firestore = FirestoreService();
@@ -206,6 +217,7 @@ class _HomePageState extends State<HomePage>
         ),
       );
     }
+    if (mounted) setState(() => _statsRefreshKey++);
   }
 
   @override
@@ -279,7 +291,10 @@ class _HomePageState extends State<HomePage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const StatsRow(),
+          StatsRow(
+            key: ValueKey(_statsRefreshKey),
+            onTap: () => _tabController.animateTo(1),
+          ),
           const SizedBox(height: 16),
           const UpcomingEvents(),
           const SizedBox(height: 20),
@@ -294,7 +309,8 @@ class _HomePageState extends State<HomePage>
           ),
           const SizedBox(height: 12),
           DemographicDataForm(
-            nameController: nameController,
+            firstNameController: firstNameController,
+            lastNameController: lastNameController,
             ageController: ageController,
             sexController: sexController,
             addressController: addressController,
@@ -315,6 +331,9 @@ class _HomePageState extends State<HomePage>
             weightForHeightController: weightForHeightController,
             heightForAgeController: heightForAgeController,
             bmiController: bmiController,
+            ageController: ageController,
+            sexController: sexController,
+            dobController: dobController,
           ),
           const SizedBox(height: 16),
           HealthStatusForm(
@@ -339,7 +358,11 @@ class _HomePageState extends State<HomePage>
             mealFrequencyController: mealFreqController,
           ),
           const SizedBox(height: 16),
-          const OralAssessmentForm(),
+          OralAssessmentForm(
+            onDataChanged: (data) {
+              _oralData = data;
+            },
+          ),
           const SizedBox(height: 16),
           const VaccinationForm(),
           const SizedBox(height: 16),
@@ -461,8 +484,30 @@ class _HomePageState extends State<HomePage>
 
 
 // ==================== STATS ROW ====================
-class StatsRow extends StatelessWidget {
-  const StatsRow({super.key});
+class StatsRow extends StatefulWidget {
+  final VoidCallback? onTap;
+
+  const StatsRow({super.key, this.onTap});
+
+  @override
+  State<StatsRow> createState() => _StatsRowState();
+}
+
+class _StatsRowState extends State<StatsRow> {
+  Future<int> _loadTodayCount() async {
+    await LocalDbService.instance.init();
+    final online = await ConnectivityService.instance.checkOnline();
+    if (online) {
+      return FirestoreService().getTodayScreenedCount();
+    }
+    return LocalDbService.instance.getTodayScreenedCount();
+  }
+
+  String _formatDate(DateTime d) {
+    const months = ['January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'];
+    return '${months[d.month - 1]} ${d.day}, ${d.year}';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -470,68 +515,77 @@ class StatsRow extends StatelessWidget {
       children: [
         Expanded(
           flex: 2,
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF5A962),
-                    borderRadius: BorderRadius.circular(8),
+          child: GestureDetector(
+            onTap: widget.onTap,
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
                   ),
-                  child: const Text(
-                    '16',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                ],
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF5A962),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: FutureBuilder<int>(
+                      future: _loadTodayCount(),
+                      builder: (context, snapshot) {
+                        final count = snapshot.hasData ? snapshot.data! : null;
+                        return Text(
+                          count != null ? '$count' : '—',
+                          style: const TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        );
+                      },
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'No. of patient',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87,
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'No. of patient',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
+                          ),
                         ),
-                      ),
-                      Text(
-                        'screened today',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87,
+                        const Text(
+                          'screened today',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
+                          ),
                         ),
-                      ),
-                      Text(
-                        'January 8, 2026',
-                        style: TextStyle(
-                          fontSize: 9,
-                          color: Color(0xFFF5A962),
+                        Text(
+                          _formatDate(DateTime.now()),
+                          style: const TextStyle(
+                            fontSize: 9,
+                            color: Color(0xFFF5A962),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -750,6 +804,7 @@ class FormFieldRow extends StatelessWidget {
   final String? hint;
   final double labelWidth;
   final TextEditingController? controller;
+  final bool readOnly;
 
   const FormFieldRow({
     super.key,
@@ -757,6 +812,7 @@ class FormFieldRow extends StatelessWidget {
     this.hint,
     this.labelWidth = 100,
     this.controller,
+    this.readOnly = false,
   });
 
   @override
@@ -787,6 +843,7 @@ class FormFieldRow extends StatelessWidget {
             ),
             child: TextField(
               controller: controller,
+              readOnly: readOnly,
               decoration: InputDecoration(
                 border: InputBorder.none,
                 hintText: hint,
@@ -900,7 +957,8 @@ class _CheckboxFieldRowState extends State<CheckboxFieldRow> {
 
 // ==================== DEMOGRAPHIC DATA FORM ====================
 class DemographicDataForm extends StatelessWidget {
-  final TextEditingController nameController;
+  final TextEditingController firstNameController;
+  final TextEditingController lastNameController;
   final TextEditingController ageController;
   final TextEditingController sexController;
   final TextEditingController addressController;
@@ -913,7 +971,8 @@ class DemographicDataForm extends StatelessWidget {
 
   const DemographicDataForm({
     super.key,
-    required this.nameController,
+    required this.firstNameController,
+    required this.lastNameController,
     required this.ageController,
     required this.sexController,
     required this.addressController,
@@ -931,7 +990,9 @@ class DemographicDataForm extends StatelessWidget {
       title: 'DEMOGRAPHIC DATA',
       child: Column(
         children: [
-          FormFieldRow(label: 'Name:', controller: nameController),
+          FormFieldRow(label: 'First Name:', controller: firstNameController),
+          const SizedBox(height: 12),
+          FormFieldRow(label: 'Last Name:', controller: lastNameController),
           const SizedBox(height: 12),
           Row(
             children: [
@@ -961,7 +1022,7 @@ class DemographicDataForm extends StatelessWidget {
 }
 
 // ==================== ANTHROPOMETRIC DATA FORM ====================
-class AnthropometricDataForm extends StatelessWidget {
+class AnthropometricDataForm extends StatefulWidget {
   final TextEditingController dateController;
   final TextEditingController weightController;
   final TextEditingController heightController;
@@ -970,6 +1031,9 @@ class AnthropometricDataForm extends StatelessWidget {
   final TextEditingController weightForHeightController;
   final TextEditingController heightForAgeController;
   final TextEditingController bmiController;
+  final TextEditingController ageController;
+  final TextEditingController sexController;
+  final TextEditingController dobController;
 
   const AnthropometricDataForm({
     super.key,
@@ -981,7 +1045,62 @@ class AnthropometricDataForm extends StatelessWidget {
     required this.weightForHeightController,
     required this.heightForAgeController,
     required this.bmiController,
+    required this.ageController,
+    required this.sexController,
+    required this.dobController,
   });
+
+  @override
+  State<AnthropometricDataForm> createState() => _AnthropometricDataFormState();
+}
+
+class _AnthropometricDataFormState extends State<AnthropometricDataForm> {
+  void _recalculate() {
+    final r = AnthropometricCalculator.calculate(
+      weightStr: widget.weightController.text,
+      heightStr: widget.heightController.text,
+      ageStr: widget.ageController.text,
+      sexStr: widget.sexController.text,
+      dobStr: widget.dobController.text,
+      measurementDateStr: widget.dateController.text,
+    );
+    if (r != null) {
+      widget.weightForAgeController.text = r.weightForAge ?? '';
+      widget.weightForHeightController.text = r.weightForHeight ?? '';
+      widget.heightForAgeController.text = r.heightForAge ?? '';
+      widget.bmiController.text = r.bmi ?? '';
+    } else {
+      widget.weightForAgeController.clear();
+      widget.weightForHeightController.clear();
+      widget.heightForAgeController.clear();
+      widget.bmiController.clear();
+    }
+  }
+
+  late final VoidCallback _listener;
+
+  @override
+  void initState() {
+    super.initState();
+    _listener = _recalculate;
+    widget.weightController.addListener(_listener);
+    widget.heightController.addListener(_listener);
+    widget.ageController.addListener(_listener);
+    widget.sexController.addListener(_listener);
+    widget.dobController.addListener(_listener);
+    widget.dateController.addListener(_listener);
+  }
+
+  @override
+  void dispose() {
+    widget.weightController.removeListener(_listener);
+    widget.heightController.removeListener(_listener);
+    widget.ageController.removeListener(_listener);
+    widget.sexController.removeListener(_listener);
+    widget.dobController.removeListener(_listener);
+    widget.dateController.removeListener(_listener);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -990,15 +1109,15 @@ class AnthropometricDataForm extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          FormFieldRow(label: 'Date of Measurement:', labelWidth: 140, controller: dateController),
+          FormFieldRow(label: 'Date of Measurement:', labelWidth: 140, controller: widget.dateController),
           const SizedBox(height: 12),
-          FormFieldRow(label: 'Weight:', controller: weightController),
+          FormFieldRow(label: 'Weight:', controller: widget.weightController),
           const SizedBox(height: 12),
-          FormFieldRow(label: 'Height:', controller: heightController),
+          FormFieldRow(label: 'Height:', controller: widget.heightController),
           const SizedBox(height: 12),
-          FormFieldRow(label: 'MUAC:', controller: muacController),
+          FormFieldRow(label: 'MUAC:', controller: widget.muacController),
           const SizedBox(height: 16),
-          // Auto-calculated fields
+          // Auto-calculated fields (z-score interpretation per WHO standards)
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -1006,14 +1125,20 @@ class AnthropometricDataForm extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                FormFieldRow(label: 'Weight-for-Age:', labelWidth: 140, controller: weightForAgeController),
+                Text(
+                  'Auto-calculated from weight, height, age & sex (WHO z-scores)',
+                  style: TextStyle(fontSize: 11, color: Colors.brown.shade800, fontStyle: FontStyle.italic),
+                ),
                 const SizedBox(height: 8),
-                FormFieldRow(label: 'Weight-for-Height/Length:', labelWidth: 160, controller: weightForHeightController),
+                FormFieldRow(label: 'Weight-for-Age:', labelWidth: 140, controller: widget.weightForAgeController, readOnly: true),
                 const SizedBox(height: 8),
-                FormFieldRow(label: 'Height-for-Age:', labelWidth: 140, controller: heightForAgeController),
+                FormFieldRow(label: 'Weight-for-Height/Length:', labelWidth: 160, controller: widget.weightForHeightController, readOnly: true),
                 const SizedBox(height: 8),
-                FormFieldRow(label: 'BMI:', labelWidth: 140, controller: bmiController),
+                FormFieldRow(label: 'Height-for-Age:', labelWidth: 140, controller: widget.heightForAgeController, readOnly: true),
+                const SizedBox(height: 8),
+                FormFieldRow(label: 'BMI:', labelWidth: 140, controller: widget.bmiController, readOnly: true),
               ],
             ),
           ),
@@ -1242,7 +1367,9 @@ class _DietaryAssessmentFormState extends State<DietaryAssessmentForm> {
 
 // ==================== ORAL ASSESSMENT FORM ====================
 class OralAssessmentForm extends StatefulWidget {
-  const OralAssessmentForm({super.key});
+  final Function(Map<String, dynamic>)? onDataChanged;
+
+  const OralAssessmentForm({super.key, this.onDataChanged});
 
   @override
   State<OralAssessmentForm> createState() => _OralAssessmentFormState();
@@ -1250,6 +1377,14 @@ class OralAssessmentForm extends StatefulWidget {
 
 class _OralAssessmentFormState extends State<OralAssessmentForm> {
   String? _selectedOverallRisk;
+
+  void _notifyDataChanged() {
+    if (widget.onDataChanged != null && _selectedOverallRisk != null) {
+      widget.onDataChanged!({
+        'overallRisk': _selectedOverallRisk,
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1436,6 +1571,7 @@ class _OralAssessmentFormState extends State<OralAssessmentForm> {
         setState(() {
           _selectedOverallRisk = isSelected ? null : label;
         });
+        _notifyDataChanged();
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
