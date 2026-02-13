@@ -1,17 +1,29 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'dart:io';
+import 'dart:convert';
+
 
 class FirestoreService {
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
+  //final FirebaseStorage _storage;  // Add this
 
+  FirestoreService({
+    FirebaseFirestore? firestore,
+    FirebaseAuth? auth,
+    //FirebaseStorage? storage,  // Add this
+  })  : _firestore = firestore ?? FirebaseFirestore.instance,
+        _auth = auth ?? FirebaseAuth.instance;
+        //_storage = storage ?? FirebaseStorage.instance;  // Add this
+
+  // Add these getters
   FirebaseFirestore get firestore => _firestore;
   FirebaseAuth get auth => _auth;
+  //FirebaseStorage get storage => _storage;
 
-  FirestoreService({FirebaseFirestore? firestore, FirebaseAuth? auth})
-      : _firestore = firestore ?? FirebaseFirestore.instance,
-        _auth = auth ?? FirebaseAuth.instance;
 
   /// Saves a map containing data from HomePage under:
   /// users/{uid}/homepageData/{autoId}
@@ -205,52 +217,6 @@ class FirestoreService {
     }
   }
 
-  /// Returns the count of patients screened today (homepageData records with createdAt today)
-  Future<int> getTodayScreenedCount() async {
-    final user = _auth.currentUser;
-    if (user == null) return 0;
-
-    final now = DateTime.now();
-    final startOfDay = DateTime(now.year, now.month, now.day);
-    final endOfDay = startOfDay.add(const Duration(days: 1));
-
-    final snapshot = await _firestore
-        .collection('users')
-        .doc(user.uid)
-        .collection('homepageData')
-        .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
-        .where('createdAt', isLessThan: Timestamp.fromDate(endOfDay))
-        .get();
-
-    return snapshot.docs.length;
-  }
-
-  /// Saves vaccination completion status for a patient to the vaccinations subcollection.
-  /// This is used by the Profile Overview's VaccinationStatusSection.
-  /// Supports both Map<String, bool> (legacy) and Map<String, String> (dose-based) formats.
-  Future<void> saveVaccinationStatus({
-    required String firstName,
-    required String lastName,
-    required Map<String, dynamic> statuses, // Changed to dynamic to support both bool and String
-  }) async {
-    final user = _auth.currentUser;
-    if (user == null) return;
-
-    final patientKey =
-        '${firstName.trim().toLowerCase()}_${lastName.trim().toLowerCase()}';
-
-    await _firestore
-        .collection('users')
-        .doc(user.uid)
-        .collection('vaccinations')
-        .doc(patientKey)
-        .set({
-      'firstName': firstName,
-      'lastName': lastName,
-      'lastReviewDate': FieldValue.serverTimestamp(),
-      ...statuses,
-    }, SetOptions(merge: true));
-  }
 
   /// CHANGE USERNAME
 /// Updates username in both users and usernames collections
@@ -396,4 +362,249 @@ Future<bool> changeUsername({
     return false;
   }
 }
+
+/// CHANGE EMAIL
+/// Updates email in Firebase Auth, Firestore, and requires re-authentication
+ /// CHANGE EMAIL - FIXED VERSION
+  Future<bool> changeEmail({
+    required String currentPassword,
+    required String newEmail,
+    required BuildContext context,
+  }) async {
+    print('FirestoreService.changeEmail called');
+    
+    try {
+      final user = _auth.currentUser;
+      
+      if (user == null || user.email == null) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("No user logged in"), backgroundColor: Colors.red),
+          );
+        }
+        return false;
+      }
+
+      final uid = user.uid;
+      final oldEmail = user.email!;
+      
+      // Validate email
+      if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(newEmail)) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Invalid email format"), backgroundColor: Colors.red),
+          );
+        }
+        return false;
+      }
+      
+      if (newEmail.toLowerCase() == oldEmail.toLowerCase()) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("This is already your current email"), backgroundColor: Colors.orange),
+          );
+        }
+        return false;
+      }
+      
+      // Get username before signing out
+      final userDoc = await _firestore.collection('users').doc(uid).get();
+      final username = userDoc.data()?['username'] as String?;
+      
+      // Sign out and re-authenticate
+      await _auth.signOut();
+      
+      UserCredential userCred = await _auth.signInWithEmailAndPassword(
+        email: oldEmail,
+        password: currentPassword,
+      ).timeout(const Duration(seconds: 15));
+      
+      // Update email in Firebase Auth
+      await userCred.user!.verifyBeforeUpdateEmail(newEmail).timeout(
+  const Duration(seconds: 15),
+);
+
+      // Send verification email
+      await userCred.user!.sendEmailVerification();
+      
+      // Update Firestore
+      final batch = _firestore.batch();
+      
+      batch.update(
+        _firestore.collection('users').doc(uid),
+        {
+          'email': newEmail,
+          'emailVerified': false,
+          'updatedAt': FieldValue.serverTimestamp(),
+        },
+      );
+      
+      if (username != null && username.isNotEmpty) {
+        batch.update(
+          _firestore.collection('usernames').doc(username.toLowerCase()),
+          {
+            'email': newEmail,
+            'updatedAt': FieldValue.serverTimestamp(),
+          },
+        );
+      }
+      
+      await batch.commit();
+      
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Verification email sent to $newEmail"),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+      
+      return true;
+      
+    } on FirebaseAuthException catch (e) {
+      String msg = "Failed to change email";
+      
+      switch (e.code) {
+        case "wrong-password":
+        case "invalid-credential":
+          msg = "Current password is incorrect";
+          break;
+        case "email-already-in-use":
+          msg = "This email is already in use";
+          break;
+        case "invalid-email":
+          msg = "Invalid email format";
+          break;
+        default:
+          msg = e.message ?? "An error occurred";
+      }
+      
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(msg), backgroundColor: Colors.red),
+        );
+      }
+      return false;
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
+        );
+      }
+      return false;
+    }
+  }
+
+/// UPDATE DISPLAY NAME
+  Future<bool> updateDisplayName({
+    required String displayName,
+    required BuildContext context,
+  }) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return false;
+
+      await user.updateDisplayName(displayName);
+      
+      await _firestore.collection('users').doc(user.uid).update({
+        'displayName': displayName,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Display name updated successfully!"),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+      
+      return true;
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
+        );
+      }
+      return false;
+    }
+  }
+
+
+ /// UPDATE PROFILE PICTURE - Upload to Firebase Storage
+
+Future<String> updateProfilePicture(
+  String uid,
+  String imagePath,
+) async {
+  try {
+    final file = File(imagePath);
+
+    final bytes = await file.readAsBytes();
+
+    String base64Image = base64Encode(bytes);
+
+    await _firestore.collection('users').doc(uid).update({
+      'profilePicture': base64Image,
+    });
+
+    return base64Image;
+  } catch (e) {
+    print("Upload error: $e");
+    rethrow;
+  }
 }
+
+
+
+/// GET USER PROFILE DATA
+Future<Map<String, dynamic>?> getUserProfile() async {
+  try {
+    final user = _auth.currentUser;
+    
+    if (user == null) {
+      print('No user logged in');
+      return null;
+    }
+
+    final uid = user.uid;
+    final doc = await _firestore.collection('users').doc(uid).get();
+    
+    if (doc.exists) {
+      return doc.data();
+    }
+    
+    return null;
+    
+  } catch (e) {
+    print('Error getting user profile: $e');
+    return null;
+  }
+}
+
+
+
+  Future<int> getTodayScreenedCount() async {
+    final user = _auth.currentUser;
+    if (user == null) return 0;
+
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
+    final endOfDay = startOfDay.add(const Duration(days: 1));
+
+    final snapshot = await _firestore
+        .collection('users')
+        .doc(user.uid)
+        .collection('homepageData')
+        .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
+        .where('createdAt', isLessThan: Timestamp.fromDate(endOfDay))
+        .get();
+
+    return snapshot.docs.length;
+  }
+}
+
+
