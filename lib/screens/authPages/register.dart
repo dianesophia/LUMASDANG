@@ -37,17 +37,22 @@ class _RegisterPageState extends State<RegisterPage> {
   String? selectedBarangay;
 
   final List<String> barangays = [
-    "Barangay Apas",
-    "Barangay Banilad",
-    "Barangay Guadalupe",
-    "Barangay Inayawan",
-    "Barangay Lahug",
-    "Barangay Lapulapu",
-    "Barangay Mabolo",
-    "Barangay Mambaling",
-    "Barangay Pardo",
-    "Barangay Talamban",
-    "Barangay Tisa",
+    "Barangay Alapang",
+    "Barangay Alno",
+    "Barangay Ambiong",
+    "Barangay Bahong",
+    "Barangay Balili",
+    "Barangay Beckel",
+    "Barangay Betag",
+    "Barangay Bineng",
+    "Barangay Cruz",
+    "Barangay Lubas",
+    "Barangay Pico",
+    "Barangay Poblacion",
+    "Barangay Puguis",
+    "Barangay Shilan",
+    "Barangay Tawang",
+    "Barangay Wangal",
     "Others (Please specify)",
   ];
 
