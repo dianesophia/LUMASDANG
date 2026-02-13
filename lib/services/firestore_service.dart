@@ -223,6 +223,34 @@ class FirestoreService {
         .get();
 
     return snapshot.docs.length;
+  }
+
+  /// Saves vaccination completion status for a patient to the vaccinations subcollection.
+  /// This is used by the Profile Overview's VaccinationStatusSection.
+  /// Supports both Map<String, bool> (legacy) and Map<String, String> (dose-based) formats.
+  Future<void> saveVaccinationStatus({
+    required String firstName,
+    required String lastName,
+    required Map<String, dynamic> statuses, // Changed to dynamic to support both bool and String
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    final patientKey =
+        '${firstName.trim().toLowerCase()}_${lastName.trim().toLowerCase()}';
+
+    await _firestore
+        .collection('users')
+        .doc(user.uid)
+        .collection('vaccinations')
+        .doc(patientKey)
+        .set({
+      'firstName': firstName,
+      'lastName': lastName,
+      'lastReviewDate': FieldValue.serverTimestamp(),
+      ...statuses,
+    }, SetOptions(merge: true));
+  }
 
   /// CHANGE USERNAME
 /// Updates username in both users and usernames collections

@@ -4,12 +4,10 @@ import 'package:flutter/material.dart';
 /// Shows medication given, dosage, deworming recency, and health outcomes.
 class DewormingStatusSection extends StatelessWidget {
   final List<Map<String, dynamic>> assessments;
-  final VoidCallback? onReturnToDashboard;
 
   const DewormingStatusSection({
     super.key,
     required this.assessments,
-    this.onReturnToDashboard,
   });
 
   /// Get the most recent assessment with deworming data
@@ -23,19 +21,21 @@ class DewormingStatusSection extends StatelessWidget {
     return null;
   }
 
-  /// Parse a date string (MM/DD/YYYY or YYYY-MM-DD) into a DateTime
+  /// Parse a date string (MM-DD-YYYY, MM/DD/YYYY or YYYY-MM-DD) into a DateTime
   DateTime? _parseDate(String? dateStr) {
     if (dateStr == null || dateStr.trim().isEmpty) return null;
     try {
-      final slashParts = dateStr.split('/');
-      if (slashParts.length == 3) {
-        final month = int.tryParse(slashParts[0]);
-        final day = int.tryParse(slashParts[1]);
-        final year = int.tryParse(slashParts[2]);
+      // Try MM-DD-YYYY or MM/DD/YYYY
+      final parts = dateStr.split(RegExp(r'[-/]'));
+      if (parts.length == 3) {
+        final month = int.tryParse(parts[0]);
+        final day = int.tryParse(parts[1]);
+        final year = int.tryParse(parts[2]);
         if (month != null && day != null && year != null) {
           return DateTime(year, month, day);
         }
       }
+      // Fallback: ISO-like formats (e.g. YYYY-MM-DD)
       return DateTime.tryParse(dateStr);
     } catch (_) {
       return null;
@@ -203,30 +203,6 @@ class DewormingStatusSection extends StatelessWidget {
           ],
 
           const SizedBox(height: 20),
-
-          // ── Return to Dashboard ──
-          Center(
-            child: ElevatedButton(
-              onPressed: onReturnToDashboard,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFF5A962),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(25),
-                ),
-                elevation: 3,
-              ),
-              child: const Text(
-                'Return to Dashboard',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ),
-          ),
         ],
       ),
     );

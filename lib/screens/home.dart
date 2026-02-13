@@ -64,8 +64,27 @@ class _HomePageState extends State<HomePage>
   // Oral assessment data
   Map<String, dynamic>? _oralData;
 
+  // Vaccination data captured from VaccinationForm
+  Map<String, dynamic>? _vaccinationData;
+
   // Refresh key for StatsRow (incremented after save to refresh screened count)
   int _statsRefreshKey = 0;
+
+  // Reset keys for forms with internal state (incremented to force rebuild)
+  int _demographicFormKey = 0;
+  int _anthropometricFormKey = 0;
+  int _dietaryFormKey = 0;
+  int _dewormingFormKey = 0;
+  int _oralFormKey = 0;
+  int _vaccinationFormKey = 0;
+
+  // Form validation key
+  final _formKey = GlobalKey<FormState>();
+
+  // Validation error states for non-text fields
+  String? _purelyBreastfedError;
+  String? _dewormingError;
+  String? _oralRiskError;
 
   @override
   void initState() {
@@ -134,6 +153,57 @@ class _HomePageState extends State<HomePage>
   }
 
   Future<void> _saveAllData() async {
+    // Validate all form fields
+    final isFormValid = _formKey.currentState?.validate() ?? false;
+
+    // Validate non-text fields
+    bool hasNonTextErrors = false;
+
+    if (_purelyBreastfed == null) {
+      setState(() => _purelyBreastfedError = 'Please select Yes or No');
+      hasNonTextErrors = true;
+    } else {
+      setState(() => _purelyBreastfedError = null);
+    }
+
+    if (_oralData == null || _oralData!['overallRisk'] == null) {
+      setState(() => _oralRiskError = 'Please select an overall risk level');
+      hasNonTextErrors = true;
+    } else {
+      setState(() => _oralRiskError = null);
+    }
+
+    // Validate deworming: either N/A or must have date and drug
+    if (_dewormingData == null) {
+      setState(() => _dewormingError = 'Please fill in deworming information');
+      hasNonTextErrors = true;
+    } else {
+      final isNA = _dewormingData!['isNA'] == true;
+      if (!isNA) {
+        if ((_dewormingData!['dateOfLastDeworming'] ?? '').toString().trim().isEmpty) {
+          setState(() => _dewormingError = 'Please enter a date or select N/A');
+          hasNonTextErrors = true;
+        } else if (_dewormingData!['drugGiven'] == null) {
+          setState(() => _dewormingError = 'Please select a drug given');
+          hasNonTextErrors = true;
+        } else {
+          setState(() => _dewormingError = null);
+        }
+      } else {
+        setState(() => _dewormingError = null);
+      }
+    }
+
+    if (!isFormValid || hasNonTextErrors) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please fill in all required fields.'),
+          backgroundColor: Color(0xFFD32F2F),
+        ),
+      );
+      return;
+    }
+
     final data = {
       'demographic': {
         'firstName': firstNameController.text.trim(),
@@ -174,6 +244,7 @@ class _HomePageState extends State<HomePage>
       },
       'deworming': _dewormingData,
       'oral': _oralData,
+      'vaccination': _vaccinationData,
     };
 
     final firestore = FirestoreService();
@@ -217,7 +288,131 @@ class _HomePageState extends State<HomePage>
         ),
       );
     }
-    if (mounted) setState(() => _statsRefreshKey++);
+    // Sync vaccination status to the vaccinations collection for Profile Overview
+    if (_vaccinationData != null && online) {
+      try {
+        // Count how many scheduled doses have been marked for this vaccine
+        int _trueDoseCount(String name) {
+          final doses = _vaccinationData![name] as Map<String, dynamic>?;
+          if (doses == null) return 0;
+          return doses.values.where((v) => v == true).length;
+        }
+
+        // Convert dose count into a human‑readable label
+        String _doseLabelForCount(int count) {
+          if (count <= 0) return 'Pending';
+          switch (count) {
+            case 1:
+              return '1st dose';
+            case 2:
+              return '2nd dose';
+            case 3:
+              return '3rd dose';
+            case 4:
+              return '4th dose';
+            case 5:
+              return '5th dose';
+            default:
+              // For anything beyond 5, treat as Booster
+              return 'Booster';
+          }
+        }
+
+        String _vaccineStatus(String name) {
+          final count = _trueDoseCount(name);
+          return _doseLabelForCount(count);
+        }
+
+        // OPV / IPV are combined in the profile card, so we sum their doses
+        final opvCount = _trueDoseCount('OPV');
+        final ipvCount = _trueDoseCount('IPV');
+
+        final statuses = <String, String>{
+          'bcg': _vaccineStatus('BCG'),
+          'hepatitisB': _vaccineStatus('HEP B'),
+          'dptPentavalent': _vaccineStatus('PENTAVALENT'),
+          'opvIpv': _doseLabelForCount(opvCount + ipvCount),
+          'measlesMmr': _vaccineStatus('MMR'),
+          'pcv': _vaccineStatus('PCV'),
+        };
+
+        await FirestoreService().saveVaccinationStatus(
+          firstName: firstNameController.text.trim(),
+          lastName: lastNameController.text.trim(),
+          statuses: statuses,
+        );
+      } catch (e) {
+        debugPrint('Error syncing vaccination status: $e');
+      }
+    }
+    if (mounted) {
+      // Clear all text controllers FIRST
+      firstNameController.clear();
+      lastNameController.clear();
+      ageController.clear();
+      sexController.clear();
+      addressController.clear();
+      placeOfBirthController.clear();
+      dobController.clear();
+      motherController.clear();
+      motherContactController.clear();
+      fatherController.clear();
+      fatherContactController.clear();
+
+      measurementDateController.clear();
+      weightController.clear();
+      heightController.clear();
+      muacController.clear();
+      weightForAgeController.clear();
+      weightForHeightController.clear();
+      heightForAgeController.clear();
+      bmiController.clear();
+
+      cfAgeController.clear();
+      cfFreqController.clear();
+      cfFoodController.clear();
+      mealFreqController.clear();
+
+      // Then rebuild all forms with new keys and reset state
+      setState(() {
+        // Increment stats key to refresh header
+        _statsRefreshKey++;
+
+        // Increment form keys to force rebuild of all forms
+        // This ensures forms rebuild with cleared controllers
+        _demographicFormKey++;
+        _anthropometricFormKey++;
+        _dietaryFormKey++;
+        _dewormingFormKey++;
+        _oralFormKey++;
+        _vaccinationFormKey++;
+
+        // Reset toggle/checkbox/radio state
+        _diarrhea = false;
+        _fever = false;
+        _cough = false;
+        _other = false;
+        _medications = false;
+
+        _purelyBreastfed = null;
+        _purelyBreastfedError = null;
+
+        _oralData = null;
+        _oralRiskError = null;
+
+        _vaccinationData = null;
+
+        _dewormingData = null;
+        _dewormingError = null;
+      });
+
+      // Reset form validation state AFTER rebuild to ensure it doesn't restore old values
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _formKey.currentState?.reset();
+        }
+      });
+    }
   }
 
   @override
@@ -288,109 +483,136 @@ class _HomePageState extends State<HomePage>
   Widget _buildHomeTab() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          StatsRow(
-            key: ValueKey(_statsRefreshKey),
-            onTap: () => _tabController.animateTo(1),
-          ),
-          const SizedBox(height: 16),
-          const UpcomingEvents(),
-          const SizedBox(height: 20),
-          const Text(
-            'NEW ASSESSMENT',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-              letterSpacing: 1.2,
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            StatsRow(
+              key: ValueKey(_statsRefreshKey),
+              onTap: () => _tabController.animateTo(1),
             ),
-          ),
-          const SizedBox(height: 12),
-          DemographicDataForm(
-            firstNameController: firstNameController,
-            lastNameController: lastNameController,
-            ageController: ageController,
-            sexController: sexController,
-            addressController: addressController,
-            placeOfBirthController: placeOfBirthController,
-            dobController: dobController,
-            motherController: motherController,
-            motherContactController: motherContactController,
-            fatherController: fatherController,
-            fatherContactController: fatherContactController,
-          ),
-          const SizedBox(height: 16),
-          AnthropometricDataForm(
-            dateController: measurementDateController,
-            weightController: weightController,
-            heightController: heightController,
-            muacController: muacController,
-            weightForAgeController: weightForAgeController,
-            weightForHeightController: weightForHeightController,
-            heightForAgeController: heightForAgeController,
-            bmiController: bmiController,
-            ageController: ageController,
-            sexController: sexController,
-            dobController: dobController,
-          ),
-          const SizedBox(height: 16),
-          HealthStatusForm(
-            diarrhea: _diarrhea,
-            onDiarrheaChanged: (v) => setState(() => _diarrhea = v),
-            fever: _fever,
-            onFeverChanged: (v) => setState(() => _fever = v),
-            cough: _cough,
-            onCoughChanged: (v) => setState(() => _cough = v),
-            other: _other,
-            onOtherChanged: (v) => setState(() => _other = v),
-            medications: _medications,
-            onMedicationsChanged: (v) => setState(() => _medications = v),
-          ),
-          const SizedBox(height: 16),
-          DietaryAssessmentForm(
-            purelyBreastfed: _purelyBreastfed,
-            onPurelyBreastfedChanged: (v) => setState(() => _purelyBreastfed = v),
-            ageWhenCfController: cfAgeController,
-            freqCfController: cfFreqController,
-            foodCfController: cfFoodController,
-            mealFrequencyController: mealFreqController,
-          ),
-          const SizedBox(height: 16),
-          OralAssessmentForm(
-            onDataChanged: (data) {
-              _oralData = data;
-            },
-          ),
-          const SizedBox(height: 16),
-          const VaccinationForm(),
-          const SizedBox(height: 16),
-          DewormingForm(
-            onSave: (map) => setState(() => _dewormingData = map),
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _saveAllData,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2E8B7B),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(25),
+            const SizedBox(height: 16),
+            const UpcomingEvents(),
+            const SizedBox(height: 20),
+            const Text(
+              'NEW ASSESSMENT',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+                letterSpacing: 1.2,
+              ),
+            ),
+            const SizedBox(height: 12),
+            DemographicDataForm(
+              key: ValueKey('demographic_form_$_demographicFormKey'),
+              firstNameController: firstNameController,
+              lastNameController: lastNameController,
+              ageController: ageController,
+              sexController: sexController,
+              addressController: addressController,
+              placeOfBirthController: placeOfBirthController,
+              dobController: dobController,
+              motherController: motherController,
+              motherContactController: motherContactController,
+              fatherController: fatherController,
+              fatherContactController: fatherContactController,
+            ),
+            const SizedBox(height: 16),
+            AnthropometricDataForm(
+              key: ValueKey('anthropometric_form_$_anthropometricFormKey'),
+              dateController: measurementDateController,
+              weightController: weightController,
+              heightController: heightController,
+              muacController: muacController,
+              weightForAgeController: weightForAgeController,
+              weightForHeightController: weightForHeightController,
+              heightForAgeController: heightForAgeController,
+              bmiController: bmiController,
+              ageController: ageController,
+              sexController: sexController,
+              dobController: dobController,
+            ),
+            const SizedBox(height: 16),
+            HealthStatusForm(
+              diarrhea: _diarrhea,
+              onDiarrheaChanged: (v) => setState(() => _diarrhea = v),
+              fever: _fever,
+              onFeverChanged: (v) => setState(() => _fever = v),
+              cough: _cough,
+              onCoughChanged: (v) => setState(() => _cough = v),
+              other: _other,
+              onOtherChanged: (v) => setState(() => _other = v),
+              medications: _medications,
+              onMedicationsChanged: (v) => setState(() => _medications = v),
+            ),
+            const SizedBox(height: 16),
+            DietaryAssessmentForm(
+              key: ValueKey('dietary_form_$_dietaryFormKey'),
+              purelyBreastfed: _purelyBreastfed,
+              onPurelyBreastfedChanged: (v) {
+                setState(() {
+                  _purelyBreastfed = v;
+                  _purelyBreastfedError = null;
+                });
+              },
+              ageWhenCfController: cfAgeController,
+              freqCfController: cfFreqController,
+              foodCfController: cfFoodController,
+              mealFrequencyController: mealFreqController,
+              purelyBreastfedError: _purelyBreastfedError,
+            ),
+            const SizedBox(height: 16),
+            OralAssessmentForm(
+              key: ValueKey('oral_form_$_oralFormKey'),
+              onDataChanged: (data) {
+                _oralData = data;
+                setState(() => _oralRiskError = null);
+              },
+              overallRiskError: _oralRiskError,
+            ),
+            const SizedBox(height: 16),
+            VaccinationForm(
+              key: ValueKey('vaccination_form_$_vaccinationFormKey'),
+              onDataChanged: (data) {
+                _vaccinationData = data;
+              },
+            ),
+            const SizedBox(height: 16),
+            DewormingForm(
+              key: ValueKey('deworming_form_$_dewormingFormKey'),
+              onSave: (map) {
+                setState(() {
+                  _dewormingData = map;
+                  _dewormingError = null;
+                });
+              },
+              errorText: _dewormingError,
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _saveAllData,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2E8B7B),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(25),
+                  ),
+                  elevation: 3,
                 ),
-                elevation: 3,
-              ),
-              child: const Text(
-                'Save',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                child: const Text(
+                  'Save',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 30),
-        ],
+            const SizedBox(height: 30),
+          ],
+        ),
       ),
     );
   }
@@ -805,6 +1027,8 @@ class FormFieldRow extends StatelessWidget {
   final double labelWidth;
   final TextEditingController? controller;
   final bool readOnly;
+  final String? Function(String?)? validator;
+  final TextInputType? keyboardType;
 
   const FormFieldRow({
     super.key,
@@ -813,55 +1037,71 @@ class FormFieldRow extends StatelessWidget {
     this.labelWidth = 100,
     this.controller,
     this.readOnly = false,
+    this.validator,
+    this.keyboardType,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        SizedBox(
-          width: labelWidth,
-          child: Text(
-            label,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF5D4037),
-            ),
-          ),
-        ),
-        Expanded(
-          child: Container(
-            height: 32,
-            decoration: const BoxDecoration(
-              border: Border(
-                bottom: BorderSide(
-                  color: Color(0xFF8B6914),
-                  width: 1.5,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: labelWidth,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF5D4037),
+                  ),
                 ),
               ),
             ),
-            child: TextField(
-              controller: controller,
-              readOnly: readOnly,
-              decoration: InputDecoration(
-                border: InputBorder.none,
-                hintText: hint,
-                hintStyle: const TextStyle(
-                  fontSize: 12,
-                  color: Color(0xFF8B6914),
-                  fontStyle: FontStyle.italic,
+            Expanded(
+              child: TextFormField(
+                controller: controller,
+                readOnly: readOnly,
+                validator: validator,
+                keyboardType: keyboardType,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
+                decoration: InputDecoration(
+                  hintText: hint,
+                  hintStyle: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF8B6914),
+                    fontStyle: FontStyle.italic,
+                  ),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                  isDense: true,
+                  enabledBorder: const UnderlineInputBorder(
+                    borderSide: BorderSide(color: Color(0xFF8B6914), width: 1.5),
+                  ),
+                  focusedBorder: const UnderlineInputBorder(
+                    borderSide: BorderSide(color: Color(0xFF5D4037), width: 2),
+                  ),
+                  errorBorder: const UnderlineInputBorder(
+                    borderSide: BorderSide(color: Color(0xFFD32F2F), width: 1.5),
+                  ),
+                  focusedErrorBorder: const UnderlineInputBorder(
+                    borderSide: BorderSide(color: Color(0xFFD32F2F), width: 2),
+                  ),
+                  errorStyle: const TextStyle(fontSize: 11, color: Color(0xFFD32F2F)),
                 ),
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                isDense: true,
-              ),
-              style: const TextStyle(
-                fontSize: 14,
-                color: Color(0xFF5D4037),
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF5D4037),
+                ),
               ),
             ),
-          ),
+          ],
         ),
       ],
     );
@@ -990,31 +1230,137 @@ class DemographicDataForm extends StatelessWidget {
       title: 'DEMOGRAPHIC DATA',
       child: Column(
         children: [
-          FormFieldRow(label: 'First Name:', controller: firstNameController),
+          FormFieldRow(
+            label: 'First Name:',
+            controller: firstNameController,
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) return 'First name is required';
+              if (v.trim().length < 2) return 'Must be at least 2 characters';
+              return null;
+            },
+          ),
           const SizedBox(height: 12),
-          FormFieldRow(label: 'Last Name:', controller: lastNameController),
+          FormFieldRow(
+            label: 'Last Name:',
+            controller: lastNameController,
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) return 'Last name is required';
+              if (v.trim().length < 2) return 'Must be at least 2 characters';
+              return null;
+            },
+          ),
           const SizedBox(height: 12),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(child: FormFieldRow(label: 'Age:', labelWidth: 40, controller: ageController)),
+              Expanded(
+                child: FormFieldRow(
+                  label: 'Age:',
+                  labelWidth: 40,
+                  controller: ageController,
+                  keyboardType: TextInputType.number,
+                  hint: 'Enter age in months (0–60)',
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return 'Required';
+                    final age = int.tryParse(v.trim());
+                    if (age == null) return 'Enter a number';
+                    if (age < 0 || age > 60) return 'Enter age in months (0–60)';
+                    return null;
+                  },
+                ),
+              ),
               const SizedBox(width: 16),
-              Expanded(child: FormFieldRow(label: 'Sex:', labelWidth: 40, controller: sexController)),
+              Expanded(
+                child: FormFieldRow(
+                  label: 'Sex:',
+                  labelWidth: 40,
+                  controller: sexController,
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return 'Required';
+                    final sex = v.trim().toUpperCase();
+                    if (sex != 'M' && sex != 'F' && sex != 'MALE' && sex != 'FEMALE') {
+                      return 'Enter M or F';
+                    }
+                    return null;
+                  },
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 12),
-          FormFieldRow(label: 'Address:', controller: addressController),
+          FormFieldRow(
+            label: 'Address:',
+            controller: addressController,
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) return 'Address is required';
+              return null;
+            },
+          ),
           const SizedBox(height: 12),
-          FormFieldRow(label: 'Place of Birth:', controller: placeOfBirthController),
+          FormFieldRow(
+            label: 'Place of Birth:',
+            controller: placeOfBirthController,
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) return 'Place of birth is required';
+              return null;
+            },
+          ),
           const SizedBox(height: 12),
-          FormFieldRow(label: 'Date of Birth:', controller: dobController),
+          FormFieldRow(
+            label: 'Date of Birth:',
+            controller: dobController,
+            keyboardType: TextInputType.datetime,
+            hint: 'MM-DD-YYYY (e.g. 05-01-2023)',
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) return 'Date of birth is required';
+              final value = v.trim();
+              final regex = RegExp(r'^\d{2}-\d{2}-\d{4}$');
+              if (!regex.hasMatch(value)) {
+                return 'Use format MM-DD-YYYY';
+              }
+              return null;
+            },
+          ),
           const SizedBox(height: 12),
-          FormFieldRow(label: 'Mother:', controller: motherController),
+          FormFieldRow(
+            label: 'Mother Name:',
+            controller: motherController,
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) return 'Mother\'s name is required';
+              return null;
+            },
+          ),
           const SizedBox(height: 12),
-          FormFieldRow(label: 'Contact #:', controller: motherContactController),
+          FormFieldRow(
+            label: 'Contact #:',
+            controller: motherContactController,
+            keyboardType: TextInputType.phone,
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) return 'Contact number is required';
+              if (v.trim().length != 11) return 'Enter a valid contact number';
+              return null;
+            },
+          ),
           const SizedBox(height: 12),
-          FormFieldRow(label: 'Father:', controller: fatherController),
+          FormFieldRow(
+            label: 'Fathers Name:',
+            controller: fatherController,
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) return 'Father\'s name is required';
+              return null;
+            },
+          ),
           const SizedBox(height: 12),
-          FormFieldRow(label: 'Contact #:', controller: fatherContactController),
+          FormFieldRow(
+            label: 'Contact #:',
+            controller: fatherContactController,
+            keyboardType: TextInputType.phone,
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) return 'Contact number is required';
+              if (v.trim().length != 11) return 'Enter a valid contact number';
+              return null;
+            },
+          ),
         ],
       ),
     );
@@ -1109,13 +1455,61 @@ class _AnthropometricDataFormState extends State<AnthropometricDataForm> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          FormFieldRow(label: 'Date of Measurement:', labelWidth: 140, controller: widget.dateController),
+          FormFieldRow(
+            label: 'Date of Measurement:',
+            labelWidth: 140,
+            controller: widget.dateController,
+            keyboardType: TextInputType.datetime,
+            hint: 'MM-DD-YYYY (e.g. 02-13-2026)',
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) return 'Date of measurement is required';
+              final value = v.trim();
+              final regex = RegExp(r'^\d{2}-\d{2}-\d{4}$');
+              if (!regex.hasMatch(value)) {
+                return 'Use format MM-DD-YYYY';
+              }
+              return null;
+            },
+          ),
           const SizedBox(height: 12),
-          FormFieldRow(label: 'Weight:', controller: widget.weightController),
+          FormFieldRow(
+            label: 'Weight (kg):',
+            controller: widget.weightController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) return 'Weight is required';
+              final w = double.tryParse(v.trim());
+              if (w == null) return 'Enter a valid number';
+              if (w <= 0 || w > 300) return 'Enter a valid weight';
+              return null;
+            },
+          ),
           const SizedBox(height: 12),
-          FormFieldRow(label: 'Height:', controller: widget.heightController),
+          FormFieldRow(
+            label: 'Height (cm):',
+            controller: widget.heightController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) return 'Height is required';
+              final h = double.tryParse(v.trim());
+              if (h == null) return 'Enter a valid number';
+              if (h <= 0 || h > 300) return 'Enter a valid height';
+              return null;
+            },
+          ),
           const SizedBox(height: 12),
-          FormFieldRow(label: 'MUAC:', controller: widget.muacController),
+          FormFieldRow(
+            label: 'MUAC (cm):',
+            controller: widget.muacController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) return 'MUAC is required';
+              final m = double.tryParse(v.trim());
+              if (m == null) return 'Enter a valid number';
+              if (m <= 0) return 'Enter a valid MUAC value';
+              return null;
+            },
+          ),
           const SizedBox(height: 16),
           // Auto-calculated fields (z-score interpretation per WHO standards)
           Container(
@@ -1132,13 +1526,13 @@ class _AnthropometricDataFormState extends State<AnthropometricDataForm> {
                   style: TextStyle(fontSize: 11, color: Colors.brown.shade800, fontStyle: FontStyle.italic),
                 ),
                 const SizedBox(height: 8),
-                FormFieldRow(label: 'Weight-for-Age:', labelWidth: 140, controller: widget.weightForAgeController, readOnly: true),
+                FormFieldRow(label: 'Weight-for-Age (kg):', labelWidth: 140, controller: widget.weightForAgeController, readOnly: true),
                 const SizedBox(height: 8),
-                FormFieldRow(label: 'Weight-for-Height/Length:', labelWidth: 160, controller: widget.weightForHeightController, readOnly: true),
+                FormFieldRow(label: 'Weight-for-Height/Length (kg):', labelWidth: 160, controller: widget.weightForHeightController, readOnly: true),
                 const SizedBox(height: 8),
-                FormFieldRow(label: 'Height-for-Age:', labelWidth: 140, controller: widget.heightForAgeController, readOnly: true),
+                FormFieldRow(label: 'Height-for-Age (cm):', labelWidth: 140, controller: widget.heightForAgeController, readOnly: true),
                 const SizedBox(height: 8),
-                FormFieldRow(label: 'BMI:', labelWidth: 140, controller: widget.bmiController, readOnly: true),
+                FormFieldRow(label: 'BMI (kg/m²):', labelWidth: 140, controller: widget.bmiController, readOnly: true),
               ],
             ),
           ),
@@ -1230,6 +1624,7 @@ class DietaryAssessmentForm extends StatefulWidget {
   final TextEditingController freqCfController;
   final TextEditingController foodCfController;
   final TextEditingController mealFrequencyController;
+  final String? purelyBreastfedError;
 
   const DietaryAssessmentForm({
     super.key,
@@ -1239,6 +1634,7 @@ class DietaryAssessmentForm extends StatefulWidget {
     required this.freqCfController,
     required this.foodCfController,
     required this.mealFrequencyController,
+    this.purelyBreastfedError,
   });
 
   @override
@@ -1262,45 +1658,58 @@ class _DietaryAssessmentFormState extends State<DietaryAssessmentForm> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Purely Breastfed
-          Row(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Purely Breastfed:',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF5D4037),
+              Row(
+                children: [
+                  const Text(
+                    'Purely Breastfed:',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF5D4037),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Row(
+                    children: [
+                      const Text('YES', style: TextStyle(fontSize: 12, color: Color(0xFF5D4037))),
+                      Radio<bool>(
+                        value: true,
+                        groupValue: _purelyBreastfed,
+                        onChanged: (v) {
+                          setState(() => _purelyBreastfed = v);
+                          widget.onPurelyBreastfedChanged?.call(v);
+                        },
+                        activeColor: const Color(0xFF2E8B7B),
+                      ),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      const Text('NO', style: TextStyle(fontSize: 12, color: Color(0xFF5D4037))),
+                      Radio<bool>(
+                        value: false,
+                        groupValue: _purelyBreastfed,
+                        onChanged: (v) {
+                          setState(() => _purelyBreastfed = v);
+                          widget.onPurelyBreastfedChanged?.call(v);
+                        },
+                        activeColor: const Color(0xFF2E8B7B),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              if (widget.purelyBreastfedError != null)
+                Padding(
+                  padding: const EdgeInsets.only(left: 4, top: 4),
+                  child: Text(
+                    widget.purelyBreastfedError!,
+                    style: const TextStyle(fontSize: 11, color: Color(0xFFD32F2F)),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 16),
-              Row(
-                children: [
-                  const Text('YES', style: TextStyle(fontSize: 12, color: Color(0xFF5D4037))),
-                  Radio<bool>(
-                    value: true,
-                    groupValue: _purelyBreastfed,
-                    onChanged: (v) {
-                      setState(() => _purelyBreastfed = v);
-                      widget.onPurelyBreastfedChanged?.call(v);
-                    },
-                    activeColor: const Color(0xFF2E8B7B),
-                  ),
-                ],
-              ),
-              Row(
-                children: [
-                  const Text('NO', style: TextStyle(fontSize: 12, color: Color(0xFF5D4037))),
-                  Radio<bool>(
-                    value: false,
-                    groupValue: _purelyBreastfed,
-                    onChanged: (v) {
-                      setState(() => _purelyBreastfed = v);
-                      widget.onPurelyBreastfedChanged?.call(v);
-                    },
-                    activeColor: const Color(0xFF2E8B7B),
-                  ),
-                ],
-              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -1318,11 +1727,37 @@ class _DietaryAssessmentFormState extends State<DietaryAssessmentForm> {
             padding: const EdgeInsets.only(left: 12),
             child: Column(
               children: [
-                FormFieldRow(label: 'Age when CF started:', hint: '(Age in months)', labelWidth: 140, controller: widget.ageWhenCfController),
+                FormFieldRow(
+                  label: 'Age when CF started:',
+                  hint: '(Age in months)',
+                  labelWidth: 140,
+                  controller: widget.ageWhenCfController,
+                  keyboardType: TextInputType.number,
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return 'Required';
+                    return null;
+                  },
+                ),
                 const SizedBox(height: 8),
-                FormFieldRow(label: 'Frequency of CF a day:', labelWidth: 140, controller: widget.freqCfController),
+                FormFieldRow(
+                  label: 'Frequency of CF a day:',
+                  labelWidth: 140,
+                  controller: widget.freqCfController,
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return 'Required';
+                    return null;
+                  },
+                ),
                 const SizedBox(height: 8),
-                FormFieldRow(label: 'Food/s given on CF:', labelWidth: 140, controller: widget.foodCfController),
+                FormFieldRow(
+                  label: 'Food/s given on CF:',
+                  labelWidth: 140,
+                  controller: widget.foodCfController,
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return 'Required';
+                    return null;
+                  },
+                ),
               ],
             ),
           ),
@@ -1358,7 +1793,16 @@ class _DietaryAssessmentFormState extends State<DietaryAssessmentForm> {
             ),
           ),
           const SizedBox(height: 12),
-          FormFieldRow(label: 'Meal frequency in a day:', labelWidth: 160, controller: widget.mealFrequencyController),
+          FormFieldRow(
+            label: 'Meal frequency in a day:',
+            labelWidth: 160,
+            controller: widget.mealFrequencyController,
+            keyboardType: TextInputType.number,
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) return 'Meal frequency is required';
+              return null;
+            },
+          ),
         ],
       ),
     );
@@ -1368,8 +1812,9 @@ class _DietaryAssessmentFormState extends State<DietaryAssessmentForm> {
 // ==================== ORAL ASSESSMENT FORM ====================
 class OralAssessmentForm extends StatefulWidget {
   final Function(Map<String, dynamic>)? onDataChanged;
+  final String? overallRiskError;
 
-  const OralAssessmentForm({super.key, this.onDataChanged});
+  const OralAssessmentForm({super.key, this.onDataChanged, this.overallRiskError});
 
   @override
   State<OralAssessmentForm> createState() => _OralAssessmentFormState();
@@ -1446,6 +1891,14 @@ class _OralAssessmentFormState extends State<OralAssessmentForm> {
           const SizedBox(height: 12),
           // Overall Risk
           _buildOverallRisk(),
+          if (widget.overallRiskError != null)
+            Padding(
+              padding: const EdgeInsets.only(left: 4, top: 6),
+              child: Text(
+                widget.overallRiskError!,
+                style: const TextStyle(fontSize: 11, color: Color(0xFFD32F2F)),
+              ),
+            ),
         ],
       ),
     );
@@ -1691,8 +2144,96 @@ class _YesNoRowState extends State<YesNoRow> {
 }
 
 // ==================== VACCINATION FORM ====================
-class VaccinationForm extends StatelessWidget {
-  const VaccinationForm({super.key});
+class VaccinationForm extends StatefulWidget {
+  final Function(Map<String, dynamic>)? onDataChanged;
+
+  const VaccinationForm({super.key, this.onDataChanged});
+
+  @override
+  State<VaccinationForm> createState() => _VaccinationFormState();
+}
+
+class _VaccinationFormState extends State<VaccinationForm> {
+  static const _vaccineNames = ['BCG', 'HEP B', 'PENTAVALENT', 'OPV', 'IPV', 'PCV', 'MMR'];
+  static const _columnHeaders = ['BIRTH', '1½', '2½', '3½', '9', '1 YR'];
+
+  // Track dose selection: vaccineName -> [dose string or null × 6]
+  final Map<String, List<String?>> _doses = {};
+
+  // Define possible doses for each vaccine at each age column
+  List<String> _getPossibleDoses(String vaccine, int colIndex) {
+    final ageHeader = _columnHeaders[colIndex];
+    
+    switch (vaccine) {
+      case 'BCG':
+        return ageHeader == 'BIRTH' ? ['1st dose'] : [];
+      case 'HEP B':
+        if (ageHeader == 'BIRTH') return ['1st dose'];
+        if (ageHeader == '1½') return ['2nd dose'];
+        if (ageHeader == '2½') return ['3rd dose'];
+        return [];
+      case 'PENTAVALENT':
+        if (ageHeader == '1½') return ['1st dose'];
+        if (ageHeader == '2½') return ['2nd dose'];
+        if (ageHeader == '3½') return ['3rd dose'];
+        if (ageHeader == '1 YR') return ['4th dose'];
+        return [];
+      case 'OPV':
+        if (ageHeader == 'BIRTH') return ['1st dose'];
+        if (ageHeader == '2½') return ['2nd dose'];
+        if (ageHeader == '9') return ['3rd dose'];
+        return [];
+      case 'IPV':
+        if (ageHeader == '1½') return ['1st dose'];
+        if (ageHeader == '2½') return ['2nd dose'];
+        if (ageHeader == '3½') return ['3rd dose'];
+        if (ageHeader == '1 YR') return ['4th dose'];
+        return [];
+      case 'PCV':
+        if (ageHeader == '1½') return ['1st dose'];
+        if (ageHeader == '2½') return ['2nd dose'];
+        if (ageHeader == '3½') return ['3rd dose'];
+        if (ageHeader == '1 YR') return ['4th dose'];
+        return [];
+      case 'MMR':
+        if (ageHeader == '9') return ['1st dose'];
+        if (ageHeader == '1 YR') return ['2nd dose'];
+        return [];
+      default:
+        return [];
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    for (final name in _vaccineNames) {
+      _doses[name] = List.filled(6, null);
+    }
+    // Notify parent of initial (all-null) state after first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) => _notifyParent());
+  }
+
+  void _onDoseChanged(String vaccine, int colIndex, String? dose) {
+    setState(() {
+      _doses[vaccine]![colIndex] = dose;
+    });
+    _notifyParent();
+  }
+
+  void _notifyParent() {
+    if (widget.onDataChanged == null) return;
+    final data = <String, dynamic>{};
+    for (final name in _vaccineNames) {
+      final doses = <String, bool>{};
+      for (int i = 0; i < _columnHeaders.length; i++) {
+        // Convert dose string to boolean for backward compatibility
+        doses[_columnHeaders[i]] = _doses[name]![i] != null;
+      }
+      data[name] = doses;
+    }
+    widget.onDataChanged!(data);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1700,7 +2241,6 @@ class VaccinationForm extends StatelessWidget {
       title: 'VACCINATION',
       child: Column(
         children: [
-          // Vaccination Table
           Container(
             decoration: BoxDecoration(
               border: Border.all(color: const Color(0xFF5D4037), width: 1),
@@ -1714,26 +2254,22 @@ class VaccinationForm extends StatelessWidget {
                   decoration: const BoxDecoration(
                     border: Border(bottom: BorderSide(color: Color(0xFF5D4037))),
                   ),
-                  child: const Row(
+                  child: Row(
                     children: [
-                      SizedBox(width: 80),
-                      Expanded(child: Text('BIRTH', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF5D4037)), textAlign: TextAlign.center)),
-                      Expanded(child: Text('1½', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF5D4037)), textAlign: TextAlign.center)),
-                      Expanded(child: Text('2½', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF5D4037)), textAlign: TextAlign.center)),
-                      Expanded(child: Text('3½', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF5D4037)), textAlign: TextAlign.center)),
-                      Expanded(child: Text('9', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF5D4037)), textAlign: TextAlign.center)),
-                      Expanded(child: Text('1 YR', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF5D4037)), textAlign: TextAlign.center)),
+                      const SizedBox(width: 80),
+                      for (final header in _columnHeaders)
+                        Expanded(
+                          child: Text(
+                            header,
+                            style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF5D4037)),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
                     ],
                   ),
                 ),
                 // Vaccine Rows
-                _buildVaccineRow('BCG', [true, false, false, false, false, false]),
-                _buildVaccineRow('HEP B', [true, false, false, false, false, false]),
-                _buildVaccineRow('PENTAVALENT', [false, true, true, true, false, false]),
-                _buildVaccineRow('OPV', [false, true, true, true, false, false]),
-                _buildVaccineRow('IPV', [false, true, true, false, false, false]),
-                _buildVaccineRow('PCV', [false, true, true, true, false, false]),
-                _buildVaccineRow('MMR', [false, false, false, false, true, true]),
+                for (final name in _vaccineNames) _buildVaccineRow(name),
               ],
             ),
           ),
@@ -1742,7 +2278,7 @@ class VaccinationForm extends StatelessWidget {
     );
   }
 
-  Widget _buildVaccineRow(String name, List<bool> schedule) {
+  Widget _buildVaccineRow(String name) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 6),
       decoration: const BoxDecoration(
@@ -1760,57 +2296,275 @@ class VaccinationForm extends StatelessWidget {
               ),
             ),
           ),
-          ...schedule.map((scheduled) => Expanded(
-                child: Center(
-                  child: scheduled ? const VaccineCheckCircle() : const SizedBox(),
+          for (int i = 0; i < 6; i++)
+            Expanded(
+              child: Center(
+                child: VaccineDoseSelector(
+                  selectedDose: _doses[name]![i],
+                  possibleDoses: _getPossibleDoses(name, i),
+                  onDoseSelected: (dose) => _onDoseChanged(name, i, dose),
                 ),
-              )),
+              ),
+            ),
         ],
       ),
     );
   }
 }
 
-class VaccineCheckCircle extends StatefulWidget {
-  const VaccineCheckCircle({super.key});
+class VaccineDoseSelector extends StatelessWidget {
+  final String? selectedDose;
+  final List<String> possibleDoses;
+  final ValueChanged<String?> onDoseSelected;
 
-  @override
-  State<VaccineCheckCircle> createState() => _VaccineCheckCircleState();
-}
+  // All possible doses that can be selected
+  static const List<String> allPossibleDoses = [
+    '1st dose',
+    '2nd dose',
+    '3rd dose',
+    '4th dose',
+    '5th dose',
+    'Booster',
+  ];
 
-class _VaccineCheckCircleState extends State<VaccineCheckCircle> {
-  bool _isChecked = false;
+  const VaccineDoseSelector({
+    super.key,
+    required this.selectedDose,
+    required this.possibleDoses,
+    required this.onDoseSelected,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => setState(() => _isChecked = !_isChecked),
-      child: Container(
-        width: 20,
-        height: 20,
+    // If no doses are possible for this vaccine at this age, show empty box
+    if (possibleDoses.isEmpty) {
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+        height: 24,
         decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: _isChecked
-              ? const Color(0xFF2E8B7B)
-              : const Color(0xFF2E8B7B).withValues(alpha: 0.25),
+          color: Colors.grey.withValues(alpha: 0.06),
           border: Border.all(
-            color: const Color(0xFF2E8B7B),
-            width: 1.5,
+            color: Colors.grey.withValues(alpha: 0.25),
+            width: 1,
+          ),
+          borderRadius: BorderRadius.circular(4),
+        ),
+      );
+    }
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          debugPrint('Box tapped! Possible doses: ${possibleDoses.length}');
+          _showDoseMenu(context);
+        },
+        borderRadius: BorderRadius.circular(4),
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+          constraints: const BoxConstraints(minHeight: 24, minWidth: 30),
+          decoration: BoxDecoration(
+            color: selectedDose != null
+                ? const Color(0xFF2E8B7B).withValues(alpha: 0.18)
+                : const Color(0xFFD4F1E3), // soft green used elsewhere
+            border: Border.all(
+              color: selectedDose != null
+                  ? const Color(0xFF2E8B7B)
+                  : const Color(0xFF2E8B7B).withValues(alpha: 0.6),
+              width: selectedDose != null ? 1.5 : 1,
+            ),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Center(
+            child: selectedDose != null
+                ? Text(
+                    selectedDose!,
+                    style: const TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF2E8B7B),
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  )
+                : const Icon(
+                    Icons.add,
+                    size: 12,
+                    color: Color(0xFF5D4037),
+                  ),
           ),
         ),
-        child: _isChecked
-            ? const Icon(Icons.check, size: 12, color: Colors.white)
-            : null,
       ),
     );
+  }
+
+  void _showDoseMenu(BuildContext context) {
+    debugPrint('_showDoseMenu called. Valid doses for this age: $possibleDoses');
+    
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFFD4F1E3),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+          titlePadding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+          contentPadding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+          actionsPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+          title: const Text(
+            'Select Dose',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF2E8B7B),
+            ),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Show warning if there are valid doses for this age
+                if (possibleDoses.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    margin: const EdgeInsets.only(bottom: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFB8E6D5),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(
+                        color: const Color(0xFF2E8B7B).withValues(alpha: 0.4),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.info_outline,
+                          size: 16,
+                          color: Color(0xFF2E8B7B),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Valid doses for this age: ${possibleDoses.join(", ")}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: const Color(0xFF2E8B7B).withValues(alpha: 0.9),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                // Clear selection option
+                if (selectedDose != null)
+                  ListTile(
+                    leading: const Icon(Icons.clear, color: Colors.red),
+                    title: const Text(
+                      'Clear selection',
+                      style: TextStyle(color: Colors.red, fontSize: 14),
+                    ),
+                    onTap: () {
+                      Navigator.of(dialogContext).pop();
+                      onDoseSelected(null);
+                    },
+                  ),
+                // Show all possible doses
+                ...allPossibleDoses.map((dose) {
+                  final isSelected = selectedDose == dose;
+                  final isValid = possibleDoses.contains(dose);
+                  return ListTile(
+                    leading: Icon(
+                      isSelected
+                          ? Icons.check_circle
+                          : Icons.radio_button_unchecked,
+                      color: isValid
+                          ? (isSelected ? const Color(0xFF2E8B7B) : Colors.grey)
+                          : Colors.grey.withValues(alpha: 0.4),
+                    ),
+                    title: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            dose,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight:
+                                  isSelected ? FontWeight.bold : FontWeight.normal,
+                              color: isValid
+                                  ? (isSelected
+                                      ? const Color(0xFF2E8B7B)
+                                      : Colors.black87)
+                                  : Colors.grey.withValues(alpha: 0.5),
+                            ),
+                          ),
+                        ),
+                        if (!isValid)
+                          const Padding(
+                            padding: EdgeInsets.only(left: 8),
+                            child: Icon(
+                              Icons.warning_amber_rounded,
+                              size: 16,
+                              color: Colors.orange,
+                            ),
+                          ),
+                      ],
+                    ),
+                    onTap: () {
+                      Navigator.of(dialogContext).pop();
+                      if (isValid) {
+                        onDoseSelected(dose);
+                      } else {
+                        // Show error message
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Error: "$dose" is not appropriate for this vaccine at this age. Valid doses: ${possibleDoses.join(", ")}',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                            backgroundColor: Colors.red,
+                            duration: const Duration(seconds: 3),
+                            action: SnackBarAction(
+                              label: 'OK',
+                              textColor: Colors.white,
+                              onPressed: () {},
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                  );
+                }),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+          ],
+        );
+      },
+    ).then((_) {
+      debugPrint('Dialog closed');
+    }).catchError((error) {
+      debugPrint('Error showing dialog: $error');
+    });
   }
 }
 
 // ==================== DEWORMING FORM ====================
 class DewormingForm extends StatefulWidget {
   final ValueChanged<Map<String, dynamic>>? onSave;
+  final String? errorText;
 
-  const DewormingForm({super.key, this.onSave});
+  const DewormingForm({super.key, this.onSave, this.errorText});
 
   @override
   State<DewormingForm> createState() => _DewormingFormState();
@@ -1824,14 +2578,25 @@ class _DewormingFormState extends State<DewormingForm> {
   final TextEditingController _nextDateController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    _dateController.addListener(_notifyParent);
+    _adverseController.addListener(_notifyParent);
+    _nextDateController.addListener(_notifyParent);
+  }
+
+  @override
   void dispose() {
+    _dateController.removeListener(_notifyParent);
+    _adverseController.removeListener(_notifyParent);
+    _nextDateController.removeListener(_notifyParent);
     _dateController.dispose();
     _adverseController.dispose();
     _nextDateController.dispose();
     super.dispose();
   }
 
-  void _onSavePressed() {
+  void _notifyParent() {
     final map = {
       'dateOfLastDeworming': _dateController.text.trim(),
       'isNA': _isNA,
@@ -1839,7 +2604,6 @@ class _DewormingFormState extends State<DewormingForm> {
       'adverseReactions': _adverseController.text.trim(),
       'nextDewormingDate': _nextDateController.text.trim(),
     };
-
     widget.onSave?.call(map);
   }
 
@@ -1850,34 +2614,66 @@ class _DewormingFormState extends State<DewormingForm> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Text(
-                'Date of last deworming:',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF5D4037)),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Container(
-                  height: 28,
-                  decoration: const BoxDecoration(
-                    border: Border(bottom: BorderSide(color: Color(0xFF8B6914), width: 1)),
-                  ),
-                  child: TextField(
-                    controller: _dateController,
-                    decoration: const InputDecoration(border: InputBorder.none, isDense: true),
-                    style: const TextStyle(fontSize: 12, color: Color(0xFF5D4037)),
-                  ),
+          if (widget.errorText != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD32F2F).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFFD32F2F).withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.error_outline, size: 16, color: Color(0xFFD32F2F)),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        widget.errorText!,
+                        style: const TextStyle(fontSize: 11, color: Color(0xFFD32F2F)),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
+            ),
+          FormFieldRow(
+            label: 'Date of last deworming:',
+            labelWidth: 160,
+            controller: _dateController,
+            keyboardType: TextInputType.datetime,
+            hint: 'MM-DD-YYYY (e.g. 11-01-2025)',
+            readOnly: _isNA,
+            validator: (v) {
+              if (_isNA) return null;
+              if (v == null || v.trim().isEmpty) return 'Enter a date or select N/A';
+              final value = v.trim();
+              final regex = RegExp(r'^\d{2}-\d{2}-\d{4}$');
+              if (!regex.hasMatch(value)) {
+                return 'Use format MM-DD-YYYY';
+              }
+              return null;
+            },
           ),
           Row(
             children: [
               const SizedBox(width: 12),
               Checkbox(
                 value: _isNA,
-                onChanged: (v) => setState(() => _isNA = v ?? false),
+                onChanged: (v) {
+                  setState(() {
+                    _isNA = v ?? false;
+                    if (_isNA) {
+                      // When N/A is selected, clear all related inputs
+                      _dateController.clear();
+                      _nextDateController.clear();
+                      _adverseController.clear();
+                      _drugGiven = null;
+                    }
+                  });
+                  _notifyParent();
+                },
                 activeColor: const Color(0xFF2E8B7B),
               ),
               const Text('N/A', style: TextStyle(fontSize: 12, color: Color(0xFF5D4037))),
@@ -1892,14 +2688,24 @@ class _DewormingFormState extends State<DewormingForm> {
               ),
               const SizedBox(width: 8),
               Checkbox(
-                value: _drugGiven == 'Albendazole',
-                onChanged: (v) => setState(() => _drugGiven = v == true ? 'Albendazole' : null),
+                value: !_isNA && _drugGiven == 'Albendazole',
+                onChanged: _isNA
+                    ? null
+                    : (v) {
+                        setState(() => _drugGiven = v == true ? 'Albendazole' : null);
+                        _notifyParent();
+                      },
                 activeColor: const Color(0xFF2E8B7B),
               ),
               const Text('Albendazole', style: TextStyle(fontSize: 12, color: Color(0xFF5D4037))),
               Checkbox(
-                value: _drugGiven == 'Mebendazole',
-                onChanged: (v) => setState(() => _drugGiven = v == true ? 'Mebendazole' : null),
+                value: !_isNA && _drugGiven == 'Mebendazole',
+                onChanged: _isNA
+                    ? null
+                    : (v) {
+                        setState(() => _drugGiven = v == true ? 'Mebendazole' : null);
+                        _notifyParent();
+                      },
                 activeColor: const Color(0xFF2E8B7B),
               ),
               const Text('Mebendazole', style: TextStyle(fontSize: 12, color: Color(0xFF5D4037))),
@@ -1908,31 +2714,24 @@ class _DewormingFormState extends State<DewormingForm> {
           const SizedBox(height: 12),
           FormFieldRow(label: 'Adverse Reactions:', labelWidth: 130, controller: _adverseController),
           const SizedBox(height: 12),
-          FormFieldRow(label: 'Next deworming date:', labelWidth: 140, controller: _nextDateController),
-          const SizedBox(height: 24),
-          // Save Button
-          /*SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _onSavePressed,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2E8B7B),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(25),
-                ),
-                elevation: 3,
-              ),
-              child: const Text(
-                'Savesadf',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),*/
+          FormFieldRow(
+            label: 'Next deworming date:',
+            labelWidth: 140,
+            controller: _nextDateController,
+            keyboardType: TextInputType.datetime,
+            hint: 'MM-DD-YYYY (e.g. 05-01-2026)',
+            readOnly: _isNA,
+            validator: (v) {
+              if (_isNA) return null;
+              if (v == null || v.trim().isEmpty) return 'Next deworming date is required';
+              final value = v.trim();
+              final regex = RegExp(r'^\d{2}-\d{2}-\d{4}$');
+              if (!regex.hasMatch(value)) {
+                return 'Use format MM-DD-YYYY';
+              }
+              return null;
+            },
+          ),
         ],
       ),
     );
