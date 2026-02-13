@@ -6,16 +6,28 @@ import 'package:firebase_auth/firebase_auth.dart';
 class _Vaccine {
   final String key;
   final String displayName;
+  final List<String> possibleDoses;
 
-  const _Vaccine({required this.key, required this.displayName});
+  const _Vaccine({
+    required this.key,
+    required this.displayName,
+    required this.possibleDoses,
+  });
 }
 
 const _vaccines = [
-  _Vaccine(key: 'bcg', displayName: 'BCG'),
-  _Vaccine(key: 'opvIpv', displayName: 'OPV / IPV'),
-  _Vaccine(key: 'dptPentavalent', displayName: 'DPT / Pentavalent'),
-  _Vaccine(key: 'measlesMmr', displayName: 'Measles / MMR'),
-  _Vaccine(key: 'hepatitisB', displayName: 'Hepatitis B'),
+  _Vaccine(key: 'bcg', displayName: 'BCG', possibleDoses: ['Pending', '1st dose']),
+  _Vaccine(key: 'hepatitisB', displayName: 'Hepatitis B', possibleDoses: ['Pending', '1st dose', '2nd dose', '3rd dose']),
+  _Vaccine(key: 'opv', displayName: 'OPV', possibleDoses: ['Pending', '1st dose', '2nd dose', '3rd dose']),
+  _Vaccine(key: 'dtap', displayName: 'DTaP', possibleDoses: ['Pending', '1st dose', '2nd dose', '3rd dose', '4th dose', '5th dose']),
+  _Vaccine(key: 'ipv', displayName: 'IPV', possibleDoses: ['Pending', '1st dose', '2nd dose', '3rd dose', '4th dose']),
+  _Vaccine(key: 'hib', displayName: 'HIB', possibleDoses: ['Pending', '1st dose', '2nd dose', '3rd dose', 'Booster']),
+  _Vaccine(key: 'rotaV', displayName: 'Rota V', possibleDoses: ['Pending', '1st dose', '2nd dose', '3rd dose']),
+  _Vaccine(key: 'pcv', displayName: 'PCV', possibleDoses: ['Pending', '1st dose', '2nd dose', '3rd dose', '4th dose']),
+  _Vaccine(key: 'mmr', displayName: 'MMR', possibleDoses: ['Pending', '1st dose', '2nd dose']),
+  _Vaccine(key: 'typhoid', displayName: 'Typhoid', possibleDoses: ['Pending', '1st dose']),
+  _Vaccine(key: 'hepatitisA', displayName: 'Hepatitis A', possibleDoses: ['Pending', '1st dose', '2nd dose']),
+  _Vaccine(key: 'varicella', displayName: 'Varicella', possibleDoses: ['Pending', '1st dose', '2nd dose']),
 ];
 
 /// Widget displaying the Vaccination Status card in the patient profile.
@@ -37,7 +49,7 @@ class VaccinationStatusSection extends StatefulWidget {
 }
 
 class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
-  Map<String, bool> _statuses = {};
+  Map<String, String> _statuses = {}; // Changed from bool to String (dose values)
   DateTime? _lastReviewDate;
   bool _loading = true;
 
@@ -65,9 +77,20 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
       final snap = await _docRef.get();
       if (snap.exists) {
         final data = snap.data() as Map<String, dynamic>? ?? {};
-        final Map<String, bool> loaded = {};
+        final Map<String, String> loaded = {};
         for (final v in _vaccines) {
-          loaded[v.key] = data[v.key] == true;
+          // Handle migration from old bool format or new string format
+          final value = data[v.key];
+          if (value is bool) {
+            // Migrate from old format: true -> 'Completed', false -> 'Pending'
+            loaded[v.key] = value ? 'Completed' : 'Pending';
+          } else if (value is String) {
+            // New format: use the dose string directly
+            loaded[v.key] = value;
+          } else {
+            // Default to Pending
+            loaded[v.key] = 'Pending';
+          }
         }
         final ts = data['lastReviewDate'] as Timestamp?;
         setState(() {
@@ -77,9 +100,9 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
         });
       } else {
         // No record yet – initialize with all pending
-        final Map<String, bool> defaults = {};
+        final Map<String, String> defaults = {};
         for (final v in _vaccines) {
-          defaults[v.key] = false;
+          defaults[v.key] = 'Pending';
         }
         setState(() {
           _statuses = defaults;
@@ -93,7 +116,7 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
     }
   }
 
-  Future<void> _saveVaccination(Map<String, bool> updated) async {
+  Future<void> _saveVaccination(Map<String, String> updated) async {
     try {
       final now = DateTime.now();
       final payload = <String, dynamic>{
@@ -132,7 +155,24 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
   }
 
   int get _completedCount =>
-      _statuses.values.where((v) => v).length;
+      _statuses.values.where((v) => v != 'Pending' && v.isNotEmpty).length;
+  
+  bool _isCompleted(String dose) {
+    return dose != 'Pending' && dose.isNotEmpty;
+  }
+  
+  String _getDisplayDose(String dose) {
+    // Handle migration: "Completed" should show as the last possible dose
+    if (dose == 'Completed') {
+      return 'Completed';
+    }
+    return dose;
+  }
+  
+  bool get _allCompleted {
+    return _statuses.values.every((dose) => 
+        dose != 'Pending' && dose.isNotEmpty);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -208,7 +248,9 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
 
                 // ── Vaccine list ──
                 ...(_vaccines.map((v) {
-                  final completed = _statuses[v.key] ?? false;
+                  final dose = _statuses[v.key] ?? 'Pending';
+                  final completed = _isCompleted(dose);
+                  final displayDose = _getDisplayDose(dose);
                   return Padding(
                     padding: const EdgeInsets.only(left: 34, bottom: 6),
                     child: Row(
@@ -230,7 +272,7 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
                           ),
                         ),
                         Text(
-                          completed ? 'Completed' : 'Pending',
+                          displayDose,
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
@@ -248,7 +290,7 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
                 const SizedBox(height: 12),
 
                 // ── Overall status checkmark ──
-                if (_completedCount == _vaccines.length)
+                if (_allCompleted)
                   Padding(
                     padding: const EdgeInsets.only(left: 4, bottom: 8),
                     child: Row(
@@ -339,7 +381,7 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
   // ─── Update vaccination bottom sheet ───
   void _showUpdateSheet(BuildContext context) {
     // Local copy for the sheet
-    final draft = Map<String, bool>.from(_statuses);
+    final draft = Map<String, String>.from(_statuses);
 
     showModalBottomSheet(
       context: context,
@@ -350,7 +392,7 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
           builder: (ctx, setSheetState) {
             return Container(
               constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(ctx).size.height * 0.7,
+                maxHeight: MediaQuery.of(ctx).size.height * 0.8,
               ),
               decoration: const BoxDecoration(
                 color: Colors.white,
@@ -395,59 +437,110 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Vaccine toggles
+                  // Vaccine dose selectors
                   Flexible(
                     child: ListView(
                       shrinkWrap: true,
                       padding: const EdgeInsets.symmetric(horizontal: 24),
                       children: _vaccines.map((v) {
-                        final completed = draft[v.key] ?? false;
+                        final currentDose = draft[v.key] ?? 'Pending';
+                        final isCompleted = _isCompleted(currentDose);
                         return Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.only(bottom: 12),
                           child: Container(
                             decoration: BoxDecoration(
-                              color: completed
+                              color: isCompleted
                                   ? const Color(0xFFE8F5E9)
                                   : const Color(0xFFFFF3E0),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: completed
+                                color: isCompleted
                                     ? const Color(0xFF4CAF50).withOpacity(0.4)
                                     : const Color(0xFFFF9800).withOpacity(0.4),
                                 width: 1,
                               ),
                             ),
-                            child: CheckboxListTile(
-                              value: completed,
-                              onChanged: (val) {
-                                setSheetState(() {
-                                  draft[v.key] = val ?? false;
-                                });
-                              },
-                              title: Text(
-                                v.displayName,
-                                style: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.black87,
-                                ),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    v.displayName,
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  DropdownButtonFormField<String>(
+                                    value: currentDose,
+                                    decoration: InputDecoration(
+                                      contentPadding: const EdgeInsets.symmetric(
+                                          horizontal: 12, vertical: 8),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: BorderSide(
+                                          color: isCompleted
+                                              ? const Color(0xFF4CAF50)
+                                              : const Color(0xFFFF9800),
+                                        ),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: BorderSide(
+                                          color: isCompleted
+                                              ? const Color(0xFF4CAF50)
+                                              : const Color(0xFFFF9800),
+                                        ),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: const BorderSide(
+                                          color: Color(0xFF2E8B7B),
+                                          width: 2,
+                                        ),
+                                      ),
+                                      filled: true,
+                                      fillColor: Colors.white,
+                                    ),
+                                    items: v.possibleDoses.map((dose) {
+                                      return DropdownMenuItem<String>(
+                                        value: dose,
+                                        child: Text(
+                                          dose,
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: dose == 'Pending'
+                                                ? FontWeight.w500
+                                                : FontWeight.w600,
+                                            color: dose == 'Pending'
+                                                ? const Color(0xFFFF9800)
+                                                : Colors.black87,
+                                          ),
+                                        ),
+                                      );
+                                    }).toList(),
+                                    onChanged: (value) {
+                                      if (value != null) {
+                                        setSheetState(() {
+                                          draft[v.key] = value;
+                                        });
+                                      }
+                                    },
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.black87,
+                                    ),
+                                    icon: const Icon(
+                                      Icons.arrow_drop_down,
+                                      color: Color(0xFF2E8B7B),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              subtitle: Text(
-                                completed ? 'Completed' : 'Pending',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                  color: completed
-                                      ? const Color(0xFF4CAF50)
-                                      : const Color(0xFFFF9800),
-                                ),
-                              ),
-                              activeColor: const Color(0xFF2E8B7B),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 4),
                             ),
                           ),
                         );
