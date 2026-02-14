@@ -414,6 +414,9 @@ class _HomePageState extends State<HomePage>
       });
     }
   }
+  
+  if (mounted) setState(() => _statsRefreshKey++);
+}
 
   @override
   Widget build(BuildContext context) {
@@ -720,7 +723,8 @@ class _StatsRowState extends State<StatsRow> {
     await LocalDbService.instance.init();
     final online = await ConnectivityService.instance.checkOnline();
     if (online) {
-      return FirestoreService().getTodayScreenedCount();
+      //return FirestoreService().getTodayScreenedCount();
+      return FirestoreService().getTodayScreenedCountFromBarangay();
     }
     return LocalDbService.instance.getTodayScreenedCount();
   }

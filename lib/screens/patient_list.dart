@@ -101,6 +101,8 @@ class _PatientListTabState extends State<PatientListTab> {
   }
 
   Future<void> _fetchPatients() async {
+    setState(() => _loading = true);
+    
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
@@ -109,13 +111,34 @@ class _PatientListTabState extends State<PatientListTab> {
         return;
       }
 
-      final snapshot = await FirebaseFirestore.instance
+      // ✅ STEP 1: Get user's barangay
+      print('Fetching user barangay...');
+      final userDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
-          .collection('homepageData')
           .get();
 
-      // Group documents by patient name (firstName + lastName)
+      final barangayId = userDoc.data()?['barangayId'] as String?;
+      
+      if (barangayId == null) {
+        print('User has no barangay assigned');
+        setState(() => _loading = false);
+        return;
+      }
+
+      print('User barangay: $barangayId');
+
+      // ✅ STEP 2: Fetch all patients from barangay's shared patient list
+      final snapshot = await FirebaseFirestore.instance
+          .collection('barangays')
+          .doc(barangayId)
+          .collection('patients')
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      print('Found ${snapshot.docs.length} patient records');
+
+      // ✅ STEP 3: Group by patient name
       final Map<String, List<QueryDocumentSnapshot>> patientGroups = {};
       
       for (var doc in snapshot.docs) {
@@ -124,14 +147,6 @@ class _PatientListTabState extends State<PatientListTab> {
         
         String firstName = demographic['firstName']?.toString() ?? '';
         String lastName = demographic['lastName']?.toString() ?? '';
-        
-        // Fallback to name field if firstName/lastName not available
-        if (firstName.isEmpty && lastName.isEmpty) {
-          final name = demographic['name']?.toString() ?? '';
-          final parts = name.trim().split(RegExp(r'\s+'));
-          firstName = parts.isNotEmpty ? parts.first : '';
-          lastName = parts.length > 1 ? parts.sublist(1).join(' ') : '';
-        }
         
         // Create a key for grouping (case-insensitive)
         final key = '${firstName.toLowerCase().trim()}_${lastName.toLowerCase().trim()}';
@@ -142,10 +157,11 @@ class _PatientListTabState extends State<PatientListTab> {
         }
       }
       
-      // Create one Patient entry per unique patient (use most recent document)
+      print('Grouped into ${patientGroups.length} unique patients');
+
+      // ✅ STEP 4: Create one Patient entry per unique patient
       setState(() {
         _patients = patientGroups.entries.map((entry) {
-          // Sort by createdAt and get the most recent document
           final docs = entry.value;
           final assessmentCount = docs.length;
           docs.sort((a, b) {
@@ -156,6 +172,23 @@ class _PatientListTabState extends State<PatientListTab> {
             return timeB.compareTo(timeA); // Most recent first
           });
           
+          // Sort by createdAt and get the most recent document
+          docs.sort((a, b) {
+              final dataA = a.data() as Map<String, dynamic>?; 
+              final dataB = b.data() as Map<String, dynamic>?;
+
+              final timeA = (dataA?['createdAt'] as Timestamp?)
+                      ?.toDate() ??
+                  DateTime(1970);
+
+              final timeB = (dataB?['createdAt'] as Timestamp?)
+                      ?.toDate() ??
+                  DateTime(1970);
+
+              return timeB.compareTo(timeA);
+            });
+            
+
           final mostRecentDoc = docs.first;
           final data = mostRecentDoc.data() as Map<String, dynamic>;
           final demographic = data['demographic'] ?? {};
@@ -163,9 +196,6 @@ class _PatientListTabState extends State<PatientListTab> {
           final assessmentRemarks =
               _buildAssessmentRemarks(data, assessmentCount);
 
-          final name = demographic['name']?.toString() ?? '';
-          final parts = name.trim().split(RegExp(r'\s+'));
-          
           return Patient(
             firstName: demographic['firstName'] ?? (parts.isNotEmpty ? parts.first : ''),
             lastName: demographic['lastName'] ?? (parts.length > 1 ? parts.sublist(1).join(' ') : ''),
@@ -177,11 +207,13 @@ class _PatientListTabState extends State<PatientListTab> {
             address: demographic['address'] ?? '',
             dateOfBirth: demographic['dateOfBirth'] ?? '',
             sex: demographic['sex'] ?? '',
-            docId: mostRecentDoc.id, // Use most recent doc ID
+            docId: mostRecentDoc.id,
             motherName: demographic['mother'] ?? '',
             motherContact: demographic['motherContact'] ?? '',
             fatherName: demographic['father'] ?? '',
             fatherContact: demographic['fatherContact'] ?? '',
+            createdBy: data?['createdByName'] ?? 'Unknown',
+            barangayId: barangayId,
           );
         }).toList();
 
@@ -190,6 +222,15 @@ class _PatientListTabState extends State<PatientListTab> {
     } catch (e) {
       print('Error fetching patients: $e');
       setState(() => _loading = false);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading patients: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -218,11 +259,42 @@ class _PatientListTabState extends State<PatientListTab> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+        child: CircularProgressIndicator(
+          color: Colors.white,
+        ),
+      );
     }
 
     if (_patients.isEmpty) {
-      return const Center(child: Text('No patients found'));
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.person_off_outlined,
+              size: 64,
+              color: Colors.white.withOpacity(0.5),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'No patients found in your barangay',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Add a patient assessment to get started',
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+      );
     }
 
     return Padding(
@@ -284,7 +356,7 @@ class _PatientListTabState extends State<PatientListTab> {
           });
         },
         decoration: InputDecoration(
-          hintText: 'Search',
+          hintText: 'Search patients...',
           hintStyle: TextStyle(
             color: Colors.grey[400],
             fontSize: 14,
@@ -464,7 +536,7 @@ class _PatientListTabState extends State<PatientListTab> {
                   flex: 2,
                   child: Text(
                     patient.assessmentRemarks,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 9,
                       fontWeight: FontWeight.w500,
                       color: Colors.green,
@@ -637,13 +709,6 @@ class _PatientListTabState extends State<PatientListTab> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.edit, color: Color(0xFFF5A962)),
-              title: const Text('Edit Patient'),
-              onTap: () {
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
               leading: const Icon(Icons.assessment, color: Color(0xFF2E8B7B)),
               title: const Text('New Assessment'),
               onTap: () {
@@ -691,6 +756,7 @@ class _PatientListTabState extends State<PatientListTab> {
             _buildDetailRow('Last Visit',
                 '${patient.lastVisit.month}/${patient.lastVisit.day}/${patient.lastVisit.year}'),
             _buildDetailRow('Guardian Contact', patient.guardianContact),
+            _buildDetailRow('Added by', patient.createdBy),
           ],
         ),
         actions: [
@@ -707,7 +773,13 @@ class _PatientListTabState extends State<PatientListTab> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => PatientProfileOverview(patient: patient),
+                  builder: (_) => PatientProfileOverview(
+                    patient: patient,
+                    //isSharedPatient: true,           // ← Mark as shared
+                    //sharedPatientId: patient.docId,  // ← Pass the Firestore document ID
+                   //barangayId: patient.barangayId,  // ← Pass the barangay ID
+                  
+                  ),
                 ),
               );
             },
@@ -774,6 +846,8 @@ class Patient {
   final String motherContact;
   final String fatherName;
   final String fatherContact;
+  final String createdBy;
+  final String barangayId;
 
   Patient({
     required this.lastName,
@@ -791,5 +865,7 @@ class Patient {
     this.motherContact = '',
     this.fatherName = '',
     this.fatherContact = '',
+    this.createdBy = 'Unknown',
+    this.barangayId = '',
   });
 }

@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
+import '../../../services/assessment_service.dart';
 
 /// Assessment table widget displaying patient assessments
 class AssessmentTable extends StatelessWidget {
   final List<Map<String, dynamic>> assessments;
+  final String patientId;
   final bool loading;
   final VoidCallback onAddAssessment;
+   final Future<void> Function(Map<String, dynamic>, String patientId)? saveNewAssessment;
 
   const AssessmentTable({
     super.key,
+    required this.patientId, // new
     required this.assessments,
     required this.loading,
     required this.onAddAssessment,
+    this.saveNewAssessment, 
   });
 
   String _getClassification(Map<String, dynamic> assessment) {
@@ -325,3 +330,5 @@ class AssessmentTable extends StatelessWidget {
     );
   }
 }
+
+
