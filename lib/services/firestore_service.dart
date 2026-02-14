@@ -54,6 +54,29 @@ class FirestoreService {
     return docRef.id;
   }
 
+  /// Saves vaccination status for Profile Overview (keyed by child name).
+  Future<void> saveVaccinationStatus({
+    required String firstName,
+    required String lastName,
+    required Map<String, String> statuses,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+    final key = '${firstName.trim()}_${lastName.trim()}'.toLowerCase();
+    if (key == '_') return;
+    await _firestore
+        .collection('users')
+        .doc(user.uid)
+        .collection('vaccinationStatus')
+        .doc(key)
+        .set({
+      'firstName': firstName.trim(),
+      'lastName': lastName.trim(),
+      'statuses': statuses,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
   /// SOFT DELETE USER: marks all user's records as deleted
   Future<void> softDeleteUser(String uid) async {
     final userDoc = _firestore.collection('users').doc(uid);

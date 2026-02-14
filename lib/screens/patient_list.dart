@@ -196,6 +196,9 @@ class _PatientListTabState extends State<PatientListTab> {
           final assessmentRemarks =
               _buildAssessmentRemarks(data, assessmentCount);
 
+          final nameStr = '${demographic['firstName'] ?? ''} ${demographic['lastName'] ?? ''}'.trim();
+          final parts = nameStr.isEmpty ? <String>[] : nameStr.split(RegExp(r'\s+'));
+
           return Patient(
             firstName: demographic['firstName'] ?? (parts.isNotEmpty ? parts.first : ''),
             lastName: demographic['lastName'] ?? (parts.length > 1 ? parts.sublist(1).join(' ') : ''),

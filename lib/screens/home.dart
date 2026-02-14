@@ -413,10 +413,8 @@ class _HomePageState extends State<HomePage>
         }
       });
     }
+    if (mounted) setState(() => _statsRefreshKey++);
   }
-  
-  if (mounted) setState(() => _statsRefreshKey++);
-}
 
   @override
   Widget build(BuildContext context) {

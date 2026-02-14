@@ -109,11 +109,15 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
           // Handle migration from old bool format or new string format
           final value = data[v.key];
           if (value is bool) {
-            // Migrate from old format: true -> 'Completed', false -> 'Pending'
-            loaded[v.key] = value ? 'Completed' : 'Pending';
+            // Migrate from old format: true -> last dose (completed), false -> 'Pending'
+            loaded[v.key] = value ? v.possibleDoses.last : 'Pending';
           } else if (value is String) {
-            // New format: use the dose string directly
-            loaded[v.key] = value;
+            // Normalize legacy 'Completed' to this vaccine's last dose so dropdown has a valid item
+            if (value == 'Completed' && !v.possibleDoses.contains('Completed')) {
+              loaded[v.key] = v.possibleDoses.last;
+            } else {
+              loaded[v.key] = value;
+            }
           } else {
             // Default to Pending
             loaded[v.key] = 'Pending';
@@ -568,6 +572,10 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
                       padding: const EdgeInsets.symmetric(horizontal: 24),
                       children: _vaccines.map((v) {
                         final currentDose = draft[v.key] ?? 'Pending';
+                        // Ensure dropdown value exists in items: map legacy 'Completed' to last dose; fallback if invalid
+                        final dropdownValue = (currentDose == 'Completed' && !v.possibleDoses.contains('Completed'))
+                            ? v.possibleDoses.last
+                            : (v.possibleDoses.contains(currentDose) ? currentDose : v.possibleDoses.first);
                         final isCompleted = _isCompleted(currentDose);
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 12),
@@ -600,7 +608,7 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
                                   ),
                                   const SizedBox(height: 8),
                                   DropdownButtonFormField<String>(
-                                    value: currentDose,
+                                    value: dropdownValue,
                                     decoration: InputDecoration(
                                       contentPadding: const EdgeInsets.symmetric(
                                           horizontal: 12, vertical: 8),
