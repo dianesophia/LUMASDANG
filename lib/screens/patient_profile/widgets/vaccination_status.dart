@@ -19,16 +19,29 @@ const _vaccines = [
 ];
 
 /// Widget displaying the Vaccination Status card in the patient profile.
-/// Reads & writes vaccination data to Firestore under
-/// `users/{uid}/vaccinations/{patientKey}`.
+/// 
+/// Supports two storage modes:
+/// 1. Personal mode: Stores under `users/{uid}/vaccinations/{patientKey}`
+/// 2. Shared mode: Stores under `barangays/{barangayId}/patients/{patientId}/vaccination`
+///    (Use this when patient data is shared across barangay)
 class VaccinationStatusSection extends StatefulWidget {
   final String firstName;
   final String lastName;
+  
+  /// Optional: If provided, vaccination will be stored in barangay-shared patient record
+  final String? patientId;
+  final String? barangayId;
+  
+  /// If true, stores vaccination in barangay-shared location
+  final bool useSharedStorage;
 
   const VaccinationStatusSection({
     super.key,
     required this.firstName,
     required this.lastName,
+    this.patientId,
+    this.barangayId,
+    this.useSharedStorage = false,
   });
 
   @override
@@ -39,19 +52,33 @@ class VaccinationStatusSection extends StatefulWidget {
 class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
   Map<String, bool> _statuses = {};
   DateTime? _lastReviewDate;
+  String? _lastModifiedByName;
   bool _loading = true;
 
-  /// Firestore document key for this patient's vaccination record
+  /// Firestore document key for this patient's vaccination record (personal mode)
   String get _patientKey =>
       '${widget.firstName.trim().toLowerCase()}_${widget.lastName.trim().toLowerCase()}';
 
+  /// Get the appropriate document reference based on storage mode
   DocumentReference get _docRef {
-    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
-    return FirebaseFirestore.instance
-        .collection('users')
-        .doc(uid)
-        .collection('vaccinations')
-        .doc(_patientKey);
+    if (widget.useSharedStorage && widget.patientId != null && widget.barangayId != null) {
+      // Shared storage: barangays/{barangayId}/patients/{patientId}/vaccination/record
+      return FirebaseFirestore.instance
+          .collection('barangays')
+          .doc(widget.barangayId)
+          .collection('patients')
+          .doc(widget.patientId)
+          .collection('vaccination')
+          .doc('record');
+    } else {
+      // Personal storage: users/{uid}/vaccinations/{patientKey}
+      final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+      return FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('vaccinations')
+          .doc(_patientKey);
+    }
   }
 
   @override
@@ -73,6 +100,7 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
         setState(() {
           _statuses = loaded;
           _lastReviewDate = ts?.toDate();
+          _lastModifiedByName = data['lastModifiedByName'] as String?;
           _loading = false;
         });
       } else {
@@ -84,6 +112,7 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
         setState(() {
           _statuses = defaults;
           _lastReviewDate = null;
+          _lastModifiedByName = null;
           _loading = false;
         });
       }
@@ -96,18 +125,40 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
   Future<void> _saveVaccination(Map<String, bool> updated) async {
     try {
       final now = DateTime.now();
+      final currentUser = FirebaseAuth.instance.currentUser;
+      
+      // Get current user's name for audit trail
+      String userName = 'Unknown';
+      if (currentUser != null) {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUser.uid)
+            .get();
+        userName = userDoc.data()?['fullName'] ?? 
+                   userDoc.data()?['username'] ?? 
+                   currentUser.email ?? 
+                   'Unknown';
+      }
+      
       final payload = <String, dynamic>{
         'firstName': widget.firstName,
         'lastName': widget.lastName,
         'lastReviewDate': Timestamp.fromDate(now),
+        'lastModifiedBy': currentUser?.uid ?? '',
+        'lastModifiedByName': userName,
+        'updatedAt': Timestamp.fromDate(now),
       };
+      
       for (final entry in updated.entries) {
         payload[entry.key] = entry.value;
       }
+      
       await _docRef.set(payload, SetOptions(merge: true));
+      
       setState(() {
         _statuses = Map.from(updated);
         _lastReviewDate = now;
+        _lastModifiedByName = userName;
       });
     } catch (e) {
       debugPrint('Error saving vaccination: $e');
@@ -168,14 +219,31 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
 
                 // ── Last review date ──
                 Center(
-                  child: Text(
-                    'Last Vaccination Review: ${_formatDate(_lastReviewDate)}',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: Color(0xFF2E8B7B),
-                      fontStyle: FontStyle.italic,
-                    ),
+                  child: Column(
+                    children: [
+                      Text(
+                        'Last Vaccination Review: ${_formatDate(_lastReviewDate)}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF2E8B7B),
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                      if (_lastModifiedByName != null && widget.useSharedStorage)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            'Updated by: $_lastModifiedByName',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.black.withOpacity(0.5),
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 18),
@@ -322,15 +390,38 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
         color: const Color(0xFFD4F1E3),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: const Center(
-        child: Text(
-          'Vaccination Status',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
-            letterSpacing: 0.5,
-          ),
+      child: Center(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Vaccination Status',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
+                letterSpacing: 0.5,
+              ),
+            ),
+            if (widget.useSharedStorage) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2E8B7B),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Text(
+                  'Shared',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -393,6 +484,39 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
                       color: Colors.black54,
                     ),
                   ),
+                  if (widget.useSharedStorage)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE8F5E9),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: const Color(0xFF2E8B7B).withOpacity(0.3),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.people,
+                              size: 14,
+                              color: const Color(0xFF2E8B7B),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Shared with barangay team',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF2E8B7B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 16),
 
                   // Vaccine toggles

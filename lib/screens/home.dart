@@ -133,7 +133,7 @@ class _HomePageState extends State<HomePage>
     super.dispose();
   }
 
-  Future<void> _saveAllData() async {
+  /*Future<void> _saveAllData() async {
     final data = {
       'demographic': {
         'firstName': firstNameController.text.trim(),
@@ -218,7 +218,191 @@ class _HomePageState extends State<HomePage>
       );
     }
     if (mounted) setState(() => _statsRefreshKey++);
+  }*/
+
+  /*Future<void> _saveAllData() async {
+  final data = {
+    'demographic': {
+      'firstName': firstNameController.text.trim(),
+      'lastName': lastNameController.text.trim(),
+      'age': ageController.text.trim(),
+      'sex': sexController.text.trim(),
+      'address': addressController.text.trim(),
+      'placeOfBirth': placeOfBirthController.text.trim(),
+      'dateOfBirth': dobController.text.trim(),
+      'mother': motherController.text.trim(),
+      'motherContact': motherContactController.text.trim(),
+      'father': fatherController.text.trim(),
+      'fatherContact': fatherContactController.text.trim(),
+    },
+    'anthropometric': {
+      'dateOfMeasurement': measurementDateController.text.trim(),
+      'weight': weightController.text.trim(),
+      'height': heightController.text.trim(),
+      'muac': muacController.text.trim(),
+      'weightForAge': weightForAgeController.text.trim(),
+      'weightForHeight': weightForHeightController.text.trim(),
+      'heightForAge': heightForAgeController.text.trim(),
+      'bmi': bmiController.text.trim(),
+    },
+    'healthStatus': {
+      'diarrhea': _diarrhea,
+      'fever': _fever,
+      'cough': _cough,
+      'other': _other,
+      'medications': _medications,
+    },
+    'dietary': {
+      'purelyBreastfed': _purelyBreastfed,
+      'cfAge': cfAgeController.text.trim(),
+      'cfFrequency': cfFreqController.text.trim(),
+      'cfFoods': cfFoodController.text.trim(),
+      'mealFrequency': mealFreqController.text.trim(),
+    },
+    'deworming': _dewormingData,
+    'oral': _oralData,
+  };
+
+  final firestore = FirestoreService();
+
+  // Check current connectivity
+  final online = await ConnectivityService.instance.checkOnline();
+
+  if (online) {
+    try {
+      // ✅ Save to barangay's shared patient list
+      final patientId = await firestore.savePatientToBarangay(data);
+      
+      // Also save locally marked as synced
+      await LocalDbService.instance.saveLocalRecord(data, synced: true, firestoreId: patientId);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Patient assessment saved successfully! Visible to all health workers in your barangay.'),
+          backgroundColor: Color(0xFF2E8B7B),
+        ),
+      );
+    } catch (e) {
+      // If Firestore write fails, fallback to local only
+      await LocalDbService.instance.saveLocalRecord(data, synced: false);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Saved locally (will sync later). Error: ${e.toString()}'),
+          backgroundColor: Colors.orangeAccent,
+        ),
+      );
+    }
+  } else {
+    // Offline: save locally for later sync
+    await LocalDbService.instance.saveLocalRecord(data, synced: false);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('No internet: saved locally and will sync when online.'),
+        backgroundColor: Colors.orangeAccent,
+      ),
+    );
   }
+  
+  if (mounted) setState(() => _statsRefreshKey++);
+}*/
+
+// ============================================================================
+// CHANGE #1: Update home.dart - Save to Barangay Instead of Personal
+// ============================================================================
+
+
+Future<void> _saveAllData() async {
+  final data = {
+    'demographic': {
+      'firstName': firstNameController.text.trim(),
+      'lastName': lastNameController.text.trim(),
+      'age': ageController.text.trim(),
+      'sex': sexController.text.trim(),
+      'address': addressController.text.trim(),
+      'placeOfBirth': placeOfBirthController.text.trim(),
+      'dateOfBirth': dobController.text.trim(),
+      'mother': motherController.text.trim(),
+      'motherContact': motherContactController.text.trim(),
+      'father': fatherController.text.trim(),
+      'fatherContact': fatherContactController.text.trim(),
+    },
+    'anthropometric': {
+      'dateOfMeasurement': measurementDateController.text.trim(),
+      'weight': weightController.text.trim(),
+      'height': heightController.text.trim(),
+      'muac': muacController.text.trim(),
+      'weightForAge': weightForAgeController.text.trim(),
+      'weightForHeight': weightForHeightController.text.trim(),
+      'heightForAge': heightForAgeController.text.trim(),
+      'bmi': bmiController.text.trim(),
+    },
+    'healthStatus': {
+      'diarrhea': _diarrhea,
+      'fever': _fever,
+      'cough': _cough,
+      'other': _other,
+      'medications': _medications,
+    },
+    'dietary': {
+      'purelyBreastfed': _purelyBreastfed,
+      'cfAge': cfAgeController.text.trim(),
+      'cfFrequency': cfFreqController.text.trim(),
+      'cfFoods': cfFoodController.text.trim(),
+      'mealFrequency': mealFreqController.text.trim(),
+    },
+    'deworming': _dewormingData,
+    'oral': _oralData,
+  };
+
+  final firestore = FirestoreService();
+
+  // Check current connectivity
+  final online = await ConnectivityService.instance.checkOnline();
+
+  if (online) {
+    try {
+      // ✅ CHANGED: Save to barangay's shared patient list instead of personal storage
+      final patientId = await firestore.savePatientToBarangay(data);
+      
+      // Also save locally marked as synced
+      await LocalDbService.instance.saveLocalRecord(data, synced: true, firestoreId: patientId);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✅ Patient saved to shared barangay list! All health workers can now see this patient.'),
+          backgroundColor: Color(0xFF2E8B7B),
+          duration: Duration(seconds: 3),
+        ),
+      );
+    } catch (e) {
+      // If Firestore write fails, fallback to local only
+      await LocalDbService.instance.saveLocalRecord(data, synced: false);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Saved locally (will sync later). Error: ${e.toString()}'),
+          backgroundColor: Colors.orangeAccent,
+        ),
+      );
+    }
+  } else {
+    // Offline: save locally for later sync
+    await LocalDbService.instance.saveLocalRecord(data, synced: false);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('No internet: saved locally and will sync when online.'),
+        backgroundColor: Colors.orangeAccent,
+      ),
+    );
+  }
+  
+  if (mounted) setState(() => _statsRefreshKey++);
+}
 
   @override
   Widget build(BuildContext context) {
@@ -498,7 +682,8 @@ class _StatsRowState extends State<StatsRow> {
     await LocalDbService.instance.init();
     final online = await ConnectivityService.instance.checkOnline();
     if (online) {
-      return FirestoreService().getTodayScreenedCount();
+      //return FirestoreService().getTodayScreenedCount();
+      return FirestoreService().getTodayScreenedCountFromBarangay();
     }
     return LocalDbService.instance.getTodayScreenedCount();
   }

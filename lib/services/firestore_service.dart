@@ -559,8 +559,6 @@ Future<String> updateProfilePicture(
 }
 
 
-
-/// GET USER PROFILE DATA
 Future<Map<String, dynamic>?> getUserProfile() async {
   try {
     final user = _auth.currentUser;
@@ -585,26 +583,361 @@ Future<Map<String, dynamic>?> getUserProfile() async {
   }
 }
 
+Future<int> getTodayScreenedCount() async {
+  final user = _auth.currentUser;
+  if (user == null) return 0;
+
+  final now = DateTime.now();
+  final startOfDay = DateTime(now.year, now.month, now.day);
+  final endOfDay = startOfDay.add(const Duration(days: 1));
+
+  final snapshot = await _firestore
+      .collection('users')
+      .doc(user.uid)
+      .collection('homepageData')
+      .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
+      .where('createdAt', isLessThan: Timestamp.fromDate(endOfDay))
+      .get();
+
+  return snapshot.docs.length;
+}
 
 
-  Future<int> getTodayScreenedCount() async {
-    final user = _auth.currentUser;
-    if (user == null) return 0;
+/// Save patient data to barangay-specific patient list
+Future<String> savePatientToBarangay(Map<String, dynamic> patientData) async {
+  final user = _auth.currentUser;
+  if (user == null) {
+    throw FirebaseAuthException(
+      code: 'no-current-user',
+      message: 'No authenticated user found',
+    );
+  }
+
+  print('💾 Saving patient to barangay...');
+  
+  // Get user's barangay
+  final userDoc = await _firestore.collection('users').doc(user.uid).get();
+  final barangayId = userDoc.data()?['barangayId'] as String?;
+
+  if (barangayId == null || barangayId.isEmpty) {
+    print('❌ User has no barangay assigned');
+    throw Exception('User has no barangay assigned');
+  }
+
+  print('✅ User barangayId: $barangayId');
+
+  // Save patient to barangay's patients collection
+  final patientRef = _firestore
+      .collection('barangays')
+      .doc(barangayId)
+      .collection('patients')
+      .doc(); // auto-generate ID
+
+  final payload = {
+    ...patientData,
+    'createdAt': FieldValue.serverTimestamp(),
+    'createdBy': user.uid,
+    'createdByName': userDoc.data()?['fullName'] ?? userDoc.data()?['username'] ?? 'Unknown',
+    'barangayId': barangayId,
+    'barangay': userDoc.data()?['barangay'] ?? '',
+    'isDeleted': false,  // ← REQUIRED by Firestore rules
+    'lastModifiedBy': user.uid,  // ← Add this for future updates
+    'lastModifiedAt': FieldValue.serverTimestamp(),
+  };
+
+  await patientRef.set(payload);
+  print('✅ Patient saved with ID: ${patientRef.id}');
+  
+  return patientRef.id;
+}
+
+
+/// Get all patients from user's barangay
+Future<List<Map<String, dynamic>>> getPatientsFromBarangay() async {
+  final user = _auth.currentUser;
+  if (user == null) {
+    print('❌ No user logged in');
+    return [];
+  }
+
+  try {
+    print('📋 Getting patients from barangay...');
+    
+    // Get user's barangay
+    final userDoc = await _firestore.collection('users').doc(user.uid).get();
+    final barangayId = userDoc.data()?['barangayId'] as String?;
+
+    if (barangayId == null || barangayId.isEmpty) {
+      print('❌ User has no barangayId');
+      return [];
+    }
+
+    print('✅ User barangayId: $barangayId');
+
+    // Get all patients from this barangay (excluding deleted ones)
+    final snapshot = await _firestore
+        .collection('barangays')
+        .doc(barangayId)
+        .collection('patients')
+        .where('isDeleted', isEqualTo: false)  // ← Filter out deleted patients
+        .orderBy('createdAt', descending: true)
+        .get();
+
+    print('✅ Found ${snapshot.docs.length} patients');
+
+    return snapshot.docs.map((doc) {
+      final data = doc.data();
+      data['id'] = doc.id;
+      return data;
+    }).toList();
+    
+  } catch (e) {
+    print('❌ Error getting patients from barangay: $e');
+    return [];
+  }
+}
+
+
+/// Get today's screened count from barangay
+Future<int> getTodayScreenedCountFromBarangay() async {
+  final user = _auth.currentUser;
+  if (user == null) {
+    print('❌ No user logged in');
+    return 0;
+  }
+
+  try {
+    final userDoc = await _firestore.collection('users').doc(user.uid).get();
+    final barangayId = userDoc.data()?['barangayId'] as String?;
+
+    if (barangayId == null || barangayId.isEmpty) {
+      print('❌ No barangayId found');
+      return 0;
+    }
+
+    print('📊 Counting today\'s screenings for barangayId: $barangayId');
 
     final now = DateTime.now();
     final startOfDay = DateTime(now.year, now.month, now.day);
     final endOfDay = startOfDay.add(const Duration(days: 1));
 
     final snapshot = await _firestore
-        .collection('users')
-        .doc(user.uid)
-        .collection('homepageData')
+        .collection('barangays')
+        .doc(barangayId)
+        .collection('patients')
+        .where('isDeleted', isEqualTo: false)  // ← Only count non-deleted
         .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
         .where('createdAt', isLessThan: Timestamp.fromDate(endOfDay))
         .get();
 
+    print('✅ Today\'s count: ${snapshot.docs.length}');
     return snapshot.docs.length;
+    
+  } catch (e) {
+    print('❌ Error counting today\'s screenings: $e');
+    return 0;
   }
+}
+
+// ============================================================================
+// PATIENT ASSESSMENTS - Barangay shared
+// ============================================================================
+
+/// Save assessment to barangay patient's assessments subcollection
+Future<String> saveAssessmentToBarangayPatient({
+  required String patientId,
+  required Map<String, dynamic> assessmentData,
+}) async {
+  final user = _auth.currentUser;
+  if (user == null) {
+    throw FirebaseAuthException(
+      code: 'no-current-user',
+      message: 'No authenticated user found',
+    );
+  }
+
+  // Get user's barangay
+  final userDoc = await _firestore.collection('users').doc(user.uid).get();
+  final barangayId = userDoc.data()?['barangayId'] as String?;
+
+  if (barangayId == null || barangayId.isEmpty) {
+    throw Exception('User has no barangay assigned');
+  }
+
+  // Create assessment document
+  final assessmentRef = _firestore
+      .collection('barangays')
+      .doc(barangayId)
+      .collection('patients')
+      .doc(patientId)
+      .collection('assessments')
+      .doc(); // auto-generate ID
+
+  final payload = {
+    ...assessmentData,
+    'createdAt': FieldValue.serverTimestamp(),
+    'createdBy': user.uid,
+    'createdByName': userDoc.data()?['fullName'] ?? userDoc.data()?['username'] ?? 'Unknown',
+    'barangayId': barangayId,
+  };
+
+  await assessmentRef.set(payload);
+  return assessmentRef.id;
+}
+
+/// Get all assessments for a specific patient
+Future<List<Map<String, dynamic>>> getAssessmentsForBarangayPatient(String patientId) async {
+  final user = _auth.currentUser;
+  if (user == null) return [];
+
+  // Get user's barangay
+  final userDoc = await _firestore.collection('users').doc(user.uid).get();
+  final barangayId = userDoc.data()?['barangayId'] as String?;
+
+  if (barangayId == null) return [];
+
+  // Get all assessments for this patient
+  final snapshot = await _firestore
+      .collection('barangays')
+      .doc(barangayId)
+      .collection('patients')
+      .doc(patientId)
+      .collection('assessments')
+      .orderBy('createdAt', descending: false) // ascending for chronological order
+      .get();
+
+  return snapshot.docs.map((doc) {
+    final data = doc.data();
+    data['id'] = doc.id;
+    return data;
+  }).toList();
+}
+
+/// Update an existing assessment
+Future<void> updateAssessmentInBarangayPatient({
+  required String patientId,
+  required String assessmentId,
+  required Map<String, dynamic> updatedData,
+}) async {
+  final user = _auth.currentUser;
+  if (user == null) {
+    throw FirebaseAuthException(
+      code: 'no-current-user',
+      message: 'No authenticated user found',
+    );
+  }
+
+  // Get user's barangay
+  final userDoc = await _firestore.collection('users').doc(user.uid).get();
+  final barangayId = userDoc.data()?['barangayId'] as String?;
+
+  if (barangayId == null || barangayId.isEmpty) {
+    throw Exception('User has no barangay assigned');
+  }
+
+  // Update the assessment record
+  await _firestore
+      .collection('barangays')
+      .doc(barangayId)
+      .collection('patients')
+      .doc(patientId)
+      .collection('assessments')
+      .doc(assessmentId)
+      .update({
+    ...updatedData,
+    'updatedAt': FieldValue.serverTimestamp(),
+    'lastModifiedBy': user.uid,
+    'lastModifiedByName': userDoc.data()?['fullName'] ?? userDoc.data()?['username'] ?? 'Unknown',
+  });
+}
+
+// Add this method to your existing FirestoreService class
+
+// In firestore_service.dart, add this method:
+// ============================================================================
+// ADD THIS METHOD TO YOUR FirestoreService class
+// Replace the existing getRecentAssessments() method with this one
+// ============================================================================
+
+Future<List<Map<String, dynamic>>> getRecentAssessments({int limit = 50}) async {
+  try {
+    print('📋 getRecentAssessments() called');
+    
+    final user = _auth.currentUser;
+    if (user == null) {
+      print('❌ No user logged in');
+      return [];
+    }
+
+    print('✅ User UID: ${user.uid}');
+    
+    // Get user's barangay
+    final userDoc = await _firestore.collection('users').doc(user.uid).get();
+    
+    if (!userDoc.exists) {
+      print('❌ User document does not exist');
+      return [];
+    }
+    
+    final userData = userDoc.data()!;
+    print('📄 User data: $userData');
+    
+    // Use 'barangayId' field (NOT 'barangay')
+    final barangayId = userData['barangayId'] as String?;
+
+    if (barangayId == null || barangayId.isEmpty) {
+      print('❌ User has no barangayId assigned');
+      print('   Available fields: ${userData.keys.toList()}');
+      return [];
+    }
+
+    print('✅ User barangayId: $barangayId');
+
+    // Get recent patients from the barangay's patient list
+    final querySnapshot = await _firestore
+        .collection('barangays')
+        .doc(barangayId)
+        .collection('patients')
+        .where('isDeleted', isEqualTo: false)  // ← Filter out deleted patients
+        .orderBy('createdAt', descending: true)  // ← Use 'createdAt' NOT 'timestamp'
+        .limit(limit)
+        .get();
+
+    print('✅ Found ${querySnapshot.docs.length} patient records');
+
+    final notifications = querySnapshot.docs.map((doc) {
+      final data = doc.data();
+      
+      // Debug: Print first record to see structure
+      if (doc == querySnapshot.docs.first) {
+        print('📝 Sample patient data structure:');
+        print('   Has demographic: ${data.containsKey('demographic')}');
+        print('   Has createdAt: ${data.containsKey('createdAt')}');
+        print('   Has timestamp: ${data.containsKey('timestamp')}');
+        print('   Keys: ${data.keys.toList()}');
+      }
+      
+      return {
+        'id': doc.id,
+        'firstName': data['demographic']?['firstName'] ?? '',
+        'lastName': data['demographic']?['lastName'] ?? '',
+        'age': data['demographic']?['age'] ?? '',
+        'sex': data['demographic']?['sex'] ?? '',
+        'timestamp': data['createdAt'],  // ← Use 'createdAt' as the timestamp
+        'synced': true,
+      };
+    }).toList();
+    
+    print('✅ Returning ${notifications.length} notifications');
+    return notifications;
+    
+  } catch (e, stackTrace) {
+    print('❌ Error fetching recent assessments: $e');
+    print('Stack trace: $stackTrace');
+    return [];
+  }
+}
+
 }
 
 

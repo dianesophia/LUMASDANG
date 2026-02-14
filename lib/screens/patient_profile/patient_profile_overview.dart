@@ -14,15 +14,28 @@ import 'widgets/overall_nutritional_status.dart';
 import 'widgets/vaccination_status.dart';
 import 'widgets/deworming_status.dart';
 import 'widgets/parent_contact_tab.dart';
+import '../../services/assessment_service.dart';
 
 class PatientProfileOverview extends StatefulWidget {
   final Patient patient;
   final int initialTabIndex;
+  
+  /// If true, this patient is from the barangay shared list
+  final bool isSharedPatient;
+  
+  /// Patient ID for shared patients (from barangays collection)
+  final String? sharedPatientId;
+  
+  /// Barangay ID for shared patients
+  final String? barangayId;
 
   const PatientProfileOverview({
     super.key,
     required this.patient,
     this.initialTabIndex = 0,
+    this.isSharedPatient = false,
+    this.sharedPatientId,
+    this.barangayId,
   });
 
   @override
@@ -157,6 +170,35 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview> {
 
   Future<void> _fetchAssessments() async {
     try {
+      final firestoreService = FirestoreService();
+      
+      // If this is a shared patient, fetch from barangay assessments
+      if (widget.isSharedPatient && widget.sharedPatientId != null) {
+        final assessments = await firestoreService.getAssessmentsForBarangayPatient(
+          widget.sharedPatientId!,
+        );
+        
+        final List<Map<String, dynamic>> processed = [];
+        for (var assessment in assessments) {
+          processed.add(_extractAssessment(assessment, assessment['id']));
+        }
+        
+        // Sort by date ascending
+        processed.sort((a, b) {
+          final dateA = a['date'] as DateTime?;
+          final dateB = b['date'] as DateTime?;
+          if (dateA == null || dateB == null) return 0;
+          return dateA.compareTo(dateB);
+        });
+        
+        setState(() {
+          _assessments = processed;
+          _loading = false;
+        });
+        return;
+      }
+      
+      // Otherwise, use the original personal data logic
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
         setState(() => _loading = false);
@@ -268,9 +310,11 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview> {
 
           // ===== ASSESSMENT TABLE =====
           AssessmentTable(
+            patientId: widget.sharedPatientId ?? widget.patient.docId,
             assessments: _assessments,
             loading: _loading,
-            onAddAssessment: _showAddAssessmentSheet,
+            onAddAssessment: _showAddAssessmentSheet, 
+            saveNewAssessment: null, // We'll handle this in the sheet
           ),
           const SizedBox(height: 20),
 
@@ -293,6 +337,12 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview> {
           VaccinationStatusSection(
             firstName: patient.firstName,
             lastName: patient.lastName,
+            //patientId: widget.isSharedPatient ? widget.sharedPatientId : null,
+            //barangayId: widget.isSharedPatient ? widget.barangayId : null,
+            //useSharedStorage: widget.isSharedPatient,
+            patientId: patient.docId,        // ✅ Always use docId
+            barangayId: patient.barangayId,  // ✅ Always use barangayId
+            useSharedStorage: true,           // ✅ Always shared!
           ),
           const SizedBox(height: 20),
 
@@ -360,14 +410,37 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview> {
                     ),
                     Expanded(
                       child: Center(
-                        child: Text(
-                          _tabTitles[_currentTabIndex],
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            letterSpacing: 1.5,
-                          ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _tabTitles[_currentTabIndex],
+                              style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                letterSpacing: 1.5,
+                              ),
+                            ),
+                            if (widget.isSharedPatient) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.3),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Text(
+                                  'SHARED',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
                     ),
@@ -507,14 +580,47 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview> {
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
-                    const Text(
-                      'New Assessment',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF2E8B7B),
-                        letterSpacing: 0.5,
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text(
+                          'New Assessment',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF2E8B7B),
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        if (widget.isSharedPatient) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE8F5E9),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: const Color(0xFF2E8B7B).withOpacity(0.3),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: const [
+                                Icon(Icons.people, size: 12, color: Color(0xFF2E8B7B)),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Shared',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF2E8B7B),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -718,7 +824,7 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview> {
     );
   }
 
-  Future<void> _saveNewAssessment({
+  /*Future<void> _saveNewAssessment({
     required String date,
     required String weight,
     required String height,
@@ -758,40 +864,59 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview> {
     };
 
     final firestore = FirestoreService();
-    final online = await ConnectivityService.instance.checkOnline();
-
-    if (online) {
-      try {
-        final docId = await firestore.saveHomePageData(data);
-        await LocalDbService.instance
-            .saveLocalRecord(data, synced: true, firestoreId: docId);
-
+    
+    try {
+      // If shared patient, save to barangay assessments
+      if (widget.isSharedPatient && widget.sharedPatientId != null) {
+        await firestore.saveAssessmentToBarangayPatient(
+          patientId: widget.sharedPatientId!,
+          assessmentData: data,
+        );
+        
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Assessment saved successfully.'),
+              content: Text('Assessment saved to shared patient record.'),
               backgroundColor: Color(0xFF2E8B7B),
             ),
           );
         }
-      } catch (e) {
-        await LocalDbService.instance.saveLocalRecord(data, synced: false);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Saved locally (will sync later). Error: $e'),
-              backgroundColor: Colors.orangeAccent,
-            ),
-          );
+      } else {
+        // Otherwise save to personal homepageData
+        final online = await ConnectivityService.instance.checkOnline();
+        
+        if (online) {
+          final docId = await firestore.saveHomePageData(data);
+          await LocalDbService.instance
+              .saveLocalRecord(data, synced: true, firestoreId: docId);
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Assessment saved successfully.'),
+                backgroundColor: Color(0xFF2E8B7B),
+              ),
+            );
+          }
+        } else {
+          await LocalDbService.instance.saveLocalRecord(data, synced: false);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('No internet: saved locally and will sync when online.'),
+                backgroundColor: Colors.orangeAccent,
+              ),
+            );
+          }
         }
       }
-    } else {
-      await LocalDbService.instance.saveLocalRecord(data, synced: false);
+    } catch (e) {
+      debugPrint('Error saving assessment: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No internet: saved locally and will sync when online.'),
-            backgroundColor: Colors.orangeAccent,
+          SnackBar(
+            content: Text('Error saving assessment: $e'),
+            backgroundColor: Colors.red,
           ),
         );
       }
@@ -801,5 +926,144 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview> {
     setState(() => _loading = true);
     await _fetchAssessments();
   }
+*/
+
+// ============================================================================
+// SIMPLE FIX: Update _saveNewAssessment to save ALL data
+// Replace your existing _saveNewAssessment method with this
+// ============================================================================
+
+Future<void> _saveNewAssessment({
+  required String date,
+  required String weight,
+  required String height,
+  required String muac,
+  // Add optional parameters for complete data
+  bool? diarrhea,
+  bool? fever,
+  bool? cough,
+  bool? other,
+  bool? medications,
+  bool? purelyBreastfed,
+  String? cfAge,
+  String? cfFreq,
+  String? cfFood,
+  String? mealFreq,
+  String? dewormDate,
+  bool? dewormNA,
+  String? drugGiven,
+  String? adverseReactions,
+  String? nextDewormDate,
+  String? overallRisk,
+}) async {
+  final patient = widget.patient;
+
+  // Calculate anthropometric classifications
+  final result = AnthropometricCalculator.calculate(
+    weightStr: weight,
+    heightStr: height,
+    ageStr: patient.age.toString(),
+    sexStr: patient.sex,
+    dobStr: patient.dateOfBirth,
+    measurementDateStr: date,
+  );
+
+  // ✅ NOW INCLUDES ALL DATA - just like home page
+  final data = {
+    'demographic': {
+      'firstName': patient.firstName,
+      'lastName': patient.lastName,
+      'age': patient.age.toString(),
+      'sex': patient.sex,
+      'address': patient.address,
+      'dateOfBirth': patient.dateOfBirth,
+      'mother': patient.motherName,
+      'motherContact': patient.motherContact,
+      'father': patient.fatherName,
+      'fatherContact': patient.fatherContact,
+    },
+    'anthropometric': {
+      'dateOfMeasurement': date,
+      'weight': weight,
+      'height': height,
+      'muac': muac,
+      'weightForAge': result?.weightForAge ?? '',
+      'weightForHeight': result?.weightForHeight ?? '',
+      'heightForAge': result?.heightForAge ?? '',
+      'bmi': result?.bmi ?? '',
+    },
+    // ✅ ADD HEALTH STATUS
+    'healthStatus': {
+      'diarrhea': diarrhea ?? false,
+      'fever': fever ?? false,
+      'cough': cough ?? false,
+      'other': other ?? false,
+      'medications': medications ?? false,
+    },
+    // ✅ ADD DIETARY
+    'dietary': {
+      'purelyBreastfed': purelyBreastfed,
+      'cfAge': cfAge ?? '',
+      'cfFrequency': cfFreq ?? '',
+      'cfFoods': cfFood ?? '',
+      'mealFrequency': mealFreq ?? '',
+    },
+    // ✅ ADD DEWORMING
+    'deworming': {
+      'dateOfLastDeworming': dewormDate ?? '',
+      'isNA': dewormNA ?? false,
+      'drugGiven': drugGiven,
+      'adverseReactions': adverseReactions ?? '',
+      'nextDewormingDate': nextDewormDate ?? '',
+    },
+    // ✅ ADD ORAL ASSESSMENT
+    'oral': {
+      'overallRisk': overallRisk,
+    },
+  };
+
+  final firestore = FirestoreService();
+  
+  try {
+    // ✅ ALWAYS save to barangay shared storage
+    await firestore.saveAssessmentToBarangayPatient(
+      patientId: patient.docId,  // Use patient.docId directly
+      assessmentData: data,
+    );
+    
+    // Also save locally
+    await LocalDbService.instance
+        .saveLocalRecord(data, synced: true, firestoreId: patient.docId);
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✅ Complete assessment saved to shared patient record!'),
+          backgroundColor: Color(0xFF2E8B7B),
+        ),
+      );
+    }
+  } catch (e) {
+    debugPrint('Error saving assessment: $e');
+    
+    // Fallback to local storage
+    await LocalDbService.instance.saveLocalRecord(data, synced: false);
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Saved locally, will sync later: $e'),
+          backgroundColor: Colors.orangeAccent,
+        ),
+      );
+    }
+  }
+
+  // Refresh the assessment table
+  setState(() => _loading = true);
+  await _fetchAssessments();
+}
+
+
 
 }
