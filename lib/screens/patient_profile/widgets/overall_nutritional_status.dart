@@ -4,12 +4,10 @@ import 'package:flutter/material.dart';
 /// based on the latest assessment data (Weight-for-Age, Height-for-Age, MUAC, Risk Classification).
 class OverallNutritionalStatusSection extends StatelessWidget {
   final List<Map<String, dynamic>> assessments;
-  final VoidCallback? onReturnToDashboard;
 
   const OverallNutritionalStatusSection({
     super.key,
     required this.assessments,
-    this.onReturnToDashboard,
   });
 
   /// Get the most recent assessment that has anthropometric data
@@ -332,30 +330,6 @@ class OverallNutritionalStatusSection extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
-
-          // Return to Dashboard button
-          Center(
-            child: ElevatedButton(
-              onPressed: onReturnToDashboard,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFF5A962),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(25),
-                ),
-                elevation: 3,
-              ),
-              child: const Text(
-                'Return to Dashboard',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ),
-          ),
         ],
       ),
     );

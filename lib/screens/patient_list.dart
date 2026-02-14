@@ -16,8 +16,83 @@ class _PatientListTabState extends State<PatientListTab> {
   bool _sortAscending = true;
   String _searchQuery = '';
   bool _loading = true;
-
   List<Patient> _patients = [];
+
+  /// Extract the interpretation text from a z-score string like "-1.50 (Underweight)"
+  String _extractInterpretation(String? zScoreStr) {
+    if (zScoreStr == null || zScoreStr.isEmpty) return '';
+    final match = RegExp(r'\(([^)]+)\)').firstMatch(zScoreStr);
+    return match?.group(1) ?? '';
+  }
+
+  /// Build a simple nutritional status summary from the latest assessment.
+  ///
+  /// Examples:
+  /// - "Underweight"
+  /// - "Stunted"
+  /// - "Overweight/Obese"
+  /// - "At risk"
+  /// If no clear issue is found but assessments exist, returns "Normal".
+  /// If there are no assessments, returns "No assessments".
+  String _buildAssessmentRemarks(Map<String, dynamic> data, int assessmentCount) {
+    final anthropometric = (data['anthropometric'] ?? {}) as Map<String, dynamic>;
+
+    final weightForAge = anthropometric['weightForAge']?.toString() ?? '';
+    final heightForAge = anthropometric['heightForAge']?.toString() ?? '';
+    final weightForHeight = anthropometric['weightForHeight']?.toString() ?? '';
+    final bmi = anthropometric['bmi']?.toString() ?? '';
+
+    final interpretations = <String>[];
+    for (final raw in [weightForAge, heightForAge, weightForHeight, bmi]) {
+      final interp = _extractInterpretation(raw);
+      if (interp.isNotEmpty) {
+        interpretations.add(interp.toLowerCase());
+      }
+    }
+
+    if (assessmentCount == 0) {
+      return 'No assessments';
+    }
+
+    // Collect high-level tags based on the interpretations
+    final tags = <String>{};
+    for (final interp in interpretations) {
+      if (interp.contains('underweight')) {
+        tags.add('Underweight');
+      }
+      if (interp.contains('stunted')) {
+        tags.add('Stunted');
+      }
+      if (interp.contains('overweight') || interp.contains('obese')) {
+        tags.add('Overweight/Obese');
+      }
+      if (interp.contains('at risk')) {
+        tags.add('At risk');
+      }
+    }
+
+    if (tags.isNotEmpty) {
+      return tags.join(', ');
+    }
+
+    if (interpretations.isEmpty) {
+      // There is at least one assessment, but no anthropometric interpretation stored.
+      return 'Assessment done';
+    }
+
+    // If all interpretations are normal, label as Normal.
+    final allNormal =
+        interpretations.isNotEmpty && interpretations.every((i) => i == 'normal');
+    if (allNormal) {
+      return 'Normal';
+    }
+
+    // Fallback: use the first interpretation capitalized.
+    final first = interpretations.first;
+    return first.isEmpty
+        ? 'Assessment done'
+        : '${first[0].toUpperCase()}${first.substring(1)}';
+  }
 
   @override
   void initState() {
@@ -88,6 +163,14 @@ class _PatientListTabState extends State<PatientListTab> {
       setState(() {
         _patients = patientGroups.entries.map((entry) {
           final docs = entry.value;
+          final assessmentCount = docs.length;
+          docs.sort((a, b) {
+            final dataA = a.data() as Map<String, dynamic>;
+            final dataB = b.data() as Map<String, dynamic>;
+            final timeA = (dataA['createdAt'] as Timestamp?)?.toDate() ?? DateTime(1970);
+            final timeB = (dataB['createdAt'] as Timestamp?)?.toDate() ?? DateTime(1970);
+            return timeB.compareTo(timeA); // Most recent first
+          });
           
           // Sort by createdAt and get the most recent document
           docs.sort((a, b) {
@@ -107,16 +190,17 @@ class _PatientListTabState extends State<PatientListTab> {
             
 
           final mostRecentDoc = docs.first;
-          final data = mostRecentDoc.data() as Map<String, dynamic>?;
-          final demographic = data?['demographic'] ?? {};
-          final Timestamp? createdAt = data?['createdAt'] as Timestamp?;
-
+          final data = mostRecentDoc.data() as Map<String, dynamic>;
+          final demographic = data['demographic'] ?? {};
+          final createdAt = data['createdAt'] as Timestamp?;
+          final assessmentRemarks =
+              _buildAssessmentRemarks(data, assessmentCount);
 
           return Patient(
-            firstName: demographic['firstName'] ?? '',
-            lastName: demographic['lastName'] ?? '',
-            age: int.tryParse(demographic['age']?.toString() ?? '0') ?? 0,
-            assessmentRemarks: '${docs.length} assessment${docs.length != 1 ? 's' : ''}',
+            firstName: demographic['firstName'] ?? (parts.isNotEmpty ? parts.first : ''),
+            lastName: demographic['lastName'] ?? (parts.length > 1 ? parts.sublist(1).join(' ') : ''),
+            age: int.tryParse(demographic['age'] ?? '0') ?? 0,
+            assessmentRemarks: assessmentRemarks,
             lastVisit: createdAt?.toDate() ?? DateTime.now(),
             guardianContact: demographic['fatherContact'] ?? demographic['motherContact'] ?? '',
             avatarColor: const Color(0xFF2E8B7B),
@@ -319,7 +403,7 @@ class _PatientListTabState extends State<PatientListTab> {
           const SizedBox(width: 40),
           _buildHeaderCell('Last name', flex: 2),
           _buildHeaderCell('First name', flex: 2),
-          _buildHeaderCell('Age', flex: 1),
+          _buildHeaderCell('Age (months)', flex: 1),
           _buildHeaderCell('Assessment\nRemarks', flex: 2),
           _buildHeaderCell('Last visit', flex: 2),
           _buildHeaderCell('Guardian\nContact', flex: 2),
@@ -440,7 +524,7 @@ class _PatientListTabState extends State<PatientListTab> {
                 Expanded(
                   flex: 1,
                   child: Text(
-                    '${patient.age}',
+                    '${patient.age} mos',
                     style: const TextStyle(
                       fontSize: 10,
                       color: Color(0xFF333333),
@@ -667,7 +751,7 @@ class _PatientListTabState extends State<PatientListTab> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildDetailRow('Age', '${patient.age} years old'),
+            _buildDetailRow('Age', '${patient.age} months old'),
             _buildDetailRow('Assessment', patient.assessmentRemarks),
             _buildDetailRow('Last Visit',
                 '${patient.lastVisit.month}/${patient.lastVisit.day}/${patient.lastVisit.year}'),

@@ -6,43 +6,80 @@ import 'package:growth_standards/growth_standards.dart';
 class AnthropometricCalculator {
   static final _gs = GrowthStandard.who.fromBirthTo5Years;
 
-  /// Parse age in months from various input formats.
-  /// Supports: "2", "24", "2 years", "24 months", "1.5", "18 months"
+  /// Parse age in months.
+  ///
+  /// New convention (Feb 2026):
+  /// - Plain numbers (e.g. "18") are treated as **months**
+  /// - Strings with "year"/"yr" are converted to months
+  /// - Strings with "month" are treated as months
+  /// - When `dobStr` and `measurementDateStr` are both available, we
+  ///   prefer an exact month difference from those dates.
   static int? _parseAgeInMonths(String ageStr, String? dobStr, String? measurementDateStr) {
-    if (ageStr.trim().isEmpty && (dobStr == null || dobStr.trim().isEmpty)) return null;
+    // Prefer DOB + measurement date when available (exact calculation)
+    if (dobStr != null &&
+        dobStr.trim().isNotEmpty &&
+        measurementDateStr != null &&
+        measurementDateStr.trim().isNotEmpty) {
+      final dob = _parseDate(dobStr);
+      final meas = _parseDate(measurementDateStr);
+      if (dob != null && meas != null) {
+        final months = (meas.year - dob.year) * 12 + (meas.month - dob.month);
+        if (months >= 0) return months;
+      }
+    }
+
+    if (ageStr.trim().isEmpty) return null;
     final age = ageStr.trim().toLowerCase();
     if (age.isNotEmpty) {
       final numMatch = RegExp(r'[\d.]+').firstMatch(age);
       if (numMatch != null) {
         final num = double.tryParse(numMatch.group(0)!);
         if (num != null) {
-          if (age.contains('month')) return num.round();
-          if (age.contains('year') || age.contains('yr')) return (num * 12).round();
-          if (num >= 0 && num < 20) return (num * 12).round(); // assume years if small
-          if (num >= 24 && num <= 60) return num.round(); // months
-          return num.round();
+          if (age.contains('month')) {
+            return num.round();
+          }
+          if (age.contains('year') || age.contains('yr')) {
+            // explicit years → convert to months
+            return (num * 12).round();
+          }
+          // Plain numeric input is now interpreted as **months**
+          // (e.g. "18" → 18 months)
+          if (num >= 0) {
+            return num.round();
+          }
         }
-      }
-    }
-    if (dobStr != null && dobStr.trim().isNotEmpty && measurementDateStr != null && measurementDateStr.trim().isNotEmpty) {
-      final dob = _parseDate(dobStr);
-      final meas = _parseDate(measurementDateStr);
-      if (dob != null && meas != null) {
-        final months = (meas.year - dob.year) * 12 + (meas.month - dob.month);
-        return months >= 0 ? months : null;
       }
     }
     return null;
   }
 
   static ({int year, int month, int day})? _parseDate(String s) {
-    final parts = s.trim().split(RegExp(r'[/\-.,\s]+'));
+    final trimmed = s.trim();
+    if (trimmed.isEmpty) return null;
+
+    // Detect explicit YYYY-... pattern and parse as YYYY-MM-DD
+    final isoLike = RegExp(r'^\d{4}[-/]').hasMatch(trimmed);
+
+    final parts = trimmed.split(RegExp(r'[/\-.,\s]+'));
     if (parts.length >= 2) {
       final vals = parts.map((e) => int.tryParse(e)).toList();
-      if (vals.length >= 2 && vals[0] != null && vals[1] != null) {
-        int y = vals[0]!;
-        int m = vals[1]!.clamp(1, 12);
-        int d = vals.length >= 3 && vals[2] != null ? vals[2]!.clamp(1, 31) : 1;
+      if (vals.length >= 3 && vals[0] != null && vals[1] != null && vals[2] != null) {
+        int y;
+        int m;
+        int d;
+
+        if (isoLike) {
+          // YYYY-MM-DD
+          y = vals[0]!;
+          m = vals[1]!.clamp(1, 12);
+          d = vals[2]!.clamp(1, 31);
+        } else {
+          // Default to MM-DD-YYYY for user-entered dates
+          m = vals[0]!.clamp(1, 12);
+          d = vals[1]!.clamp(1, 31);
+          y = vals[2]!;
+        }
+
         if (y < 100) y += 2000;
         return (year: y, month: m, day: d);
       }

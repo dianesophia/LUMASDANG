@@ -273,20 +273,20 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview> {
     }
   }
 
-  /// Try to parse common date string formats (MM/DD/YYYY, YYYY-MM-DD, etc.)
+  /// Try to parse common date string formats (MM-DD-YYYY, MM/DD/YYYY, YYYY-MM-DD, etc.)
   DateTime? _parseDate(String dateStr) {
     try {
-      // Try MM/DD/YYYY
-      final slashParts = dateStr.split('/');
-      if (slashParts.length == 3) {
-        final month = int.tryParse(slashParts[0]);
-        final day = int.tryParse(slashParts[1]);
-        final year = int.tryParse(slashParts[2]);
+      // Try MM-DD-YYYY or MM/DD/YYYY
+      final parts = dateStr.split(RegExp(r'[-/]'));
+      if (parts.length == 3) {
+        final month = int.tryParse(parts[0]);
+        final day = int.tryParse(parts[1]);
+        final year = int.tryParse(parts[2]);
         if (month != null && day != null && year != null) {
           return DateTime(year, month, day);
         }
       }
-      // Try YYYY-MM-DD
+      // Fallback: try any format Dart understands (e.g. YYYY-MM-DD)
       return DateTime.tryParse(dateStr);
     } catch (_) {
       return null;
@@ -329,7 +329,6 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview> {
           // ===== OVERALL NUTRITIONAL STATUS =====
           OverallNutritionalStatusSection(
             assessments: _assessments,
-            onReturnToDashboard: () => Navigator.pop(context),
           ),
           const SizedBox(height: 24),
 
@@ -349,7 +348,31 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview> {
           // ===== DEWORMING STATUS =====
           DewormingStatusSection(
             assessments: _assessments,
-            onReturnToDashboard: () => Navigator.pop(context),
+          ),
+          const SizedBox(height: 24),
+
+          // ===== RETURN TO DASHBOARD =====
+          Center(
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFF5A962),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(25),
+                ),
+                elevation: 3,
+              ),
+              child: const Text(
+                'Return to Dashboard',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
           ),
           const SizedBox(height: 24),
         ],
