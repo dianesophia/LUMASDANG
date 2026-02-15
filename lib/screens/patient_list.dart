@@ -5,7 +5,10 @@ import 'patient_profile/patient_profile_overview.dart';
 
 // ==================== PATIENT LIST TAB ====================
 class PatientListTab extends StatefulWidget {
-  const PatientListTab({super.key});
+  /// When this notifier is incremented, the list will refresh (e.g. after home form save).
+  final ValueNotifier<int>? refreshTrigger;
+
+  const PatientListTab({super.key, this.refreshTrigger});
 
   @override
   State<PatientListTab> createState() => _PatientListTabState();
@@ -98,6 +101,11 @@ class _PatientListTabState extends State<PatientListTab> {
   void initState() {
     super.initState();
     _fetchPatients();
+    widget.refreshTrigger?.addListener(_onRefreshTriggered);
+  }
+
+  void _onRefreshTriggered() {
+    if (mounted) _fetchPatients();
   }
 
   Future<void> _fetchPatients() async {
@@ -128,11 +136,12 @@ class _PatientListTabState extends State<PatientListTab> {
 
       print('User barangay: $barangayId');
 
-      // ✅ STEP 2: Fetch all patients from barangay's shared patient list
+      // ✅ STEP 2: Fetch all patients from barangay's shared patient list (exclude deleted)
       final snapshot = await FirebaseFirestore.instance
           .collection('barangays')
           .doc(barangayId)
           .collection('patients')
+          .where('isDeleted', isEqualTo: false)
           .orderBy('createdAt', descending: true)
           .get();
 
@@ -255,6 +264,7 @@ class _PatientListTabState extends State<PatientListTab> {
 
   @override
   void dispose() {
+    widget.refreshTrigger?.removeListener(_onRefreshTriggered);
     _searchController.dispose();
     super.dispose();
   }

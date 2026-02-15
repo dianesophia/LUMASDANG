@@ -77,6 +77,64 @@ class FirestoreService {
     }, SetOptions(merge: true));
   }
 
+  /// Returns the current user's barangay ID, or null if not set.
+  Future<String?> getCurrentUserBarangayId() async {
+    final user = _auth.currentUser;
+    if (user == null) return null;
+    final userDoc = await _firestore.collection('users').doc(user.uid).get();
+    return userDoc.data()?['barangayId'] as String?;
+  }
+
+  /// Saves vaccination status to the barangay patient doc so Profile Overview (shared mode) shows it.
+  /// Maps home-page status keys to the keys expected by VaccinationStatusSection.
+  Future<void> saveVaccinationStatusToBarangayPatient({
+    required String barangayId,
+    required String patientId,
+    required String firstName,
+    required String lastName,
+    required Map<String, String> statuses,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+    // Map home-page keys to profile vaccine keys; default others to Pending
+    const profileKeys = [
+      'bcg', 'hepatitisB', 'opv', 'ipv', 'dtap', 'hib', 'rotaV', 'pcv', 'mmr',
+      'typhoid', 'hepatitisA', 'varicella',
+    ];
+    final flat = <String, String>{};
+    for (final k in profileKeys) {
+      flat[k] = 'Pending';
+    }
+    flat['bcg'] = statuses['bcg'] ?? 'Pending';
+    flat['hepatitisB'] = statuses['hepatitisB'] ?? 'Pending';
+    flat['dtap'] = statuses['dptPentavalent'] ?? 'Pending';
+    flat['opv'] = statuses['opv'] ?? statuses['opvIpv'] ?? 'Pending';
+    flat['ipv'] = statuses['ipv'] ?? statuses['opvIpv'] ?? 'Pending';
+    flat['mmr'] = statuses['measlesMmr'] ?? 'Pending';
+    flat['pcv'] = statuses['pcv'] ?? 'Pending';
+
+    final userDoc = await _firestore.collection('users').doc(user.uid).get();
+    final userName = userDoc.data()?['fullName'] ?? userDoc.data()?['username'] ?? user?.email ?? 'Unknown';
+
+    final ref = _firestore
+        .collection('barangays')
+        .doc(barangayId)
+        .collection('patients')
+        .doc(patientId)
+        .collection('vaccination')
+        .doc('record');
+
+    await ref.set({
+      'firstName': firstName.trim(),
+      'lastName': lastName.trim(),
+      'lastReviewDate': FieldValue.serverTimestamp(),
+      'lastModifiedBy': user.uid,
+      'lastModifiedByName': userName,
+      'updatedAt': FieldValue.serverTimestamp(),
+      ...flat,
+    }, SetOptions(merge: true));
+  }
+
   /// SOFT DELETE USER: marks all user's records as deleted
   Future<void> softDeleteUser(String uid) async {
     final userDoc = _firestore.collection('users').doc(uid);
