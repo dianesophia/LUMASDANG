@@ -30,6 +30,7 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _checkingUsername = false;
   bool _usernameAvailable = true;
   String _usernameErrorMessage = '';
+  bool _obscurePassword = true;
 
   // New fields
   String? selectedSex;
@@ -524,30 +525,44 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   // ---------- NORMAL TEXT FIELD ----------
-  Widget _buildField({
-    required TextEditingController controller,
-    required String hint,
-    required IconData icon,
-    bool isPassword = false,
-  }) {
-    return Container(
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Colors.white70)),
+ Widget _buildField({
+  required TextEditingController controller,
+  required String hint,
+  required IconData icon,
+  bool isPassword = false,
+}) {
+  return Container(
+    decoration: const BoxDecoration(
+      border: Border(bottom: BorderSide(color: Colors.white70)),
+    ),
+    child: TextField(
+      controller: controller,
+      obscureText: isPassword ? _obscurePassword : false,
+      style: const TextStyle(color: Colors.white),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: const TextStyle(color: Colors.white70),
+        border: InputBorder.none,
+        prefixIcon: Icon(icon, color: Colors.white70),
+        contentPadding: const EdgeInsets.symmetric(vertical: 12),
+        // Eye icon for password fields
+        suffixIcon: isPassword
+            ? IconButton(
+                icon: Icon(
+                  _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                  color: Colors.white70,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _obscurePassword = !_obscurePassword;
+                  });
+                },
+              )
+            : null,
       ),
-      child: TextField(
-        controller: controller,
-        obscureText: isPassword,
-        style: const TextStyle(color: Colors.white),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: const TextStyle(color: Colors.white70),
-          border: InputBorder.none,
-          prefixIcon: Icon(icon, color: Colors.white70),
-          contentPadding: const EdgeInsets.symmetric(vertical: 12),
-        ),
-      ),
-    );
-  }
+    ),
+  );
+}
 
   // ---------- USERNAME FIELD WITH VALIDATION ----------
   Widget _buildUsernameField() {

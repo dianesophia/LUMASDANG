@@ -708,9 +708,12 @@ import 'dart:async';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
+  
 
   @override
   State<LoginPage> createState() => _LoginPageState();
+
+
 }
 
 class _LoginPageState extends State<LoginPage> {
@@ -719,6 +722,8 @@ class _LoginPageState extends State<LoginPage> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   bool _isLoading = false;
+  bool _obscurePassword = true;
+
 
   @override
   void dispose() {
@@ -1132,30 +1137,43 @@ Future<void> _ensureUserHasBarangayId(String uid) async {
   
 
   Widget _buildField({
-    required TextEditingController controller,
-    required String hint,
-    required IconData icon,
-    bool isPassword = false,
-  }) {
-    return Container(
-      decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: Colors.white70, width: 1))),
-      child: TextField(
-        controller: controller,
-        obscureText: isPassword,
-        style: const TextStyle(color: Colors.white, fontSize: 16),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: const TextStyle(color: Colors.white70),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 12),
-          prefixIcon: Icon(icon, color: Colors.white70),
-        ),
+  required TextEditingController controller,
+  required String hint,
+  required IconData icon,
+  bool isPassword = false,
+}) {
+  return Container(
+    decoration: const BoxDecoration(
+      border: Border(bottom: BorderSide(color: Colors.white70, width: 1)),
+    ),
+    child: TextField(
+      controller: controller,
+      obscureText: isPassword ? _obscurePassword : false,
+      style: const TextStyle(color: Colors.white, fontSize: 16),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: const TextStyle(color: Colors.white70),
+        border: InputBorder.none,
+        contentPadding: const EdgeInsets.symmetric(vertical: 12),
+        prefixIcon: Icon(icon, color: Colors.white70),
+        // Add eye icon only for password field
+        suffixIcon: isPassword
+            ? IconButton(
+                icon: Icon(
+                  _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                  color: Colors.white70,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _obscurePassword = !_obscurePassword;
+                  });
+                },
+              )
+            : null,
       ),
-      
-    );
-    
-    
-  }
+    ),
+  );
+}
+
   
 }
