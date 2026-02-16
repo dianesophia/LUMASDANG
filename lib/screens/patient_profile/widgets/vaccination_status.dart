@@ -17,17 +17,12 @@ class _Vaccine {
 
 const _vaccines = [
   _Vaccine(key: 'bcg', displayName: 'BCG', possibleDoses: ['Pending', '1st dose']),
-  _Vaccine(key: 'hepatitisB', displayName: 'Hepatitis B', possibleDoses: ['Pending', '1st dose', '2nd dose', '3rd dose']),
+  _Vaccine(key: 'hepatitisB', displayName: 'HEP B', possibleDoses: ['Pending', '1st dose', '2nd dose', '3rd dose']),
+  _Vaccine(key: 'dtap', displayName: 'PENTAVALENT', possibleDoses: ['Pending', '1st dose', '2nd dose', '3rd dose', '4th dose']),
   _Vaccine(key: 'opv', displayName: 'OPV', possibleDoses: ['Pending', '1st dose', '2nd dose', '3rd dose']),
-  _Vaccine(key: 'dtap', displayName: 'DTaP', possibleDoses: ['Pending', '1st dose', '2nd dose', '3rd dose', '4th dose', '5th dose']),
   _Vaccine(key: 'ipv', displayName: 'IPV', possibleDoses: ['Pending', '1st dose', '2nd dose', '3rd dose', '4th dose']),
-  _Vaccine(key: 'hib', displayName: 'HIB', possibleDoses: ['Pending', '1st dose', '2nd dose', '3rd dose', 'Booster']),
-  _Vaccine(key: 'rotaV', displayName: 'Rota V', possibleDoses: ['Pending', '1st dose', '2nd dose', '3rd dose']),
   _Vaccine(key: 'pcv', displayName: 'PCV', possibleDoses: ['Pending', '1st dose', '2nd dose', '3rd dose', '4th dose']),
   _Vaccine(key: 'mmr', displayName: 'MMR', possibleDoses: ['Pending', '1st dose', '2nd dose']),
-  _Vaccine(key: 'typhoid', displayName: 'Typhoid', possibleDoses: ['Pending', '1st dose']),
-  _Vaccine(key: 'hepatitisA', displayName: 'Hepatitis A', possibleDoses: ['Pending', '1st dose', '2nd dose']),
-  _Vaccine(key: 'varicella', displayName: 'Varicella', possibleDoses: ['Pending', '1st dose', '2nd dose']),
 ];
 
 /// Widget displaying the Vaccination Status card in the patient profile.

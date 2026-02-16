@@ -317,15 +317,61 @@ class _HomePageState extends State<HomePage>
     // Sync vaccination status to the vaccinations collection for Profile Overview
     if (_vaccinationData != null && online) {
       try {
-        int trueDoseCount(String name) {
-          final doses = _vaccinationData![name] as Map<String, dynamic>?;
+        /// Returns the highest dose number selected for a vaccine
+        /// based on which age-column checkboxes are true.
+        int highestDoseNumber(String vaccine) {
+          final doses = _vaccinationData![vaccine] as Map<String, dynamic>?;
           if (doses == null) return 0;
-          return doses.values.where((v) => v == true).length;
+
+          // Column headers in chronological order as used in VaccinationForm
+          const birth = 'BIRTH';
+          const m1_5 = '1½';
+          const m2_5 = '2½';
+          const m3_5 = '3½';
+          const m9 = '9';
+          const y1 = '1 YR';
+
+          List<String> relevantHeaders;
+          switch (vaccine) {
+            case 'BCG':
+              relevantHeaders = [birth];
+              break;
+            case 'HEP B':
+              relevantHeaders = [birth, m1_5, m2_5];
+              break;
+            case 'PENTAVALENT':
+              relevantHeaders = [m1_5, m2_5, m3_5, y1];
+              break;
+            case 'OPV':
+              relevantHeaders = [birth, m2_5, m9];
+              break;
+            case 'IPV':
+              relevantHeaders = [m1_5, m2_5, m3_5, y1];
+              break;
+            case 'PCV':
+              relevantHeaders = [m1_5, m2_5, m3_5, y1];
+              break;
+            case 'MMR':
+              relevantHeaders = [m9, y1];
+              break;
+            default:
+              // Fallback: consider all columns in generic order
+              relevantHeaders = [birth, m1_5, m2_5, m3_5, m9, y1];
+          }
+
+          // Walk from latest to earliest and pick the last true checkbox
+          for (int i = relevantHeaders.length - 1; i >= 0; i--) {
+            final header = relevantHeaders[i];
+            if (doses[header] == true) {
+              return i + 1; // dose numbers start at 1
+            }
+          }
+          return 0; // none selected → Pending
         }
 
-        String doseLabelForCount(int count) {
-          if (count <= 0) return 'Pending';
-          switch (count) {
+        String doseLabelForNumber(int number) {
+          if (number <= 0) return 'Pending';
+          switch (number) {
             case 1:
               return '1st dose';
             case 2:
@@ -342,12 +388,12 @@ class _HomePageState extends State<HomePage>
         }
 
         String vaccineStatus(String name) {
-          final count = trueDoseCount(name);
-          return doseLabelForCount(count);
+          final n = highestDoseNumber(name);
+          return doseLabelForNumber(n);
         }
 
-        final opvCount = trueDoseCount('OPV');
-        final ipvCount = trueDoseCount('IPV');
+        final opvNumber = highestDoseNumber('OPV');
+        final ipvNumber = highestDoseNumber('IPV');
 
         final statuses = <String, String>{
           'bcg': vaccineStatus('BCG'),
@@ -355,7 +401,10 @@ class _HomePageState extends State<HomePage>
           'dptPentavalent': vaccineStatus('PENTAVALENT'),
           'opv': vaccineStatus('OPV'),
           'ipv': vaccineStatus('IPV'),
-          'opvIpv': doseLabelForCount(opvCount + ipvCount),
+          // Combined OPV+IPV progress for legacy personal view
+          'opvIpv': doseLabelForNumber(
+            (opvNumber > ipvNumber) ? opvNumber : ipvNumber,
+          ),
           'measlesMmr': vaccineStatus('MMR'),
           'pcv': vaccineStatus('PCV'),
         };

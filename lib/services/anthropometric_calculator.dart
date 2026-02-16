@@ -142,7 +142,15 @@ class AnthropometricCalculator {
     }
 
     try {
-      final age = Age.byMonthsAgo(ageMonths);
+      // Pass observedDate (measurement date) when available for accurate age at measurement
+      final Age age;
+      final meas = _parseDate(measurementDateStr ?? '');
+      if (meas != null) {
+        final measDate = Date.fromDateTime(DateTime(meas.year, meas.month, meas.day));
+        age = Age.byMonthsAgo(ageMonths, observedDate: measDate);
+      } else {
+        age = Age.byMonthsAgo(ageMonths);
+      }
       final kg = Mass$Kilogram(weight);
       final cm = Length$Centimeter(height);
       final measure = ageMonths < 24
@@ -170,6 +178,7 @@ class AnthropometricCalculator {
       } catch (_) {}
 
       try {
+        // Weight-for-length: 0-2 yrs (length 45-110 cm) | Weight-for-height: 2-5 yrs (height 65-120 cm)
         if (ageMonths < 24) {
           final wfh = _gs.weightForLength(
             lengthMeasurementResult: cm,

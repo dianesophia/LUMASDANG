@@ -70,6 +70,8 @@ class _AnthropometricDataFormState extends State<AnthropometricDataForm> {
     widget.sexController.addListener(_listener);
     widget.dobController.addListener(_listener);
     widget.dateController.addListener(_listener);
+    // Initial recalc in case controllers are pre-filled (e.g. from parent)
+    WidgetsBinding.instance.addPostFrameCallback((_) => _recalculate());
   }
 
   @override
