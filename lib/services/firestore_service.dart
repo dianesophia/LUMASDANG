@@ -1019,6 +1019,110 @@ Future<List<Map<String, dynamic>>> getRecentAssessments({int limit = 50}) async 
   }
 }
 
+/// Create a notification when a patient is added
+Future<void> createPatientNotification({
+  required String barangayId,
+  required String patientId,
+  required Map<String, dynamic> patientData,
+}) async {
+  final user = _auth.currentUser;
+  if (user == null) return;
+
+  try {
+    final userDoc = await _firestore.collection('users').doc(user.uid).get();
+    final creatorName = userDoc.data()?['fullName'] ?? 
+                       userDoc.data()?['username'] ?? 
+                       user.email ?? 
+                       'Unknown';
+
+    // Create notification in barangay's notifications collection
+    await _firestore
+        .collection('barangays')
+        .doc(barangayId)
+        .collection('notifications')
+        .add({
+      'type': 'new_patient',
+      'patientId': patientId,
+      'patientName': '${patientData['demographic']?['firstName'] ?? ''} ${patientData['demographic']?['lastName'] ?? ''}',
+      'patientAge': patientData['demographic']?['age'] ?? '',
+      'patientSex': patientData['demographic']?['sex'] ?? '',
+      'createdBy': user.uid,
+      'createdByName': creatorName,
+      'createdAt': FieldValue.serverTimestamp(),
+      'barangayId': barangayId,
+      'read': false,
+    });
+
+    print('✅ Notification created for barangay: $barangayId');
+  } catch (e) {
+    print('❌ Error creating notification: $e');
+  }
+}
+
+/// Get notifications for the user's barangay
+Future<List<Map<String, dynamic>>> getBarangayNotifications({int limit = 50}) async {
+  final user = _auth.currentUser;
+  if (user == null) {
+    print('❌ No user logged in');
+    return [];
+  }
+
+  try {
+    // Get user's barangay
+    final userDoc = await _firestore.collection('users').doc(user.uid).get();
+    final barangayId = userDoc.data()?['barangayId'] as String?;
+
+    if (barangayId == null || barangayId.isEmpty) {
+      print('❌ User has no barangayId');
+      return [];
+    }
+
+    print('📋 Getting notifications for barangay: $barangayId');
+
+    // Get notifications from barangay
+    final snapshot = await _firestore
+        .collection('barangays')
+        .doc(barangayId)
+        .collection('notifications')
+        .orderBy('createdAt', descending: true)
+        .limit(limit)
+        .get();
+
+    print('✅ Found ${snapshot.docs.length} notifications');
+
+    return snapshot.docs.map((doc) {
+      final data = doc.data();
+      data['id'] = doc.id;
+      return data;
+    }).toList();
+  } catch (e) {
+    print('❌ Error getting notifications: $e');
+    return [];
+  }
+}
+
+/// Mark notification as read
+Future<void> markNotificationAsRead(String notificationId) async {
+  final user = _auth.currentUser;
+  if (user == null) return;
+
+  try {
+    final userDoc = await _firestore.collection('users').doc(user.uid).get();
+    final barangayId = userDoc.data()?['barangayId'] as String?;
+
+    if (barangayId == null) return;
+
+    await _firestore
+        .collection('barangays')
+        .doc(barangayId)
+        .collection('notifications')
+        .doc(notificationId)
+        .update({'read': true});
+  } catch (e) {
+    print('❌ Error marking notification as read: $e');
+  }
+}
+
 }
 
 

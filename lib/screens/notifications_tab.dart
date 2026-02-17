@@ -23,64 +23,71 @@ class _NotificationsTabState extends State<NotificationsTab> {
   }
 
   Future<void> _loadNotifications() async {
-    print('📱 Loading notifications...');
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+  print('📱 Loading notifications...');
+  setState(() {
+    _isLoading = true;
+    _errorMessage = null;
+  });
 
-    try {
-      final online = await ConnectivityService.instance.checkOnline();
-      print('🌐 Online: $online');
+  try {
+    final online = await ConnectivityService.instance.checkOnline();
+    print('🌐 Online: $online');
+    
+    if (online) {
+      // Load from Firestore - GET BARANGAY NOTIFICATIONS
+      print('☁️ Loading barangay notifications from Firestore...');
+      final notifications = await FirestoreService().getBarangayNotifications();
+      print('✅ Loaded ${notifications.length} notifications from Firestore');
       
-      if (online) {
-        // Load from Firestore
-        print('☁️ Loading from Firestore...');
-        final notifications = await FirestoreService().getRecentAssessments();
-        print('✅ Loaded ${notifications.length} notifications from Firestore');
-        
-        setState(() {
-          _notifications = notifications;
-          _isLoading = false;
-        });
-      } else {
-        // Load from local database
-        print('💾 Loading from local database...');
-        await LocalDbService.instance.init();
-        final localRecords = await LocalDbService.instance.getAllRecords();
-        print('✅ Loaded ${localRecords.length} records from local DB');
-        
-        // Convert local records to notification format
-        final notifications = localRecords.map((record) {
-          final data = record['data'] as Map<String, dynamic>;
-          return {
-            'id': record['id'],
-            'firstName': data['demographic']?['firstName'] ?? '',
-            'lastName': data['demographic']?['lastName'] ?? '',
-            'age': data['demographic']?['age'] ?? '',
-            'sex': data['demographic']?['sex'] ?? '',
-            'timestamp': record['timestamp'],
-            'synced': record['synced'] ?? false,
-          };
-        }).toList();
-        
-        // Sort by timestamp descending
-        notifications.sort((a, b) => 
-          (b['timestamp'] as String).compareTo(a['timestamp'] as String));
-        
-        setState(() {
-          _notifications = notifications;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      print('❌ Error loading notifications: $e');
       setState(() {
+        _notifications = notifications;
         _isLoading = false;
-        _errorMessage = e.toString();
+      });
+    } else {
+      // Load from local database
+      print('💾 Loading from local database...');
+      await LocalDbService.instance.init();
+      final localRecords = await LocalDbService.instance.getAllRecords();
+      print('✅ Loaded ${localRecords.length} records from local DB');
+      
+      // Convert local records to notification format
+      final notifications = localRecords.map((record) {
+        final data = record['data'] as Map<String, dynamic>;
+        return {
+          'id': record['id'],
+          'type': 'new_patient',
+          'patientName': '${data['demographic']?['firstName'] ?? ''} ${data['demographic']?['lastName'] ?? ''}',
+          'patientAge': data['demographic']?['age'] ?? '',
+          'patientSex': data['demographic']?['sex'] ?? '',
+          'createdAt': record['timestamp'],
+          'read': record['synced'] ?? false,
+        };
+      }).toList();
+      
+      // Sort by timestamp descending
+      notifications.sort((a, b) {
+        final aTime = a['createdAt'];
+        final bTime = b['createdAt'];
+        if (aTime is String && bTime is String) {
+          return bTime.compareTo(aTime);
+        }
+        return 0;
+      });
+      
+      setState(() {
+        _notifications = notifications;
+        _isLoading = false;
       });
     }
+  } catch (e, stackTrace) {
+    print('❌ Error loading notifications: $e');
+    print('Stack trace: $stackTrace');
+    setState(() {
+      _isLoading = false;
+      _errorMessage = e.toString();
+    });
   }
+}
 
   String _formatTimestamp(dynamic timestamp) {
     try {
@@ -311,192 +318,183 @@ class _NotificationsTabState extends State<NotificationsTab> {
     );
   }
 
-  Widget _buildNotificationCard(Map<String, dynamic> notification) {
-    final firstName = notification['firstName'] ?? '';
-    final lastName = notification['lastName'] ?? '';
-    final age = notification['age'] ?? '';
-    final sex = notification['sex'] ?? '';
-    final timestamp = notification['timestamp'];
-    final synced = notification['synced'] ?? true;
+ Widget _buildNotificationCard(Map<String, dynamic> notification) {
+  final type = notification['type'] ?? 'new_patient';
+  final patientName = notification['patientName'] ?? '';
+  final patientAge = notification['patientAge'] ?? '';
+  final patientSex = notification['patientSex'] ?? '';
+  final createdBy = notification['createdByName'] ?? 'Unknown';
+  final timestamp = notification['createdAt'];
+  final isRead = notification['read'] ?? false;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+  return Container(
+    margin: const EdgeInsets.only(bottom: 12),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(
+        color: isRead ? Colors.transparent : const Color(0xFF2E8B7B),
+        width: 2,
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: () {
-            // TODO: Navigate to patient details
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('View details for $firstName $lastName'),
-                backgroundColor: const Color(0xFF2E8B7B),
-              ),
-            );
-          },
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                // Avatar
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: _getAvatarColor(sex),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    _getAvatarIcon(sex),
-                    color: Colors.white,
-                    size: 32,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                
-                // Details
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'New Assessment',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF2E8B7B),
-                              ),
-                            ),
-                          ),
-                          if (!synced)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.orangeAccent.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: Colors.orangeAccent,
-                                  width: 1,
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.cloud_off,
-                                    size: 12,
-                                    color: Colors.orange.shade700,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Pending',
-                                    style: TextStyle(
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.orange.shade700,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '$firstName $lastName',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF5D4037),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.cake,
-                            size: 14,
-                            color: Colors.grey.shade600,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            age.isNotEmpty ? '$age years old' : 'Age not specified',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade700,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Icon(
-                            sex.toLowerCase() == 'male' || sex.toLowerCase() == 'm'
-                                ? Icons.male
-                                : sex.toLowerCase() == 'female' || sex.toLowerCase() == 'f'
-                                    ? Icons.female
-                                    : Icons.person,
-                            size: 14,
-                            color: Colors.grey.shade600,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            sex.isNotEmpty ? sex : 'Not specified',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade700,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.access_time,
-                            size: 14,
-                            color: Colors.grey.shade500,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            _formatTimestamp(timestamp),
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.grey.shade600,
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                
-                // Arrow
-                Icon(
-                  Icons.chevron_right,
-                  color: Colors.grey.shade400,
-                  size: 28,
-                ),
-              ],
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.1),
+          blurRadius: 8,
+          offset: const Offset(0, 2),
+        ),
+      ],
+    ),
+    child: Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () async {
+          // Mark as read
+          final notifId = notification['id'];
+          if (notifId != null && !isRead) {
+            await FirestoreService().markNotificationAsRead(notifId);
+            _loadNotifications(); // Refresh
+          }
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('View details for $patientName'),
+              backgroundColor: const Color(0xFF2E8B7B),
             ),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              // Avatar
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: _getAvatarColor(patientSex),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  _getAvatarIcon(patientSex),
+                  color: Colors.white,
+                  size: 32,
+                ),
+              ),
+              const SizedBox(width: 16),
+              
+              // Details
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'New Assessment',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: isRead ? Colors.grey : const Color(0xFF2E8B7B),
+                            ),
+                          ),
+                        ),
+                        if (!isRead)
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF2E8B7B),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      patientName,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: isRead ? FontWeight.normal : FontWeight.bold,
+                        color: const Color(0xFF5D4037),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Added by $createdBy',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey.shade600,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.cake,
+                          size: 14,
+                          color: Colors.grey.shade600,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          patientAge.isNotEmpty ? '$patientAge years old' : 'Age not specified',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Icon(
+                          _getAvatarIcon(patientSex),
+                          size: 14,
+                          color: Colors.grey.shade600,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          patientSex.isNotEmpty ? patientSex : 'Not specified',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.access_time,
+                          size: 14,
+                          color: Colors.grey.shade500,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _formatTimestamp(timestamp),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey.shade600,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Arrow
+              Icon(
+                Icons.chevron_right,
+                color: Colors.grey.shade400,
+                size: 28,
+              ),
+            ],
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

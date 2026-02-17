@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lumasdang/screens/patient_list.dart';
 import 'package:lumasdang/screens/settingsPages/main_Settings.dart';
+import 'package:lumasdang/screens/notifications_tab.dart';
 
 import '../../services/firestore_service.dart';
 import '../../services/local_db_service.dart';
@@ -418,19 +419,29 @@ class _HomePageState extends State<HomePage>
         // Also save to barangay patient so Profile Overview (Vaccination Status) shows it
         if (barangayPatientId != null) {
           try {
-            final barangayId = await FirestoreService().getCurrentUserBarangayId();
-            if (barangayId != null && barangayId.isNotEmpty) {
-              await FirestoreService().saveVaccinationStatusToBarangayPatient(
-                barangayId: barangayId,
-                patientId: barangayPatientId,
-                firstName: firstNameController.text.trim(),
-                lastName: lastNameController.text.trim(),
-                statuses: statuses,
-              );
+                barangayPatientId = await firestore.savePatientToBarangay(data);
+
+              if (barangayPatientId != null) {
+                final barangayId = await firestore.getCurrentUserBarangayId();
+                if (barangayId != null && barangayId.isNotEmpty) {
+                  await firestore.createPatientNotification(
+                    barangayId: barangayId,
+                    patientId: barangayPatientId,
+                    patientData: data,
+                  );
+                }
+              }
+            } catch (eBarangay) {
+              debugPrint('Barangay patient save (for Patient List): $eBarangay');
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Saved to server but could not add to Patient List: ${eBarangay.toString()}'),
+                    backgroundColor: Colors.orange,
+                  ),
+                );
+              }
             }
-          } catch (eBarangayVax) {
-            debugPrint('Error syncing vaccination to barangay patient: $eBarangayVax');
-          }
         }
       } catch (e) {
         debugPrint('Error syncing vaccination status: $e');
@@ -707,7 +718,7 @@ class _HomePageState extends State<HomePage>
     return PatientListTab(refreshTrigger: _patientListRefreshTrigger);
   }
 
-  Widget _buildNotificationsTab() {
+ /* Widget _buildNotificationsTab() {
     return const Center(
       child: Text(
         'Notifications',
@@ -719,6 +730,11 @@ class _HomePageState extends State<HomePage>
       ),
     );
   }
+  */
+
+  Widget _buildNotificationsTab() {
+  return const NotificationsTab();
+}
 
   Widget _buildBottomNavigationBar() {
     return Container(
