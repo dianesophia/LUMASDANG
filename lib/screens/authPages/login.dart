@@ -490,14 +490,35 @@ class _LoginPageState extends State<LoginPage> {
         message = 'Too many failed attempts. Try again later.';
       } else if (e.code == 'invalid-credential') {
         message = 'Invalid credentials. Please check your email and password.';
+      } else if (e.code == 'network-request-failed' || 
+                 e.message?.toLowerCase().contains('network') == true ||
+                 e.message?.toLowerCase().contains('connection') == true ||
+                 e.message?.toLowerCase().contains('ssl') == true ||
+                 e.message?.toLowerCase().contains('handshake') == true) {
+        message = 'Network error. Please check your internet connection and try again.';
+      } else if (e.code == 'unknown' && 
+                 (e.message?.toLowerCase().contains('ssl') == true ||
+                  e.message?.toLowerCase().contains('handshake') == true ||
+                  e.message?.toLowerCase().contains('connection reset') == true)) {
+        message = 'Connection error. Please check your internet connection. If using an emulator, ensure Google Play Services is installed.';
       }
       
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(message)));
     } catch (e) {
       print('General error: $e');
+      String errorMessage = 'Error: ${e.toString()}';
+      
+      // Check for network/SSL errors in general exceptions
+      if (e.toString().toLowerCase().contains('ssl') ||
+          e.toString().toLowerCase().contains('handshake') ||
+          e.toString().toLowerCase().contains('connection reset') ||
+          e.toString().toLowerCase().contains('network')) {
+        errorMessage = 'Network connection error. Please check your internet connection and try again.';
+      }
+      
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+          .showSnackBar(SnackBar(content: Text(errorMessage)));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -862,14 +883,35 @@ class _LoginPageState extends State<LoginPage> {
         message = 'Too many failed attempts. Try again later.';
       } else if (e.code == 'invalid-credential') {
         message = 'Invalid credentials. Please check your email and password.';
+      } else if (e.code == 'network-request-failed' || 
+                 e.message?.toLowerCase().contains('network') == true ||
+                 e.message?.toLowerCase().contains('connection') == true ||
+                 e.message?.toLowerCase().contains('ssl') == true ||
+                 e.message?.toLowerCase().contains('handshake') == true) {
+        message = 'Network error. Please check your internet connection and try again.';
+      } else if (e.code == 'unknown' && 
+                 (e.message?.toLowerCase().contains('ssl') == true ||
+                  e.message?.toLowerCase().contains('handshake') == true ||
+                  e.message?.toLowerCase().contains('connection reset') == true)) {
+        message = 'Connection error. Please check your internet connection. If using an emulator, ensure Google Play Services is installed.';
       }
       
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(message)));
     } catch (e) {
       print('General error: $e');
+      String errorMessage = 'Error: ${e.toString()}';
+      
+      // Check for network/SSL errors in general exceptions
+      if (e.toString().toLowerCase().contains('ssl') ||
+          e.toString().toLowerCase().contains('handshake') ||
+          e.toString().toLowerCase().contains('connection reset') ||
+          e.toString().toLowerCase().contains('network')) {
+        errorMessage = 'Network connection error. Please check your internet connection and try again.';
+      }
+      
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+          .showSnackBar(SnackBar(content: Text(errorMessage)));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

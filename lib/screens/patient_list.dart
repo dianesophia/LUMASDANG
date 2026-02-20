@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'patient_profile/patient_profile_overview.dart';
+import 'opt_plus/opt_plus_screen.dart';
 
 // ==================== PATIENT LIST TAB ====================
 class PatientListTab extends StatefulWidget {
@@ -20,6 +22,10 @@ class _PatientListTabState extends State<PatientListTab> {
   String _searchQuery = '';
   bool _loading = true;
   List<Patient> _patients = [];
+  /// Multi-select for soft delete: long-press row to enter, then tap to toggle.
+  bool _selectionMode = false;
+  final Set<String> _selectedDocIds = {};
+  bool _deleting = false;
 
   /// Extract the interpretation text from a z-score string like "-1.50 (Underweight)"
   String _extractInterpretation(String? zScoreStr) {
@@ -106,6 +112,94 @@ class _PatientListTabState extends State<PatientListTab> {
 
   void _onRefreshTriggered() {
     if (mounted) _fetchPatients();
+  }
+
+  void _exitSelectionMode() {
+    setState(() {
+      _selectionMode = false;
+      _selectedDocIds.clear();
+    });
+  }
+
+  void _toggleSelection(Patient patient) {
+    setState(() {
+      if (_selectedDocIds.contains(patient.docId)) {
+        _selectedDocIds.remove(patient.docId);
+      } else {
+        _selectedDocIds.add(patient.docId);
+      }
+    });
+  }
+
+  Future<void> _confirmAndSoftDelete() async {
+    if (_selectedDocIds.isEmpty) return;
+    final count = _selectedDocIds.length;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Delete selected?'),
+        content: Text(
+          'Soft-delete $count patient record(s)? They will be hidden from the list but can be restored later.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF2E8B7B))),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _deleting = true);
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      final deletedBy = user?.email ?? user?.uid ?? 'unknown';
+      final batch = FirebaseFirestore.instance.batch();
+      for (final patient in _filteredPatients) {
+        if (!_selectedDocIds.contains(patient.docId)) continue;
+        final ref = FirebaseFirestore.instance
+            .collection('barangays')
+            .doc(patient.barangayId)
+            .collection('patients')
+            .doc(patient.docId);
+        batch.update(ref, {
+          'isDeleted': true,
+          'deletedAt': FieldValue.serverTimestamp(),
+          'deletedBy': deletedBy,
+        });
+      }
+      await batch.commit();
+      if (mounted) {
+        _exitSelectionMode();
+        await _fetchPatients();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$count record(s) deleted.'),
+            backgroundColor: const Color(0xFF2E8B7B),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Delete failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _deleting = false);
+    }
   }
 
   Future<void> _fetchPatients() async {
@@ -316,7 +410,11 @@ class _PatientListTabState extends State<PatientListTab> {
         children: [
           _buildSearchBar(),
           const SizedBox(height: 12),
-          _buildTotalPatientsCount(),
+          _buildOptPlusAndTotalRow(),
+          if (_selectionMode) ...[
+            const SizedBox(height: 8),
+            _buildSelectionBar(),
+          ],
           const SizedBox(height: 8),
           Expanded(
             child: Container(
@@ -401,6 +499,99 @@ class _PatientListTabState extends State<PatientListTab> {
     );
   }
 
+  Widget _buildOptPlusAndTotalRow() {
+    return Row(
+      children: [
+        _buildOptPlusButton(),
+        const Spacer(),
+        _buildTotalPatientsCount(),
+      ],
+    );
+  }
+
+  Widget _buildOptPlusButton() {
+    return ElevatedButton.icon(
+      onPressed: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => const OptPlusScreen(),
+          ),
+        );
+      },
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF2E8B7B),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        elevation: 3,
+      ),
+      icon: const Icon(
+        Icons.post_add,
+        size: 18,
+      ),
+      label: const Text(
+        'OPT Plus',
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSelectionBar() {
+    final count = _selectedDocIds.length;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Text(
+            count == 0 ? 'Select rows to delete' : '$count selected',
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF333333),
+            ),
+          ),
+          const Spacer(),
+          if (count > 0)
+            TextButton.icon(
+              onPressed: _deleting ? null : _confirmAndSoftDelete,
+              icon: _deleting
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.delete_outline, size: 18),
+              label: Text(_deleting ? 'Deleting...' : 'Delete'),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red,
+              ),
+            ),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: _deleting ? null : _exitSelectionMode,
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF2E8B7B))),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTableHeader() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -451,10 +642,13 @@ class _PatientListTabState extends State<PatientListTab> {
   }
 
   Widget _buildPatientRow(Patient patient, int index) {
+    final isSelected = _selectedDocIds.contains(patient.docId);
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _selectionMode && isSelected
+            ? const Color(0xFF2E8B7B).withOpacity(0.12)
+            : Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
@@ -467,27 +661,39 @@ class _PatientListTabState extends State<PatientListTab> {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
+          onLongPress: () {
+            setState(() {
+              _selectionMode = true;
+              _selectedDocIds.add(patient.docId);
+            });
+          },
           onTap: () {
-            _showPatientDetails(patient);
+            if (_selectionMode) {
+              _toggleSelection(patient);
+            } else {
+              _showPatientDetails(patient);
+            }
           },
           borderRadius: BorderRadius.circular(12),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
             child: Row(
               children: [
-                Container(
-                  width: 20,
-                  height: 20,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2E8B7B),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Icon(
-                    Icons.check,
-                    size: 14,
-                    color: Colors.white,
-                  ),
-                ),
+                _selectionMode
+                    ? SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: Checkbox(
+                          value: isSelected,
+                          onChanged: (_) => _toggleSelection(patient),
+                          activeColor: const Color(0xFF2E8B7B),
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                      )
+                    : const SizedBox(width: 20, height: 20),
                 const SizedBox(width: 6),
                 Container(
                   width: 28,
@@ -580,19 +786,13 @@ class _PatientListTabState extends State<PatientListTab> {
                         _buildContactIcon(
                           Icons.phone,
                           const Color(0xFF2E8B7B),
-                          () => _handleCall(patient),
+                          _selectionMode ? () {} : () => _handleCall(patient),
                         ),
                         const SizedBox(width: 2),
                         _buildContactIcon(
                           Icons.message,
                           const Color(0xFFF5A962),
-                          () => _handleMessage(patient),
-                        ),
-                        const SizedBox(width: 2),
-                        _buildContactIcon(
-                          Icons.more_horiz,
-                          Colors.grey,
-                          () => _showMoreOptions(patient),
+                          _selectionMode ? () {} : () => _handleMessage(patient),
                         ),
                       ],
                     ),
@@ -671,68 +871,65 @@ class _PatientListTabState extends State<PatientListTab> {
     );
   }
 
-  void _handleCall(Patient patient) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Calling ${patient.guardianContact}...'),
-        backgroundColor: const Color(0xFF2E8B7B),
-      ),
-    );
+  /// Sanitize phone number for tel: and sms: URIs (digits and + only).
+  String _sanitizePhone(String raw) {
+    return raw.replaceAll(RegExp(r'[^\d+]'), '');
   }
 
-  void _handleMessage(Patient patient) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Messaging ${patient.guardianContact}...'),
-        backgroundColor: const Color(0xFFF5A962),
-      ),
-    );
-  }
-
-  void _showMoreOptions(Patient patient) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
+  Future<void> _handleCall(Patient patient) async {
+    final number = _sanitizePhone(patient.guardianContact);
+    if (number.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No guardian contact number to call'),
+            backgroundColor: Colors.orange,
           ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.visibility, color: Color(0xFF2E8B7B)),
-              title: const Text('View Details'),
-              onTap: () {
-                Navigator.pop(context);
-                _showPatientDetails(patient);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.assessment, color: Color(0xFF2E8B7B)),
-              title: const Text('New Assessment'),
-              onTap: () {
-                Navigator.pop(context);
-              },
-            ),
-            const SizedBox(height: 16),
-          ],
-        ),
-      ),
-    );
+        );
+      }
+      return;
+    }
+    final uri = Uri(scheme: 'tel', path: number);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Cannot open dialer for $number'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleMessage(Patient patient) async {
+    final number = _sanitizePhone(patient.guardianContact);
+    if (number.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No guardian contact number to message'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+    final uri = Uri(scheme: 'sms', path: number);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Cannot open messaging app for $number'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _showPatientDetails(Patient patient) {

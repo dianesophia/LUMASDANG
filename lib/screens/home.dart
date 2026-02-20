@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lumasdang/screens/notifications_tab.dart';
 import 'package:lumasdang/screens/patient_list.dart';
 import 'package:lumasdang/screens/settingsPages/main_Settings.dart';
 
@@ -17,9 +18,7 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _HomePageState extends State<HomePage> {
   int _selectedNavIndex = 0;
 
   // Controllers for forms
@@ -89,7 +88,6 @@ class _HomePageState extends State<HomePage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
 
     // Initialize local DB and monitor connectivity for automatic sync
     LocalDbService.instance.init().then((_) async {
@@ -120,8 +118,6 @@ class _HomePageState extends State<HomePage>
 
   @override
   void dispose() {
-    _tabController.dispose();
-
     // dispose controllers
     firstNameController.dispose();
     lastNameController.dispose();
@@ -431,52 +427,17 @@ class _HomePageState extends State<HomePage>
           ),
         ),
         child: SafeArea(
-          child: Column(
+          child: IndexedStack(
+            index: _selectedNavIndex,
             children: [
-              _buildTabBar(),
-              Expanded(
-                child: TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _buildHomeTab(),
-                    _buildPatientListTab(),
-                    _buildNotificationsTab(),
-                  ],
-                ),
-              ),
+              _buildHomeTab(),
+              _buildPatientListTab(),
+              _buildNotificationsTab(),
             ],
           ),
         ),
       ),
       bottomNavigationBar: _buildBottomNavigationBar(),
-    );
-  }
-
-  Widget _buildTabBar() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(25),
-      ),
-      child: TabBar(
-        controller: _tabController,
-        indicator: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(25),
-        ),
-        indicatorSize: TabBarIndicatorSize.tab,
-        dividerColor: Colors.transparent,
-        labelColor: const Color(0xFF2E8B7B),
-        unselectedLabelColor: Colors.white,
-        labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-        unselectedLabelStyle: const TextStyle(fontSize: 14),
-        tabs: const [
-          Tab(text: 'Home'),
-          Tab(text: 'Patient List'),
-          Tab(text: 'Notifications'),
-        ],
-      ),
     );
   }
 
@@ -490,7 +451,7 @@ class _HomePageState extends State<HomePage>
           children: [
             StatsRow(
               key: ValueKey(_statsRefreshKey),
-              onTap: () => _tabController.animateTo(1),
+              onTap: () => setState(() => _selectedNavIndex = 1),
             ),
             const SizedBox(height: 16),
             const UpcomingEvents(),
@@ -622,16 +583,7 @@ class _HomePageState extends State<HomePage>
   }
 
   Widget _buildNotificationsTab() {
-    return const Center(
-      child: Text(
-        'Notifications',
-        style: TextStyle(
-          fontSize: 24,
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
+    return const NotificationsTab();
   }
 
   Widget _buildBottomNavigationBar() {
@@ -654,10 +606,10 @@ class _HomePageState extends State<HomePage>
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildNavItem(Icons.insights, 0),
-              _buildNavItem(Icons.fact_check, 1),
-              _buildNavItem(Icons.contact_page, 2),
-              _buildNavItem(Icons.settings_outlined, 3),
+              _buildNavItem(Icons.home, 'Home', 0),
+              _buildNavItem(Icons.people, 'Patients', 1),
+              _buildNavItem(Icons.notifications_outlined, 'Notifications', 2),
+              _buildNavItem(Icons.settings_outlined, 'Settings', 3),
             ],
           ),
         ),
@@ -665,38 +617,47 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  Widget _buildNavItem(IconData icon, int index) {
+  Widget _buildNavItem(IconData icon, String label, int index) {
     final isSelected = _selectedNavIndex == index;
     return InkWell(
       onTap: () {
-         if (index == 3) {
-        // 👉 Navigate to Settings Page
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const MainSettings(),
-          ),
-        );
-        return;
-      }
-
+        if (index == 3) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const MainSettings(),
+            ),
+          );
+          return;
+        }
         setState(() {
           _selectedNavIndex = index;
         });
       },
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected
               ? Colors.white.withOpacity(0.3)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Icon(
-          icon,
-          color: Colors.white,
-          size: 28,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: Colors.white, size: 26),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
+          ],
         ),
       ),
     );
