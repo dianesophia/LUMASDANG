@@ -250,7 +250,6 @@ class _CustomizeAppearanceState extends State<CustomizeAppearance> {
               ),
 
               const SizedBox(height: 20),
-
           
               const Spacer(),
             ],

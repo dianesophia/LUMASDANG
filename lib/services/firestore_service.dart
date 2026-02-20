@@ -85,6 +85,21 @@ class FirestoreService {
     return userDoc.data()?['barangayId'] as String?;
   }
 
+  /// Returns the current user's barangay display name (e.g. "Barangay Alapang"), or empty string if not set.
+  Future<String> getCurrentUserBarangayName() async {
+    final user = _auth.currentUser;
+    if (user == null) return '';
+    final userDoc = await _firestore.collection('users').doc(user.uid).get();
+    final data = userDoc.data();
+    final fromUser = data?['barangay'] as String?;
+    if (fromUser != null && fromUser.trim().isNotEmpty) return fromUser.trim();
+    final barangayId = data?['barangayId'] as String?;
+    if (barangayId == null || barangayId.isEmpty) return '';
+    final barDoc = await _firestore.collection('barangays').doc(barangayId).get();
+    final name = barDoc.data()?['name'] as String?;
+    return (name != null && name.trim().isNotEmpty) ? name.trim() : barangayId;
+  }
+
   /// Saves vaccination status to the barangay patient doc so Profile Overview (shared mode) shows it.
   /// Maps home-page status keys to the keys expected by VaccinationStatusSection.
   Future<void> saveVaccinationStatusToBarangayPatient({

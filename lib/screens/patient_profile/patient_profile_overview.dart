@@ -198,20 +198,37 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview> {
         return;
       }
       
-      // Otherwise, use the original personal data logic
+      // For regular patients, fetch from BOTH barangay assessments AND homepageData
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
         setState(() => _loading = false);
         return;
       }
 
+      final List<Map<String, dynamic>> matched = [];
+      
+      // First, try to fetch from barangay assessments (where new assessments are saved)
+      try {
+        final barangayAssessments = await firestoreService.getAssessmentsForBarangayPatient(
+          widget.patient.docId,
+        );
+        
+        for (var assessment in barangayAssessments) {
+          matched.add(_extractAssessment(assessment, assessment['id']));
+        }
+        debugPrint('[ProfileOverview] Found ${barangayAssessments.length} assessments from barangay');
+      } catch (e) {
+        debugPrint('[ProfileOverview] Error fetching barangay assessments: $e');
+        // Continue to try homepageData as fallback
+      }
+
+      // Also fetch from homepageData (legacy data)
       final snapshot = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .collection('homepageData')
           .get();
 
-      final List<Map<String, dynamic>> matched = [];
       Map<String, dynamic>? fallbackByDocId;
 
       for (var doc in snapshot.docs) {
@@ -255,8 +272,21 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview> {
 
       debugPrint('[ProfileOverview] Total assessments found: ${matched.length}');
 
+      // Remove duplicates based on docId and date
+      final Map<String, Map<String, dynamic>> uniqueAssessments = {};
+      for (var assessment in matched) {
+        final docId = assessment['docId']?.toString() ?? '';
+        final date = assessment['date'] as DateTime?;
+        final key = '$docId-${date?.millisecondsSinceEpoch ?? 0}';
+        if (!uniqueAssessments.containsKey(key)) {
+          uniqueAssessments[key] = assessment;
+        }
+      }
+
+      final List<Map<String, dynamic>> finalList = uniqueAssessments.values.toList();
+
       // Sort by date ascending
-      matched.sort((a, b) {
+      finalList.sort((a, b) {
         final dateA = a['date'] as DateTime?;
         final dateB = b['date'] as DateTime?;
         if (dateA == null || dateB == null) return 0;
@@ -264,7 +294,7 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview> {
       });
 
       setState(() {
-        _assessments = matched;
+        _assessments = finalList;
         _loading = false;
       });
     } catch (e) {
@@ -1082,9 +1112,12 @@ Future<void> _saveNewAssessment({
     }
   }
 
-  // Refresh the assessment table
-  setState(() => _loading = true);
-  await _fetchAssessments();
+  // Refresh the assessment table and all sections
+  if (mounted) {
+    setState(() => _loading = true);
+    await _fetchAssessments();
+    debugPrint('[ProfileOverview] Refreshed assessments after save. Total: ${_assessments.length}');
+  }
 }
 
 
