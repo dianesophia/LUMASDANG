@@ -7,9 +7,7 @@ import 'opt_plus/opt_plus_screen.dart';
 
 // ==================== PATIENT LIST TAB ====================
 class PatientListTab extends StatefulWidget {
-  /// When this notifier is incremented, the list will refresh (e.g. after home form save).
   final ValueNotifier<int>? refreshTrigger;
-
   const PatientListTab({super.key, this.refreshTrigger});
 
   @override
@@ -22,30 +20,18 @@ class _PatientListTabState extends State<PatientListTab> {
   String _searchQuery = '';
   bool _loading = true;
   List<Patient> _patients = [];
-  /// Multi-select for soft delete: long-press row to enter, then tap to toggle.
   bool _selectionMode = false;
   final Set<String> _selectedDocIds = {};
   bool _deleting = false;
 
-  /// Extract the interpretation text from a z-score string like "-1.50 (Underweight)"
   String _extractInterpretation(String? zScoreStr) {
     if (zScoreStr == null || zScoreStr.isEmpty) return '';
     final match = RegExp(r'\(([^)]+)\)').firstMatch(zScoreStr);
     return match?.group(1) ?? '';
   }
 
-  /// Build a simple nutritional status summary from the latest assessment.
-  ///
-  /// Examples:
-  /// - "Underweight"
-  /// - "Stunted"
-  /// - "Overweight/Obese"
-  /// - "At risk"
-  /// If no clear issue is found but assessments exist, returns "Normal".
-  /// If there are no assessments, returns "No assessments".
   String _buildAssessmentRemarks(Map<String, dynamic> data, int assessmentCount) {
     final anthropometric = (data['anthropometric'] ?? {}) as Map<String, dynamic>;
-
     final weightForAge = anthropometric['weightForAge']?.toString() ?? '';
     final heightForAge = anthropometric['heightForAge']?.toString() ?? '';
     final weightForHeight = anthropometric['weightForHeight']?.toString() ?? '';
@@ -54,53 +40,45 @@ class _PatientListTabState extends State<PatientListTab> {
     final interpretations = <String>[];
     for (final raw in [weightForAge, heightForAge, weightForHeight, bmi]) {
       final interp = _extractInterpretation(raw);
-      if (interp.isNotEmpty) {
-        interpretations.add(interp.toLowerCase());
-      }
+      if (interp.isNotEmpty) interpretations.add(interp.toLowerCase());
     }
 
-    if (assessmentCount == 0) {
-      return 'No assessments';
-    }
+    if (assessmentCount == 0) return 'No assessments';
 
-    // Collect high-level tags based on the interpretations
     final tags = <String>{};
     for (final interp in interpretations) {
-      if (interp.contains('underweight')) {
-        tags.add('Underweight');
-      }
-      if (interp.contains('stunted')) {
-        tags.add('Stunted');
-      }
-      if (interp.contains('overweight') || interp.contains('obese')) {
-        tags.add('Overweight/Obese');
-      }
-      if (interp.contains('at risk')) {
-        tags.add('At risk');
-      }
+      if (interp.contains('underweight')) tags.add('Underweight');
+      if (interp.contains('stunted')) tags.add('Stunted');
+      if (interp.contains('overweight') || interp.contains('obese')) tags.add('Overweight/Obese');
+      if (interp.contains('at risk')) tags.add('At risk');
     }
 
-    if (tags.isNotEmpty) {
-      return tags.join(', ');
-    }
+    if (tags.isNotEmpty) return tags.join(', ');
+    if (interpretations.isEmpty) return 'Assessment done';
 
-    if (interpretations.isEmpty) {
-      // There is at least one assessment, but no anthropometric interpretation stored.
-      return 'Assessment done';
-    }
+    final allNormal = interpretations.isNotEmpty &&
+        interpretations.every((i) => i == 'normal');
+    if (allNormal) return 'Normal';
 
-    // If all interpretations are normal, label as Normal.
-    final allNormal =
-        interpretations.isNotEmpty && interpretations.every((i) => i == 'normal');
-    if (allNormal) {
-      return 'Normal';
-    }
-
-    // Fallback: use the first interpretation capitalized.
     final first = interpretations.first;
-    return first.isEmpty
-        ? 'Assessment done'
-        : '${first[0].toUpperCase()}${first.substring(1)}';
+    return first.isEmpty ? 'Assessment done' : '${first[0].toUpperCase()}${first.substring(1)}';
+  }
+
+  // ── Status color helper ──────────────────────────────────────────────────
+  Color _statusColor(String remarks) {
+    final r = remarks.toLowerCase();
+    if (r.contains('underweight') || r.contains('stunted') || r.contains('wasted')) {
+      return const Color(0xFFE57373); // red
+    }
+    if (r.contains('overweight') || r.contains('obese')) {
+      return const Color(0xFFFFB74D); // orange
+    }
+    if (r.contains('at risk')) {
+      return const Color(0xFFFFD54F); // amber
+    }
+    if (r == 'normal') return const Color(0xFF66BB6A); // green
+    if (r == 'no assessments') return Colors.grey;
+    return const Color(0xFF4DB6AC); // teal fallback
   }
 
   @override
@@ -137,8 +115,8 @@ class _PatientListTabState extends State<PatientListTab> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Delete selected?'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Delete Selected?', style: TextStyle(fontWeight: FontWeight.w700)),
         content: Text(
           'Soft-delete $count patient record(s)? They will be hidden from the list but can be restored later.',
         ),
@@ -150,8 +128,9 @@ class _PatientListTabState extends State<PatientListTab> {
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              backgroundColor: Colors.redAccent,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              elevation: 0,
             ),
             child: const Text('Delete'),
           ),
@@ -185,6 +164,9 @@ class _PatientListTabState extends State<PatientListTab> {
           SnackBar(
             content: Text('$count record(s) deleted.'),
             backgroundColor: const Color(0xFF2E8B7B),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            margin: const EdgeInsets.all(16),
           ),
         );
       }
@@ -193,7 +175,10 @@ class _PatientListTabState extends State<PatientListTab> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Delete failed: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            margin: const EdgeInsets.all(16),
           ),
         );
       }
@@ -204,33 +189,15 @@ class _PatientListTabState extends State<PatientListTab> {
 
   Future<void> _fetchPatients() async {
     setState(() => _loading = true);
-    
     try {
       final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        print('No logged in user');
-        setState(() => _loading = false);
-        return;
-      }
+      if (user == null) { setState(() => _loading = false); return; }
 
-      // ✅ STEP 1: Get user's barangay
-      print('Fetching user barangay...');
       final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
-
+          .collection('users').doc(user.uid).get();
       final barangayId = userDoc.data()?['barangayId'] as String?;
-      
-      if (barangayId == null) {
-        print('User has no barangay assigned');
-        setState(() => _loading = false);
-        return;
-      }
+      if (barangayId == null) { setState(() => _loading = false); return; }
 
-      print('User barangay: $barangayId');
-
-      // ✅ STEP 2: Fetch all patients from barangay's shared patient list (exclude deleted)
       final snapshot = await FirebaseFirestore.instance
           .collection('barangays')
           .doc(barangayId)
@@ -239,30 +206,18 @@ class _PatientListTabState extends State<PatientListTab> {
           .orderBy('createdAt', descending: true)
           .get();
 
-      print('Found ${snapshot.docs.length} patient records');
-
-      // ✅ STEP 3: Group by patient name
       final Map<String, List<QueryDocumentSnapshot>> patientGroups = {};
-      
       for (var doc in snapshot.docs) {
         final data = doc.data();
         final demographic = data['demographic'] ?? {};
-        
-        String firstName = demographic['firstName']?.toString() ?? '';
-        String lastName = demographic['lastName']?.toString() ?? '';
-        
-        // Create a key for grouping (case-insensitive)
-        final key = '${firstName.toLowerCase().trim()}_${lastName.toLowerCase().trim()}';
-        
+        final key =
+            '${(demographic['firstName'] ?? '').toString().toLowerCase().trim()}_${(demographic['lastName'] ?? '').toString().toLowerCase().trim()}';
         if (key.isNotEmpty && key != '_') {
           patientGroups.putIfAbsent(key, () => []);
           patientGroups[key]!.add(doc);
         }
       }
-      
-      print('Grouped into ${patientGroups.length} unique patients');
 
-      // ✅ STEP 4: Create one Patient entry per unique patient
       setState(() {
         _patients = patientGroups.entries.map((entry) {
           final docs = entry.value;
@@ -272,39 +227,18 @@ class _PatientListTabState extends State<PatientListTab> {
             final dataB = b.data() as Map<String, dynamic>;
             final timeA = (dataA['createdAt'] as Timestamp?)?.toDate() ?? DateTime(1970);
             final timeB = (dataB['createdAt'] as Timestamp?)?.toDate() ?? DateTime(1970);
-            return timeB.compareTo(timeA); // Most recent first
+            return timeB.compareTo(timeA);
           });
-          
-          // Sort by createdAt and get the most recent document
-          docs.sort((a, b) {
-              final dataA = a.data() as Map<String, dynamic>?; 
-              final dataB = b.data() as Map<String, dynamic>?;
-
-              final timeA = (dataA?['createdAt'] as Timestamp?)
-                      ?.toDate() ??
-                  DateTime(1970);
-
-              final timeB = (dataB?['createdAt'] as Timestamp?)
-                      ?.toDate() ??
-                  DateTime(1970);
-
-              return timeB.compareTo(timeA);
-            });
-            
 
           final mostRecentDoc = docs.first;
           final data = mostRecentDoc.data() as Map<String, dynamic>;
           final demographic = data['demographic'] ?? {};
           final createdAt = data['createdAt'] as Timestamp?;
-          final assessmentRemarks =
-              _buildAssessmentRemarks(data, assessmentCount);
-
-          final nameStr = '${demographic['firstName'] ?? ''} ${demographic['lastName'] ?? ''}'.trim();
-          final parts = nameStr.isEmpty ? <String>[] : nameStr.split(RegExp(r'\s+'));
+          final assessmentRemarks = _buildAssessmentRemarks(data, assessmentCount);
 
           return Patient(
-            firstName: demographic['firstName'] ?? (parts.isNotEmpty ? parts.first : ''),
-            lastName: demographic['lastName'] ?? (parts.length > 1 ? parts.sublist(1).join(' ') : ''),
+            firstName: demographic['firstName'] ?? '',
+            lastName: demographic['lastName'] ?? '',
             age: int.tryParse(demographic['age'] ?? '0') ?? 0,
             assessmentRemarks: assessmentRemarks,
             lastVisit: createdAt?.toDate() ?? DateTime.now(),
@@ -318,22 +252,23 @@ class _PatientListTabState extends State<PatientListTab> {
             motherContact: demographic['motherContact'] ?? '',
             fatherName: demographic['father'] ?? '',
             fatherContact: demographic['fatherContact'] ?? '',
-            createdBy: data?['createdByName'] ?? 'Unknown',
+            createdBy: data['createdByName'] ?? 'Unknown',
             barangayId: barangayId,
           );
         }).toList();
-
         _loading = false;
       });
     } catch (e) {
-      print('Error fetching patients: $e');
+      debugPrint('Error fetching patients: $e');
       setState(() => _loading = false);
-      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error loading patients: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            margin: const EdgeInsets.all(16),
           ),
         );
       }
@@ -341,18 +276,17 @@ class _PatientListTabState extends State<PatientListTab> {
   }
 
   List<Patient> get _filteredPatients {
-    final filtered = _patients.where((patient) {
-      final query = _searchQuery.toLowerCase();
-      return patient.lastName.toLowerCase().contains(query) ||
-          patient.firstName.toLowerCase().contains(query) ||
-          patient.assessmentRemarks.toLowerCase().contains(query);
+    final filtered = _patients.where((p) {
+      final q = _searchQuery.toLowerCase();
+      return p.lastName.toLowerCase().contains(q) ||
+          p.firstName.toLowerCase().contains(q) ||
+          p.assessmentRemarks.toLowerCase().contains(q);
     }).toList();
 
     filtered.sort((a, b) {
-      final comparison = a.lastName.compareTo(b.lastName);
-      return _sortAscending ? comparison : -comparison;
+      final cmp = a.lastName.compareTo(b.lastName);
+      return _sortAscending ? cmp : -cmp;
     });
-
     return filtered;
   }
 
@@ -366,11 +300,7 @@ class _PatientListTabState extends State<PatientListTab> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(
-        child: CircularProgressIndicator(
-          color: Colors.white,
-        ),
-      );
+      return const Center(child: CircularProgressIndicator(color: Colors.white));
     }
 
     if (_patients.isEmpty) {
@@ -378,24 +308,33 @@ class _PatientListTabState extends State<PatientListTab> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.person_off_outlined,
-              size: 64,
-              color: Colors.white.withOpacity(0.5),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'No patients found in your barangay',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.15),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.person_off_outlined,
+                size: 40,
+                color: Colors.white.withOpacity(0.7),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 20),
             const Text(
+              'No patients found',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
               'Add a patient assessment to get started',
               style: TextStyle(
-                color: Colors.white70,
+                color: Colors.white.withOpacity(0.7),
                 fontSize: 14,
               ),
             ),
@@ -405,165 +344,167 @@ class _PatientListTabState extends State<PatientListTab> {
     }
 
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       child: Column(
         children: [
+          /// Search bar
           _buildSearchBar(),
           const SizedBox(height: 12),
-          _buildOptPlusAndTotalRow(),
+
+          /// OPT Plus + count row
+          _buildTopRow(),
+
+          /// Selection bar
           if (_selectionMode) ...[
             const SizedBox(height: 8),
             _buildSelectionBar(),
           ],
-          const SizedBox(height: 8),
+
+          const SizedBox(height: 10),
+
+          /// Patient table
           Expanded(
             child: Container(
               decoration: BoxDecoration(
-                color: const Color(0xFF4A9B8C),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+                color: Colors.white.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: Colors.white.withOpacity(0.25), width: 1),
               ),
-              child: Column(
-                children: [
-                  _buildTableHeader(),
-                  Expanded(
-                    child: _buildPatientList(),
-                  ),
-                ],
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(18),
+                child: Column(
+                  children: [
+                    _buildTableHeader(),
+                    Expanded(child: _buildPatientList()),
+                  ],
+                ),
               ),
             ),
           ),
-          const SizedBox(height: 8),
+
+          const SizedBox(height: 10),
+
+          /// Sort button
           _buildSortButton(),
         ],
       ),
     );
   }
 
+  // ── SEARCH BAR ─────────────────────────────────────────────────────────────
   Widget _buildSearchBar() {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(25),
+        color: Colors.white.withOpacity(0.95),
+        borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
       child: TextField(
         controller: _searchController,
-        onChanged: (value) {
-          setState(() {
-            _searchQuery = value;
-          });
-        },
+        onChanged: (v) => setState(() => _searchQuery = v),
+        style: const TextStyle(fontSize: 14, color: Colors.black87),
         decoration: InputDecoration(
-          hintText: 'Search patients...',
-          hintStyle: TextStyle(
-            color: Colors.grey[400],
-            fontSize: 14,
-          ),
-          prefixIcon: Icon(
-            Icons.search,
-            color: Colors.grey[400],
-          ),
+          hintText: 'Search by name or status…',
+          hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+          prefixIcon: Icon(Icons.search_rounded, color: Colors.grey.shade400, size: 20),
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: Icon(Icons.close_rounded, color: Colors.grey.shade400, size: 18),
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() => _searchQuery = '');
+                  },
+                )
+              : null,
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         ),
       ),
     );
   }
 
-  Widget _buildTotalPatientsCount() {
+  // ── TOP ROW ────────────────────────────────────────────────────────────────
+  Widget _buildTopRow() {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        Text(
-          'Total Patients: ${_filteredPatients.length}',
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
+        // OPT Plus button
+        ElevatedButton.icon(
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const OptPlusScreen()),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.white,
+            foregroundColor: const Color(0xFF2E8B7B),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            elevation: 2,
+          ),
+          icon: const Icon(Icons.post_add_rounded, size: 16),
+          label: const Text(
+            'OPT Plus',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
           ),
         ),
-      ],
-    );
-  }
-
-  Widget _buildOptPlusAndTotalRow() {
-    return Row(
-      children: [
-        _buildOptPlusButton(),
         const Spacer(),
-        _buildTotalPatientsCount(),
+        // Total count chip
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.people_outline_rounded, color: Colors.white, size: 14),
+              const SizedBox(width: 6),
+              Text(
+                '${_filteredPatients.length} Patients',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildOptPlusButton() {
-    return ElevatedButton.icon(
-      onPressed: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => const OptPlusScreen(),
-          ),
-        );
-      },
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF2E8B7B),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        elevation: 3,
-      ),
-      icon: const Icon(
-        Icons.post_add,
-        size: 18,
-      ),
-      label: const Text(
-        'OPT Plus',
-        style: TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-
+  // ── SELECTION BAR ──────────────────────────────────────────────────────────
   Widget _buildSelectionBar() {
     final count = _selectedDocIds.length;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
+          BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 6, offset: const Offset(0, 2)),
         ],
       ),
       child: Row(
         children: [
+          Icon(
+            count > 0 ? Icons.check_circle_rounded : Icons.radio_button_unchecked,
+            size: 18,
+            color: count > 0 ? const Color(0xFF2E8B7B) : Colors.grey,
+          ),
+          const SizedBox(width: 8),
           Text(
-            count == 0 ? 'Select rows to delete' : '$count selected',
-            style: const TextStyle(
+            count == 0 ? 'Long-press a row to select' : '$count selected',
+            style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF333333),
+              color: count > 0 ? const Color(0xFF333333) : Colors.grey,
             ),
           ),
           const Spacer(),
@@ -572,17 +513,13 @@ class _PatientListTabState extends State<PatientListTab> {
               onPressed: _deleting ? null : _confirmAndSoftDelete,
               icon: _deleting
                   ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      width: 14, height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.red),
                     )
-                  : const Icon(Icons.delete_outline, size: 18),
-              label: Text(_deleting ? 'Deleting...' : 'Delete'),
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.red,
-              ),
+                  : const Icon(Icons.delete_outline_rounded, size: 16),
+              label: Text(_deleting ? 'Deleting…' : 'Delete'),
+              style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
             ),
-          const SizedBox(width: 8),
           TextButton(
             onPressed: _deleting ? null : _exitSelectionMode,
             child: const Text('Cancel', style: TextStyle(color: Color(0xFF2E8B7B))),
@@ -592,67 +529,69 @@ class _PatientListTabState extends State<PatientListTab> {
     );
   }
 
+  // ── TABLE HEADER ───────────────────────────────────────────────────────────
   Widget _buildTableHeader() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(16),
-          topRight: Radius.circular(16),
-        ),
+        color: Colors.white.withOpacity(0.12),
       ),
       child: Row(
         children: [
-          const SizedBox(width: 40),
-          _buildHeaderCell('Last name', flex: 2),
-          _buildHeaderCell('First name', flex: 2),
-          _buildHeaderCell('Age (months)', flex: 1),
-          _buildHeaderCell('Assessment\nRemarks', flex: 2),
-          _buildHeaderCell('Last visit', flex: 2),
-          _buildHeaderCell('Guardian\nContact', flex: 2),
+          const SizedBox(width: 46), // avatar + checkbox space
+          _headerCell('Last Name', flex: 2),
+          _headerCell('First Name', flex: 2),
+          _headerCell('Age', flex: 1),
+          _headerCell('Status', flex: 2),
+          _headerCell('Last Visit', flex: 2),
+          _headerCell('Contact', flex: 2),
         ],
       ),
     );
   }
 
-  Widget _buildHeaderCell(String text, {required int flex}) {
+  Widget _headerCell(String text, {required int flex}) {
     return Expanded(
       flex: flex,
       child: Text(
         text,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 10,
-          fontWeight: FontWeight.w600,
-          color: Colors.white,
+          fontWeight: FontWeight.w700,
+          color: Colors.white.withOpacity(0.85),
+          letterSpacing: 0.4,
         ),
         textAlign: TextAlign.center,
       ),
     );
   }
 
+  // ── PATIENT LIST ───────────────────────────────────────────────────────────
   Widget _buildPatientList() {
     return ListView.builder(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       itemCount: _filteredPatients.length,
-      itemBuilder: (context, index) {
-        return _buildPatientRow(_filteredPatients[index], index);
-      },
+      itemBuilder: (context, index) => _buildPatientRow(_filteredPatients[index], index),
     );
   }
 
   Widget _buildPatientRow(Patient patient, int index) {
     final isSelected = _selectedDocIds.contains(patient.docId);
+    final statusColor = _statusColor(patient.assessmentRemarks);
+
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: _selectionMode && isSelected
-            ? const Color(0xFF2E8B7B).withOpacity(0.12)
-            : Colors.white,
+        color: isSelected
+            ? const Color(0xFF2E8B7B).withOpacity(0.15)
+            : Colors.white.withOpacity(0.92),
         borderRadius: BorderRadius.circular(12),
+        border: isSelected
+            ? Border.all(color: const Color(0xFF2E8B7B).withOpacity(0.4), width: 1.5)
+            : null,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withOpacity(0.04),
             blurRadius: 4,
             offset: const Offset(0, 1),
           ),
@@ -667,135 +606,134 @@ class _PatientListTabState extends State<PatientListTab> {
               _selectedDocIds.add(patient.docId);
             });
           },
-          onTap: () {
-            if (_selectionMode) {
-              _toggleSelection(patient);
-            } else {
-              _showPatientDetails(patient);
-            }
-          },
+          onTap: () => _selectionMode ? _toggleSelection(patient) : _showPatientDetails(patient),
           borderRadius: BorderRadius.circular(12),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
             child: Row(
               children: [
-                _selectionMode
-                    ? SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: Checkbox(
-                          value: isSelected,
-                          onChanged: (_) => _toggleSelection(patient),
-                          activeColor: const Color(0xFF2E8B7B),
-                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ),
-                      )
-                    : const SizedBox(width: 20, height: 20),
-                const SizedBox(width: 6),
-                Container(
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    color: patient.avatarColor.withOpacity(0.3),
-                    shape: BoxShape.circle,
-                  ),
-                  child: ClipOval(
-                    child: Image.network(
-                      'https://ui-avatars.com/api/?name=${patient.firstName}+${patient.lastName}&background=8BC88A&color=fff&size=56',
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Icon(
-                          Icons.person,
+                // Checkbox / avatar
+                if (_selectionMode)
+                  SizedBox(
+                    width: 20, height: 20,
+                    child: Checkbox(
+                      value: isSelected,
+                      onChanged: (_) => _toggleSelection(patient),
+                      activeColor: const Color(0xFF2E8B7B),
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                    ),
+                  )
+                else
+                  // Avatar
+                  Container(
+                    width: 28, height: 28,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2E8B7B).withOpacity(0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: ClipOval(
+                      child: Image.network(
+                        'https://ui-avatars.com/api/?name=${patient.firstName}+${patient.lastName}&background=8BC88A&color=fff&size=56',
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Icon(
+                          Icons.person_rounded,
                           size: 16,
-                          color: patient.avatarColor,
-                        );
-                      },
+                          color: const Color(0xFF2E8B7B),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 8),
+
+                // Last name
                 Expanded(
                   flex: 2,
                   child: Text(
                     patient.lastName,
                     style: const TextStyle(
                       fontSize: 10,
-                      fontWeight: FontWeight.w500,
-                      color: Color(0xFF333333),
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1A1A1A),
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
+
+                // First name
                 Expanded(
                   flex: 2,
                   child: Text(
                     patient.firstName,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      color: Color(0xFF333333),
-                    ),
+                    style: const TextStyle(fontSize: 10, color: Color(0xFF444444)),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
+
+                // Age
                 Expanded(
                   flex: 1,
                   child: Text(
-                    '${patient.age} mos',
-                    style: const TextStyle(
-                      fontSize: 10,
-                      color: Color(0xFF333333),
-                    ),
+                    '${patient.age}m',
+                    style: const TextStyle(fontSize: 10, color: Color(0xFF444444)),
                     textAlign: TextAlign.center,
                   ),
                 ),
+
+                // Status badge
+                Expanded(
+                  flex: 2,
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: statusColor.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: statusColor.withOpacity(0.3), width: 0.8),
+                      ),
+                      child: Text(
+                        patient.assessmentRemarks,
+                        style: TextStyle(
+                          fontSize: 8,
+                          fontWeight: FontWeight.w700,
+                          color: statusColor,
+                        ),
+                        textAlign: TextAlign.center,
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 2,
+                      ),
+                    ),
+                  ),
+                ),
+
+                // Last visit
                 Expanded(
                   flex: 2,
                   child: Text(
-                    patient.assessmentRemarks,
-                    style: const TextStyle(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.green,
-                    ),
-                    textAlign: TextAlign.center,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                Expanded(
-                  flex: 2,
-                  child: Text(
-                    '${patient.lastVisit.month.toString().padLeft(2,'0')}/${patient.lastVisit.day.toString().padLeft(2,'0')}/${patient.lastVisit.year}',
-                    style: const TextStyle(
-                      fontSize: 9,
-                      color: Color(0xFF333333),
-                    ),
+                    '${patient.lastVisit.month.toString().padLeft(2, '0')}/${patient.lastVisit.day.toString().padLeft(2, '0')}/${patient.lastVisit.year}',
+                    style: const TextStyle(fontSize: 9, color: Color(0xFF666666)),
                     textAlign: TextAlign.center,
                   ),
                 ),
+
+                // Contact icons
                 Expanded(
                   flex: 2,
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildContactIcon(
-                          Icons.phone,
-                          const Color(0xFF2E8B7B),
-                          _selectionMode ? () {} : () => _handleCall(patient),
-                        ),
-                        const SizedBox(width: 2),
-                        _buildContactIcon(
-                          Icons.message,
-                          const Color(0xFFF5A962),
-                          _selectionMode ? () {} : () => _handleMessage(patient),
-                        ),
-                      ],
-                    ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _contactIcon(
+                        Icons.phone_rounded,
+                        const Color(0xFF2E8B7B),
+                        _selectionMode ? () {} : () => _handleCall(patient),
+                      ),
+                      const SizedBox(width: 4),
+                      _contactIcon(
+                        Icons.sms_rounded,
+                        const Color(0xFFF5A962),
+                        _selectionMode ? () {} : () => _handleMessage(patient),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -806,63 +744,51 @@ class _PatientListTabState extends State<PatientListTab> {
     );
   }
 
-  Widget _buildContactIcon(IconData icon, Color color, VoidCallback onTap) {
+  Widget _contactIcon(IconData icon, Color color, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 18,
-        height: 18,
+        width: 22, height: 22,
         decoration: BoxDecoration(
-          color: color.withOpacity(0.15),
-          shape: BoxShape.circle,
+          color: color.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(6),
         ),
-        child: Icon(
-          icon,
-          size: 10,
-          color: color,
-        ),
+        child: Icon(icon, size: 12, color: color),
       ),
     );
   }
 
+  // ── SORT BUTTON ────────────────────────────────────────────────────────────
   Widget _buildSortButton() {
     return Align(
       alignment: Alignment.centerRight,
       child: GestureDetector(
-        onTap: () {
-          setState(() {
-            _sortAscending = !_sortAscending;
-          });
-        },
+        onTap: () => setState(() => _sortAscending = !_sortAscending),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
+            color: Colors.white.withOpacity(0.9),
+            borderRadius: BorderRadius.circular(12),
             boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
+              BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 6, offset: const Offset(0, 2)),
             ],
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                _sortAscending ? 'A-Z' : 'Z-A',
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF333333),
-                ),
-              ),
-              const SizedBox(width: 4),
               Icon(
-                _sortAscending ? Icons.arrow_downward : Icons.arrow_upward,
+                _sortAscending ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
                 size: 14,
-                color: const Color(0xFF333333),
+                color: const Color(0xFF2E8B7B),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                _sortAscending ? 'A → Z' : 'Z → A',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF2E8B7B),
+                ),
               ),
             ],
           ),
@@ -871,166 +797,226 @@ class _PatientListTabState extends State<PatientListTab> {
     );
   }
 
-  /// Sanitize phone number for tel: and sms: URIs (digits and + only).
-  String _sanitizePhone(String raw) {
-    return raw.replaceAll(RegExp(r'[^\d+]'), '');
-  }
+  // ── CONTACT HANDLERS ───────────────────────────────────────────────────────
+  String _sanitizePhone(String raw) => raw.replaceAll(RegExp(r'[^\d+]'), '');
 
   Future<void> _handleCall(Patient patient) async {
     final number = _sanitizePhone(patient.guardianContact);
     if (number.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No guardian contact number to call'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('No guardian contact number to call'),
+          backgroundColor: Colors.orange.shade700,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
       return;
     }
     final uri = Uri(scheme: 'tel', path: number);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
     } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Cannot open dialer for $number'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Cannot open dialer for $number'),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
     }
   }
 
   Future<void> _handleMessage(Patient patient) async {
     final number = _sanitizePhone(patient.guardianContact);
     if (number.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No guardian contact number to message'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('No guardian contact number to message'),
+          backgroundColor: Colors.orange.shade700,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
       return;
     }
     final uri = Uri(scheme: 'sms', path: number);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
     } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Cannot open messaging app for $number'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Cannot open messaging app for $number'),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
     }
   }
 
+  // ── PATIENT DETAIL DIALOG ──────────────────────────────────────────────────
   void _showPatientDetails(Patient patient) {
+    final statusColor = _statusColor(patient.assessmentRemarks);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: patient.avatarColor.withOpacity(0.3),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(Icons.person, color: patient.avatarColor),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                '${patient.firstName} ${patient.lastName}',
-                style: const TextStyle(fontSize: 18),
-              ),
-            ),
-          ],
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        contentPadding: EdgeInsets.zero,
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildDetailRow('Age', '${patient.age} months old'),
-            _buildDetailRow('Assessment', patient.assessmentRemarks),
-            _buildDetailRow('Last Visit',
-                '${patient.lastVisit.month}/${patient.lastVisit.day}/${patient.lastVisit.year}'),
-            _buildDetailRow('Guardian Contact', patient.guardianContact),
-            _buildDetailRow('Added by', patient.createdBy),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text(
-              'Close',
-              style: TextStyle(color: Color(0xFF2E8B7B)),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => PatientProfileOverview(
-                    patient: patient,
-                    //isSharedPatient: true,           // ← Mark as shared
-                    //sharedPatientId: patient.docId,  // ← Pass the Firestore document ID
-                   //barangayId: patient.barangayId,  // ← Pass the barangay ID
-                  
-                  ),
+            // Header strip
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF2E8B7B), Color(0xFF5CAA7F)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2E8B7B),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48, height: 48,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.25),
+                      shape: BoxShape.circle,
+                    ),
+                    child: ClipOval(
+                      child: Image.network(
+                        'https://ui-avatars.com/api/?name=${patient.firstName}+${patient.lastName}&background=ffffff&color=2E8B7B&size=96',
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const Icon(Icons.person_rounded, color: Colors.white, size: 28),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${patient.firstName} ${patient.lastName}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: statusColor.withOpacity(0.25),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: Colors.white.withOpacity(0.3), width: 0.8),
+                          ),
+                          child: Text(
+                            patient.assessmentRemarks,
+                            style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
-            child: const Text(
-              'View Profile',
-              style: TextStyle(color: Colors.white),
+
+            // Details
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  _detailRow(Icons.cake_outlined, 'Age', '${patient.age} months old'),
+                  _detailRow(Icons.calendar_today_outlined, 'Last Visit',
+                      '${patient.lastVisit.month}/${patient.lastVisit.day}/${patient.lastVisit.year}'),
+                  _detailRow(Icons.phone_outlined, 'Contact', patient.guardianContact.isEmpty ? '—' : patient.guardianContact),
+                  _detailRow(Icons.person_outline_rounded, 'Added by', patient.createdBy),
+                ],
+              ),
             ),
-          ),
-        ],
+
+            // Actions
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF2E8B7B),
+                        side: const BorderSide(color: Color(0xFF2E8B7B)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      child: const Text('Close', style: TextStyle(fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => PatientProfileOverview(patient: patient),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2E8B7B),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        elevation: 0,
+                      ),
+                      child: const Text('View Profile', style: TextStyle(fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildDetailRow(String label, String value) {
+  Widget _detailRow(IconData icon, String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.only(bottom: 12),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 120,
-            child: Text(
-              '$label:',
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF666666),
-              ),
+          Icon(icon, size: 16, color: const Color(0xFF2E8B7B)),
+          const SizedBox(width: 10),
+          Text(
+            '$label:',
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF666666),
             ),
           ),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(
-                color: Color(0xFF333333),
-              ),
+              style: const TextStyle(fontSize: 13, color: Color(0xFF1A1A1A)),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],

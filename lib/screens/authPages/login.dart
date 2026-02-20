@@ -1,9 +1,10 @@
-// lib/screens/login.dart
-/*import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:lumasdang/screens/home.dart';
+import 'package:lumasdang/screens/home/home_page.dart';
 import 'register.dart';
+import 'dart:async';
+import 'dart:math' as math;
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -12,854 +13,129 @@ class LoginPage extends StatefulWidget {
   State<LoginPage> createState() => _LoginPageState();
 }
 
-class _LoginPageState extends State<LoginPage> {
-  final _emailController = TextEditingController();
+class _LoginPageState extends State<LoginPage>
+    with TickerProviderStateMixin {
+
+  final _usernameOrEmailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   bool _isLoading = false;
+  bool _obscurePassword = true;
+
+  late AnimationController _backgroundController;
+  late AnimationController _contentController;
+  late AnimationController _leafController;
+
+  late Animation<double> _contentFade;
+  late Animation<Offset> _contentSlide;
+  late Animation<double> _leafRotation;
+
+  final FocusNode _emailFocusNode = FocusNode();
+  final FocusNode _passwordFocusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+
+    _backgroundController = AnimationController(
+      duration: const Duration(seconds: 8),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    _contentController = AnimationController(
+      duration: const Duration(milliseconds: 1000),
+      vsync: this,
+    );
+
+    _leafController = AnimationController(
+      duration: const Duration(seconds: 6),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    _contentFade = CurvedAnimation(
+      parent: _contentController,
+      curve: Curves.easeOut,
+    );
+
+    _contentSlide = Tween<Offset>(
+      begin: const Offset(0, 0.05),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _contentController,
+      curve: Curves.easeOutCubic,
+    ));
+
+    _leafRotation = Tween<double>(begin: -0.05, end: 0.05).animate(
+      CurvedAnimation(parent: _leafController, curve: Curves.easeInOut),
+    );
+
+    Future.delayed(const Duration(milliseconds: 200), () {
+      _contentController.forward();
+    });
+  }
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _usernameOrEmailController.dispose();
     _passwordController.dispose();
+    _emailFocusNode.dispose();
+    _passwordFocusNode.dispose();
+    _backgroundController.dispose();
+    _contentController.dispose();
+    _leafController.dispose();
     super.dispose();
   }
 
-  // Login function with soft-delete check
   Future<void> _login() async {
-    setState(() {
-      _isLoading = true;
-    });
+    if (!_formKey.currentState!.validate()) return;
+
+    String input = _usernameOrEmailController.text.trim();
+    String password = _passwordController.text.trim();
+
+    setState(() => _isLoading = true);
 
     try {
+      String emailToUse = input;
+
+      if (!input.contains('@')) {
+        final usernameDoc = await FirebaseFirestore.instance
+            .collection('usernames')
+            .doc(input.toLowerCase())
+            .get();
+
+        if (usernameDoc.exists) {
+          emailToUse = usernameDoc.data()?['email'] ?? input;
+        } else {
+          _showErrorSnackbar('Username not found');
+          setState(() => _isLoading = false);
+          return;
+        }
+      }
+
       final userCredential = await _auth.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
+        email: emailToUse,
+        password: password,
       );
 
       final user = userCredential.user;
+
       if (user != null) {
-        // Check if account is soft-deleted in Firestore
         final doc = await FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
             .get();
 
         if (doc.exists && doc.data()?['isDeleted'] == true) {
-          // Sign out immediately if deleted
           await _auth.signOut();
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                "This account has been deleted. Please register a new account.",
-              ),
-            ),
-          );
-          return; // Stop login
-        }
-
-        // Login successful → go to HomePage
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const HomePage()),
-        );
-      }
-    } on FirebaseAuthException catch (e) {
-      String message = 'Login failed. Please try again.';
-      if (e.code == 'user-not-found') {
-        message = 'No user found for that email.';
-      } else if (e.code == 'wrong-password') {
-        message = 'Incorrect password.';
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-
-  // Forgot password dialog
-  Future<void> _showForgotPasswordDialog() async {
-    final emailController = TextEditingController();
-
-    await showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-          contentPadding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
-          actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          title: Row(
-            children: const [
-              Icon(Icons.lock_reset, color: Color(0xFF2E8B7B)),
-              SizedBox(width: 10),
-              Text(
-                "Reset Password",
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                "Enter your registered email address and we will send you a password reset link.",
-                style: TextStyle(fontSize: 14, color: Colors.grey),
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                controller: emailController,
-                keyboardType: TextInputType.emailAddress,
-                decoration: InputDecoration(
-                  prefixIcon: const Icon(Icons.email_outlined),
-                  hintText: "Enter your email",
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(
-                      color: Color(0xFF2E8B7B),
-                      width: 2,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text(
-                "Cancel",
-                style: TextStyle(color: Colors.grey),
-              ),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2E8B7B),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              ),
-              onPressed: () async {
-                final email = emailController.text.trim();
-                if (email.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Please enter your email")),
-                  );
-                  return;
-                }
-
-                try {
-                  await _auth.sendPasswordResetEmail(email: email);
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        "Password reset email sent. Please check your inbox or spam folder.",
-                      ),
-                    ),
-                  );
-                } on FirebaseAuthException catch (e) {
-                  String message = "Something went wrong.";
-                  if (e.code == 'user-not-found') {
-                    message = "No account found with that email.";
-                  } else if (e.code == 'invalid-email') {
-                    message = "Invalid email format.";
-                  }
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(message)),
-                  );
-                }
-              },
-              child: const Text("Send Reset Link"),
-            ),
-          ],
-        );
-      },
-    );
-
-    emailController.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF2E8B7B),
-              Color(0xFF5CAA7F),
-              Color(0xFF8BC88A),
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text(
-                    'Lumasdang',
-                    style: TextStyle(
-                      fontSize: 48,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      fontStyle: FontStyle.italic,
-                      shadows: [
-                        Shadow(
-                          color: Colors.black26,
-                          offset: Offset(2, 2),
-                          blurRadius: 4,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 60),
-                  _buildLoginField(
-                    controller: _emailController,
-                    hint: 'Email',
-                    icon: Icons.person_outline,
-                  ),
-                  const SizedBox(height: 20),
-                  _buildLoginField(
-                    controller: _passwordController,
-                    hint: 'Password',
-                    icon: Icons.lock_outline,
-                    isPassword: true,
-                  ),
-                  const SizedBox(height: 40),
-                  SizedBox(
-                    width: 200,
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _login,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFF5A962),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(25),
-                        ),
-                        elevation: 3,
-                      ),
-                      child: _isLoading
-                          ? const CircularProgressIndicator(
-                              color: Colors.white,
-                            )
-                          : const Text(
-                              'Log in',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  TextButton(
-                    onPressed: _showForgotPasswordDialog,
-                    child: const Text(
-                      'Forgot your password or username?',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => const RegisterPage()),
-                      );
-                    },
-                    child: const Text(
-                      "Don't have an account? Sign Up",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLoginField({
-    required TextEditingController controller,
-    required String hint,
-    required IconData icon,
-    bool isPassword = false,
-  }) {
-    return Container(
-      decoration: const BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: Colors.white70, width: 1),
-        ),
-      ),
-      child: TextField(
-        controller: controller,
-        obscureText: isPassword,
-        style: const TextStyle(color: Colors.white, fontSize: 16),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: const TextStyle(color: Colors.white70),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 12),
-        ),
-      ),
-    );
-  }
-}
-*/
-
-/*import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:lumasdang/screens/home.dart';
-import 'register.dart';
-
-class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
-
-  @override
-  State<LoginPage> createState() => _LoginPageState();
-}
-
-class _LoginPageState extends State<LoginPage> {
-  final _usernameOrEmailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-
-  bool _isLoading = false;
-
-  @override
-  void dispose() {
-    _usernameOrEmailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _login() async {
-    String input = _usernameOrEmailController.text.trim();
-    String password = _passwordController.text.trim();
-
-    if (input.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter username or email')),
-      );
-      return;
-    }
-
-    if (password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter password')),
-      );
-      return;
-    }
-
-    setState(() => _isLoading = true);
-
-    try {
-      String emailToUse = input;
-
-      print('Login attempt with input: $input');
-
-      // Check if input looks like an email (contains @)
-      if (!input.contains('@')) {
-        print('Input appears to be a username, looking up email...');
-        
-        // Treat as username - look up email
-        try {
-          final usernameDoc = await FirebaseFirestore.instance
-              .collection('usernames')
-              .doc(input.toLowerCase())
-              .get();
-
-          if (usernameDoc.exists) {
-            emailToUse = usernameDoc.data()?['email'] ?? input;
-            print('Found email for username: $emailToUse');
-          } else {
-            print('Username not found in database');
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Username not found')),
-            );
-            setState(() => _isLoading = false);
-            return;
-          }
-        } catch (e) {
-          print('Error looking up username: $e');
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error looking up username: $e')),
-          );
+          _showErrorSnackbar("This account has been deleted.");
           setState(() => _isLoading = false);
           return;
         }
-      } else {
-        print('Input appears to be an email');
-      }
 
-      print('Attempting to sign in with email: $emailToUse');
-
-      // Sign in with email
-      final userCredential = await _auth.signInWithEmailAndPassword(
-        email: emailToUse,
-        password: password,
-      );
-
-      final user = userCredential.user;
-      print('Sign in successful, user UID: ${user?.uid}');
-
-      if (user != null) {
-        // Check if account is soft-deleted
-        try {
-          final doc = await FirebaseFirestore.instance
-              .collection('users')
-              .doc(user.uid)
-              .get();
-
-          print('User document exists: ${doc.exists}');
-          if (doc.exists) {
-            print('User data: ${doc.data()}');
-          }
-
-          if (doc.exists && doc.data()?['isDeleted'] == true) {
-            print('Account is soft-deleted');
-            await _auth.signOut();
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text(
-                  "This account has been deleted. Please register a new account.",
-                ),
-              ),
-            );
-            setState(() => _isLoading = false);
-            return;
-          }
-        } catch (e) {
-          print('Error checking user document: $e');
-          // Continue with login even if we can't check the document
-        }
-
-        print('Login successful, navigating to home...');
-
-        // Login successful
-        if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const HomePage()),
-          );
-        }
-      }
-    } on FirebaseAuthException catch (e) {
-      print('FirebaseAuthException: ${e.code} - ${e.message}');
-      String message = 'Login failed. Please try again.';
-      
-      if (e.code == 'user-not-found') {
-        message = 'No account found with this email.';
-      } else if (e.code == 'wrong-password') {
-        message = 'Incorrect password.';
-      } else if (e.code == 'invalid-email') {
-        message = 'Invalid email format.';
-      } else if (e.code == 'user-disabled') {
-        message = 'This account has been disabled.';
-      } else if (e.code == 'too-many-requests') {
-        message = 'Too many failed attempts. Try again later.';
-      } else if (e.code == 'invalid-credential') {
-        message = 'Invalid credentials. Please check your email and password.';
-      } else if (e.code == 'network-request-failed' || 
-                 e.message?.toLowerCase().contains('network') == true ||
-                 e.message?.toLowerCase().contains('connection') == true ||
-                 e.message?.toLowerCase().contains('ssl') == true ||
-                 e.message?.toLowerCase().contains('handshake') == true) {
-        message = 'Network error. Please check your internet connection and try again.';
-      } else if (e.code == 'unknown' && 
-                 (e.message?.toLowerCase().contains('ssl') == true ||
-                  e.message?.toLowerCase().contains('handshake') == true ||
-                  e.message?.toLowerCase().contains('connection reset') == true)) {
-        message = 'Connection error. Please check your internet connection. If using an emulator, ensure Google Play Services is installed.';
-      }
-      
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(message)));
-    } catch (e) {
-      print('General error: $e');
-      String errorMessage = 'Error: ${e.toString()}';
-      
-      // Check for network/SSL errors in general exceptions
-      if (e.toString().toLowerCase().contains('ssl') ||
-          e.toString().toLowerCase().contains('handshake') ||
-          e.toString().toLowerCase().contains('connection reset') ||
-          e.toString().toLowerCase().contains('network')) {
-        errorMessage = 'Network connection error. Please check your internet connection and try again.';
-      }
-      
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(errorMessage)));
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _showForgotPasswordDialog() async {
-    final emailController = TextEditingController();
-
-    await showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text('Reset Password'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Enter your email address to receive a password reset link.',
-                style: TextStyle(fontSize: 14),
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                controller: emailController,
-                keyboardType: TextInputType.emailAddress,
-                decoration: InputDecoration(
-                  hintText: 'Enter your email',
-                  prefixIcon: const Icon(Icons.email_outlined),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2E8B7B),
-              ),
-              onPressed: () async {
-                final email = emailController.text.trim();
-                if (email.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please enter your email')),
-                  );
-                  return;
-                }
-
-                try {
-                  await _auth.sendPasswordResetEmail(email: email);
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Password reset email sent. Check your inbox.'),
-                    ),
-                  );
-                } on FirebaseAuthException catch (e) {
-                  String msg = 'Error occurred';
-                  if (e.code == 'user-not-found') msg = 'No account found with this email';
-                  if (e.code == 'invalid-email') msg = 'Invalid email format';
-                  ScaffoldMessenger.of(context)
-                      .showSnackBar(SnackBar(content: Text(msg)));
-                }
-              },
-              child: const Text('Send'),
-            ),
-          ],
-        );
-      },
-    );
-
-    emailController.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF2E8B7B), Color(0xFF5CAA7F), Color(0xFF8BC88A)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text(
-                    'Lumasdang',
-                    style: TextStyle(
-                      fontSize: 48,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      fontStyle: FontStyle.italic,
-                      shadows: [
-                        Shadow(
-                            color: Colors.black26,
-                            offset: Offset(2, 2),
-                            blurRadius: 4)
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 60),
-                  _buildField(
-                    controller: _usernameOrEmailController,
-                    hint: 'Username or Email',
-                    icon: Icons.person_outline,
-                  ),
-                  const SizedBox(height: 20),
-                  _buildField(
-                    controller: _passwordController,
-                    hint: 'Password',
-                    icon: Icons.lock_outline,
-                    isPassword: true,
-                  ),
-                  const SizedBox(height: 40),
-                  SizedBox(
-                    width: 200,
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _login,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFF5A962),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(25),
-                        ),
-                      ),
-                      child: _isLoading
-                          ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text(
-                              'Log in',
-                              style: TextStyle(
-                                  fontSize: 18, fontWeight: FontWeight.w600),
-                            ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextButton(
-                    onPressed: _showForgotPasswordDialog,
-                    child: const Text(
-                      'Forgot your password?',
-                      style: TextStyle(color: Colors.white, fontSize: 14),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const RegisterPage()),
-                    ),
-                    child: const Text(
-                      "Don't have an account? Sign Up",
-                      style: TextStyle(color: Colors.white, fontSize: 14),
-                    ),
-                  )
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildField({
-    required TextEditingController controller,
-    required String hint,
-    required IconData icon,
-    bool isPassword = false,
-  }) {
-    return Container(
-      decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: Colors.white70, width: 1))),
-      child: TextField(
-        controller: controller,
-        obscureText: isPassword,
-        style: const TextStyle(color: Colors.white, fontSize: 16),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: const TextStyle(color: Colors.white70),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 12),
-          prefixIcon: Icon(icon, color: Colors.white70),
-        ),
-      ),
-    );
-  }
-}*/
-
-
-// lib/screens/login.dart
-import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:lumasdang/screens/home.dart';
-import 'register.dart';
-import 'dart:async';
-
-class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
-  
-
-  @override
-  State<LoginPage> createState() => _LoginPageState();
-
-
-}
-
-class _LoginPageState extends State<LoginPage> {
-  final _usernameOrEmailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-
-  bool _isLoading = false;
-  bool _obscurePassword = true;
-
-
-  @override
-  void dispose() {
-    _usernameOrEmailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _login() async {
-    String input = _usernameOrEmailController.text.trim();
-    String password = _passwordController.text.trim();
-
-    if (input.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter username or email')),
-      );
-      return;
-    }
-
-    if (password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter password')),
-      );
-      return;
-    }
-
-    setState(() => _isLoading = true);
-
-    try {
-      String emailToUse = input;
-
-      print('Login attempt with input: $input');
-
-      // Check if input looks like an email (contains @)
-      if (!input.contains('@')) {
-        print('Input appears to be a username, looking up email...');
-        
-        // Treat as username - look up email
-        try {
-          final usernameDoc = await FirebaseFirestore.instance
-              .collection('usernames')
-              .doc(input.toLowerCase())
-              .get();
-
-          if (usernameDoc.exists) {
-            emailToUse = usernameDoc.data()?['email'] ?? input;
-            print('Found email for username: $emailToUse');
-          } else {
-            print('Username not found in database');
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Username not found')),
-            );
-            setState(() => _isLoading = false);
-            return;
-          }
-        } catch (e) {
-          print('Error looking up username: $e');
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error looking up username: $e')),
-          );
-          setState(() => _isLoading = false);
-          return;
-        }
-      } else {
-        print('Input appears to be an email');
-      }
-
-      print('Attempting to sign in with email: $emailToUse');
-
-      // Sign in with email
-      final userCredential = await _auth.signInWithEmailAndPassword(
-        email: emailToUse,
-        password: password,
-      );
-
-      final user = userCredential.user;
-      print('Sign in successful, user UID: ${user?.uid}');
-
-      if (user != null) {
-        // Check if account is soft-deleted
-        try {
-          final doc = await FirebaseFirestore.instance
-              .collection('users')
-              .doc(user.uid)
-              .get();
-
-          print('User document exists: ${doc.exists}');
-          if (doc.exists) {
-            print('User data: ${doc.data()}');
-          }
-
-          if (doc.exists && doc.data()?['isDeleted'] == true) {
-            print('Account is soft-deleted');
-            await _auth.signOut();
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text(
-                  "This account has been deleted. Please register a new account.",
-                ),
-              ),
-            );
-            setState(() => _isLoading = false);
-            return;
-          }
-        } catch (e) {
-          print('Error checking user document: $e');
-          // Continue with login even if we can't check the document
-        }
-
-        print('Login successful, navigating to home...');
-
-        // ✅ AUTO-FIX: Ensure user has barangayId before navigating
         await _ensureUserHasBarangayId(user.uid);
 
-        // Login successful
         if (mounted) {
           Navigator.pushReplacement(
             context,
@@ -868,143 +144,65 @@ class _LoginPageState extends State<LoginPage> {
         }
       }
     } on FirebaseAuthException catch (e) {
-      print('FirebaseAuthException: ${e.code} - ${e.message}');
       String message = 'Login failed. Please try again.';
-      
-      if (e.code == 'user-not-found') {
-        message = 'No account found with this email.';
-      } else if (e.code == 'wrong-password') {
-        message = 'Incorrect password.';
-      } else if (e.code == 'invalid-email') {
-        message = 'Invalid email format.';
-      } else if (e.code == 'user-disabled') {
-        message = 'This account has been disabled.';
-      } else if (e.code == 'too-many-requests') {
-        message = 'Too many failed attempts. Try again later.';
-      } else if (e.code == 'invalid-credential') {
-        message = 'Invalid credentials. Please check your email and password.';
-      } else if (e.code == 'network-request-failed' || 
-                 e.message?.toLowerCase().contains('network') == true ||
-                 e.message?.toLowerCase().contains('connection') == true ||
-                 e.message?.toLowerCase().contains('ssl') == true ||
-                 e.message?.toLowerCase().contains('handshake') == true) {
-        message = 'Network error. Please check your internet connection and try again.';
-      } else if (e.code == 'unknown' && 
-                 (e.message?.toLowerCase().contains('ssl') == true ||
-                  e.message?.toLowerCase().contains('handshake') == true ||
-                  e.message?.toLowerCase().contains('connection reset') == true)) {
-        message = 'Connection error. Please check your internet connection. If using an emulator, ensure Google Play Services is installed.';
-      }
-      
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(message)));
+      if (e.code == 'user-not-found') message = 'No account found with this email.';
+      else if (e.code == 'wrong-password') message = 'Incorrect password.';
+      else if (e.code == 'invalid-email') message = 'Invalid email format.';
+      else if (e.code == 'user-disabled') message = 'This account has been disabled.';
+      else if (e.code == 'too-many-requests') message = 'Too many failed attempts. Try again later.';
+      else if (e.code == 'invalid-credential') message = 'Invalid credentials. Please check your email and password.';
+      _showErrorSnackbar(message);
     } catch (e) {
-      print('General error: $e');
-      String errorMessage = 'Error: ${e.toString()}';
-      
-      // Check for network/SSL errors in general exceptions
-      if (e.toString().toLowerCase().contains('ssl') ||
-          e.toString().toLowerCase().contains('handshake') ||
-          e.toString().toLowerCase().contains('connection reset') ||
-          e.toString().toLowerCase().contains('network')) {
-        errorMessage = 'Network connection error. Please check your internet connection and try again.';
-      }
-      
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(errorMessage)));
+      _showErrorSnackbar('Error: ${e.toString()}');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
-// Replace the _ensureUserHasBarangayId method in your login.dart with this version:
 
-// ✅ UPDATED METHOD: Auto-fix missing barangayId BUT DON'T BLOCK LOGIN IF IT FAILS
-Future<void> _ensureUserHasBarangayId(String uid) async {
-  try {
-    print('🔍 Checking if user has barangayId...');
-    
-    final userDoc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(uid)
-        .get()
-        .timeout(const Duration(seconds: 3)); // Add timeout
-    
-    if (!userDoc.exists) {
-      print('⚠️ User document does not exist');
-      return; // Don't block login
-    }
-    
-    final data = userDoc.data();
-    final barangayId = data?['barangayId'];
-    
-    // Check if barangayId is missing or empty
-    if (barangayId == null || barangayId == '') {
-      print('⚠️ User missing barangayId, adding it now...');
-      
-      // Get existing barangay from user data if available
-      String barangayToUse = 'barangay_talisay';
-      final existingBarangay = data?['barangay'] as String?;
-      
-      if (existingBarangay != null && existingBarangay.isNotEmpty) {
-        // Convert existing barangay name to ID format
-        barangayToUse = existingBarangay.toLowerCase().replaceAll(' ', '_');
-      }
-      
-      // Try to add barangayId - but don't block if it fails
-      try {
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(uid)
-            .update({
+  void _showErrorSnackbar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.white, size: 18),
+            const SizedBox(width: 10),
+            Expanded(child: Text(message, style: const TextStyle(fontFamily: 'Georgia'))),
+          ],
+        ),
+        backgroundColor: const Color(0xFFB85C5C),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
+  }
+
+  Future<void> _ensureUserHasBarangayId(String uid) async {
+    try {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .get()
+          .timeout(const Duration(seconds: 3));
+
+      if (!userDoc.exists) return;
+
+      final data = userDoc.data();
+      final barangayId = data?['barangayId'];
+
+      if (barangayId == null || barangayId == '') {
+        String barangayToUse = 'barangay_talisay';
+        final existingBarangay = data?['barangay'] as String?;
+        if (existingBarangay != null && existingBarangay.isNotEmpty) {
+          barangayToUse = existingBarangay.toLowerCase().replaceAll(' ', '_');
+        }
+        await FirebaseFirestore.instance.collection('users').doc(uid).update({
           'barangayId': barangayToUse,
           'updatedAt': FieldValue.serverTimestamp(),
         }).timeout(const Duration(seconds: 3));
-        
-        print('✅ Added barangayId: $barangayToUse to user document');
-        
-        // Try to ensure barangay document exists
-        final barangayDoc = await FirebaseFirestore.instance
-            .collection('barangays')
-            .doc(barangayToUse)
-            .get()
-            .timeout(const Duration(seconds: 3));
-        
-        if (!barangayDoc.exists) {
-          await FirebaseFirestore.instance
-              .collection('barangays')
-              .doc(barangayToUse)
-              .set({
-            'name': existingBarangay ?? 'Barangay Talisay',
-            'barangayId': barangayToUse,
-            'createdAt': FieldValue.serverTimestamp(),
-          }).timeout(const Duration(seconds: 3));
-          print('✅ Created barangay document: $barangayToUse');
-        }
-      } catch (updateError) {
-        print('⚠️ Could not update barangayId (permission issue): $updateError');
-        print('   User can still login - will try again later');
-        // Continue with login anyway
       }
-    } else {
-      print('✅ User already has barangayId: $barangayId');
-    }
-  } on TimeoutException catch (e) {
-    print('⏱️ Timeout checking barangayId: $e');
-    print('   User can still login - will try again later');
-    // Continue with login anyway
-  } catch (e) {
-    print('❌ Error checking/adding barangayId: $e');
-    print('   User can still login - will try again later');
-    // DON'T block login if this fails - user can still access app
+    } catch (_) {}
   }
-}
-
-
-// ============================================================================
-// IMPORTANT: This version won't block your login even if Firestore rules
-// are blocking the barangayId update. You'll still be able to login,
-// but you need to fix the Firestore rules separately!
-// ============================================================================
 
   Future<void> _showForgotPasswordDialog() async {
     final emailController = TextEditingController();
@@ -1012,210 +210,538 @@ Future<void> _ensureUserHasBarangayId(String uid) async {
     await showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text('Reset Password'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Enter your email address to receive a password reset link.',
-                style: TextStyle(fontSize: 14),
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                controller: emailController,
-                keyboardType: TextInputType.emailAddress,
-                decoration: InputDecoration(
-                  hintText: 'Enter your email',
-                  prefixIcon: const Icon(Icons.email_outlined),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          backgroundColor: const Color(0xFFF5F2EC),
+          child: Padding(
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2E8B7B).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.lock_reset_rounded, color: Color(0xFF2E8B7B), size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'Reset Password',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1A3D35),
+                        fontFamily: 'Georgia',
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Enter your email and we\'ll send a reset link to your inbox.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey.shade600,
+                    height: 1.5,
                   ),
                 ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2E8B7B),
-              ),
-              onPressed: () async {
-                final email = emailController.text.trim();
-                if (email.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please enter your email')),
-                  );
-                  return;
-                }
-
-                try {
-                  await _auth.sendPasswordResetEmail(email: email);
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Password reset email sent. Check your inbox.'),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  style: const TextStyle(color: Color(0xFF1A3D35)),
+                  decoration: InputDecoration(
+                    hintText: 'your@email.com',
+                    hintStyle: TextStyle(color: Colors.grey.shade400),
+                    prefixIcon: const Icon(Icons.mail_outline_rounded, color: Color(0xFF2E8B7B), size: 20),
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(color: Colors.grey.shade200),
                     ),
-                  );
-                } on FirebaseAuthException catch (e) {
-                  String msg = 'Error occurred';
-                  if (e.code == 'user-not-found') msg = 'No account found with this email';
-                  if (e.code == 'invalid-email') msg = 'Invalid email format';
-                  ScaffoldMessenger.of(context)
-                      .showSnackBar(SnackBar(content: Text(msg)));
-                }
-              },
-              child: const Text('Send'),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(color: Colors.grey.shade200),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: Color(0xFF2E8B7B), width: 1.5),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: Text(
+                          'Cancel',
+                          style: TextStyle(color: Colors.grey.shade500, fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2E8B7B),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () async {
+                          final email = emailController.text.trim();
+                          if (email.isEmpty) {
+                            _showErrorSnackbar('Please enter your email');
+                            return;
+                          }
+                          try {
+                            await _auth.sendPasswordResetEmail(email: email);
+                            Navigator.pop(context);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: const Text('Reset link sent! Check your inbox.'),
+                                backgroundColor: const Color(0xFF3A8C6E),
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                margin: const EdgeInsets.all(16),
+                              ),
+                            );
+                          } on FirebaseAuthException catch (e) {
+                            String msg = 'Error occurred';
+                            if (e.code == 'user-not-found') msg = 'No account found with this email';
+                            if (e.code == 'invalid-email') msg = 'Invalid email format';
+                            _showErrorSnackbar(msg);
+                          }
+                        },
+                        child: const Text('Send Link', style: TextStyle(fontWeight: FontWeight.w600)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-          ],
+          ),
         );
       },
     );
-
     emailController.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF2E8B7B), Color(0xFF5CAA7F), Color(0xFF8BC88A)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+      body: Stack(
+        children: [
+          // Animated gradient background
+          AnimatedBuilder(
+            animation: _backgroundController,
+            builder: (context, child) {
+              return Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: const [
+                      Color(0xFF2E8B7B),
+                      Color(0xFF5CAA7F),
+                      Color(0xFF8BC88A),
+                    ],
+                    stops: [
+                      0.0,
+                      0.4 + _backgroundController.value * 0.1,
+                      1.0,
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text(
-                    'Lumasdang',
-                    style: TextStyle(
-                      fontSize: 48,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      fontStyle: FontStyle.italic,
-                      shadows: [
-                        Shadow(
-                            color: Colors.black26,
-                            offset: Offset(2, 2),
-                            blurRadius: 4)
-                      ],
-                    ),
+
+          // Decorative circles
+          Positioned(
+            top: -80,
+            right: -60,
+            child: AnimatedBuilder(
+              animation: _leafController,
+              builder: (_, __) => Transform.rotate(
+                angle: _leafRotation.value,
+                child: Container(
+                  width: 250,
+                  height: 250,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withOpacity(0.04),
+                    border: Border.all(color: Colors.white.withOpacity(0.06), width: 1),
                   ),
-                  const SizedBox(height: 60),
-                  _buildField(
-                    controller: _usernameOrEmailController,
-                    hint: 'Username or Email',
-                    icon: Icons.person_outline,
-                  ),
-                  const SizedBox(height: 20),
-                  _buildField(
-                    controller: _passwordController,
-                    hint: 'Password',
-                    icon: Icons.lock_outline,
-                    isPassword: true,
-                  ),
-                  const SizedBox(height: 40),
-                  SizedBox(
-                    width: 200,
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _login,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFF5A962),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(25),
-                        ),
-                      ),
-                      child: _isLoading
-                          ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text(
-                              'Log in',
-                              style: TextStyle(
-                                  fontSize: 18, fontWeight: FontWeight.w600),
-                            ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextButton(
-                    onPressed: _showForgotPasswordDialog,
-                    child: const Text(
-                      'Forgot your password?',
-                      style: TextStyle(color: Colors.white, fontSize: 14),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const RegisterPage()),
-                    ),
-                    child: const Text(
-                      "Don't have an account? Sign Up",
-                      style: TextStyle(color: Colors.white, fontSize: 14),
-                    ),
-                  )
-                ],
+                ),
               ),
             ),
           ),
-        ),
+          Positioned(
+            bottom: -100,
+            left: -80,
+            child: Container(
+              width: 320,
+              height: 320,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.03),
+                border: Border.all(color: Colors.white.withOpacity(0.05), width: 1),
+              ),
+            ),
+          ),
+
+          // Leaf decoration top-left
+          Positioned(
+            top: 40,
+            left: 24,
+            child: AnimatedBuilder(
+              animation: _leafController,
+              builder: (_, __) => Transform.rotate(
+                angle: _leafRotation.value * 2,
+                child: Opacity(
+                  opacity: 0.15,
+                  child: Icon(
+                    Icons.eco_rounded,
+                    color: Colors.white,
+                    size: 80,
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // Main content
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+                child: Form(
+                  key: _formKey,
+                  child: SlideTransition(
+                    position: _contentSlide,
+                    child: FadeTransition(
+                      opacity: _contentFade,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Brand mark
+                          Center(
+                            child: Column(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: Colors.white.withOpacity(0.2),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: const Icon(
+                                    Icons.eco_rounded,
+                                    color: Colors.white,
+                                    size: 36,
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+                                const Text(
+                                  'Lumasdang',
+                                  style: TextStyle(
+                                    fontSize: 40,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                    fontFamily: 'Georgia',
+                                    letterSpacing: 1.5,
+                                    shadows: [
+                                      Shadow(
+                                        color: Colors.black26,
+                                        offset: Offset(0, 3),
+                                        blurRadius: 12,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Welcome back',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    color: Colors.white.withOpacity(0.65),
+                                    letterSpacing: 0.5,
+                                    fontWeight: FontWeight.w300,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 48),
+
+                          // Card
+                          Container(
+                            padding: const EdgeInsets.all(28),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8F5EF),
+                              borderRadius: BorderRadius.circular(28),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.25),
+                                  blurRadius: 40,
+                                  offset: const Offset(0, 20),
+                                  spreadRadius: -5,
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Sign In',
+                                  style: TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF1A5F4A),
+                                    fontFamily: 'Georgia',
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Enter your credentials to continue',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey.shade500,
+                                  ),
+                                ),
+                                const SizedBox(height: 28),
+
+                                // Email/Username
+                                _buildField(
+                                  controller: _usernameOrEmailController,
+                                  label: 'Username or Email',
+                                  icon: Icons.person_outline_rounded,
+                                  focusNode: _emailFocusNode,
+                                  validator: (value) {
+                                    if (value == null || value.trim().isEmpty) {
+                                      return 'Please enter your username or email';
+                                    }
+                                    return null;
+                                  },
+                                  onEditingComplete: () => _passwordFocusNode.requestFocus(),
+                                ),
+
+                                const SizedBox(height: 16),
+
+                                // Password
+                                _buildField(
+                                  controller: _passwordController,
+                                  label: 'Password',
+                                  icon: Icons.lock_outline_rounded,
+                                  focusNode: _passwordFocusNode,
+                                  isPassword: true,
+                                  validator: (value) {
+                                    if (value == null || value.trim().isEmpty) {
+                                      return 'Please enter your password';
+                                    }
+                                    return null;
+                                  },
+                                  onEditingComplete: () {
+                                    if (!_isLoading) _login();
+                                  },
+                                ),
+
+                                // Forgot password
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: TextButton(
+                                    onPressed: _showForgotPasswordDialog,
+                                    style: TextButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                    child: const Text(
+                                      'Forgot password?',
+                                      style: TextStyle(
+                                        color: Color(0xFF2E8B7B),
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+
+                                const SizedBox(height: 8),
+
+                                // Login button
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 54,
+                                  child: ElevatedButton(
+                                    onPressed: _isLoading ? null : _login,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF1A5F4A),
+                                      disabledBackgroundColor: Colors.grey.shade200,
+                                      foregroundColor: Colors.white,
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                    ),
+                                    child: _isLoading
+                                        ? const SizedBox(
+                                            width: 22,
+                                            height: 22,
+                                            child: CircularProgressIndicator(
+                                              color: Colors.white,
+                                              strokeWidth: 2.5,
+                                            ),
+                                          )
+                                        : const Row(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Text(
+                                                'Sign In',
+                                                style: TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w700,
+                                                  letterSpacing: 0.5,
+                                                ),
+                                              ),
+                                              SizedBox(width: 8),
+                                              Icon(Icons.arrow_forward_rounded, size: 18),
+                                            ],
+                                          ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 28),
+
+                          // Sign up link
+                          Center(
+                            child: GestureDetector(
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const RegisterPage()),
+                              ),
+                              child: RichText(
+                                text: TextSpan(
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.white.withOpacity(0.7),
+                                  ),
+                                  children: const [
+                                    TextSpan(text: "Don't have an account? "),
+                                    TextSpan(
+                                      text: 'Sign Up',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w700,
+                                        decoration: TextDecoration.underline,
+                                        decorationColor: Colors.white,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  
-  
-
   Widget _buildField({
-  required TextEditingController controller,
-  required String hint,
-  required IconData icon,
-  bool isPassword = false,
-}) {
-  return Container(
-    decoration: const BoxDecoration(
-      border: Border(bottom: BorderSide(color: Colors.white70, width: 1)),
-    ),
-    child: TextField(
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    required FocusNode focusNode,
+    String? Function(String?)? validator,
+    VoidCallback? onEditingComplete,
+    bool isPassword = false,
+  }) {
+    return TextFormField(
       controller: controller,
+      focusNode: focusNode,
       obscureText: isPassword ? _obscurePassword : false,
-      style: const TextStyle(color: Colors.white, fontSize: 16),
+      validator: validator,
+      onEditingComplete: onEditingComplete,
+      style: const TextStyle(
+        fontSize: 15,
+        color: Color(0xFF1A5F4A),
+        fontWeight: FontWeight.w500,
+      ),
       decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: const TextStyle(color: Colors.white70),
-        border: InputBorder.none,
-        contentPadding: const EdgeInsets.symmetric(vertical: 12),
-        prefixIcon: Icon(icon, color: Colors.white70),
-        // Add eye icon only for password field
+        labelText: label,
+        labelStyle: TextStyle(
+          color: Colors.grey.shade500,
+          fontSize: 14,
+          fontWeight: FontWeight.w400,
+        ),
+        prefixIcon: Icon(icon, color: const Color(0xFF2E8B7B), size: 20),
         suffixIcon: isPassword
             ? IconButton(
                 icon: Icon(
-                  _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                  color: Colors.white70,
+                  _obscurePassword
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                  color: Colors.grey.shade400,
+                  size: 20,
                 ),
-                onPressed: () {
-                  setState(() {
-                    _obscurePassword = !_obscurePassword;
-                  });
-                },
+                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
               )
             : null,
+        filled: true,
+        fillColor: const Color(0xFFF0EDE6),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFFE2DDD5), width: 1),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFF2E8B7B), width: 1.5),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFFB85C5C), width: 1),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFFB85C5C), width: 1.5),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       ),
-    ),
-  );
-}
-
-  
+    );
+  }
 }

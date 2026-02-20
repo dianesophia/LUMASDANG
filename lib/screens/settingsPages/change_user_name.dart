@@ -28,40 +28,38 @@ class _ChangeUserNameState extends State<ChangeUserName> {
     super.dispose();
   }
 
-Future<void> _loadCurrentUsername() async {
-  try {
-    final user = _firestoreService.auth.currentUser;
-
-    if (user != null) {
-      final doc = await _firestoreService.firestore
-          .collection('users')
-          .doc(user.uid)
-          .get();
-
-      if (mounted && doc.exists) {
-        setState(() {
-          _currentUsername = doc.data()?['username'] as String?;
-        });
+  Future<void> _loadCurrentUsername() async {
+    try {
+      final user = _firestoreService.auth.currentUser;
+      if (user != null) {
+        final doc = await _firestoreService.firestore
+            .collection('users')
+            .doc(user.uid)
+            .get();
+        if (mounted && doc.exists) {
+          setState(() {
+            _currentUsername = doc.data()?['username'] as String?;
+          });
+        }
       }
+    } catch (e) {
+      debugPrint('Error loading current username: $e');
     }
-  } catch (e) {
-    debugPrint('Error loading current username: $e');
   }
-}
-
 
   Future<void> _updateUsername() async {
-   if (!(_formKey.currentState?.validate() ?? false)) return;
-
+    if (!(_formKey.currentState?.validate() ?? false)) return;
 
     final newUsername = _usernameController.text.trim();
 
-    // Check if username is the same as current
     if (newUsername.toLowerCase() == _currentUsername?.toLowerCase()) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("This is already your current username"),
-          backgroundColor: Colors.orange,
+        SnackBar(
+          content: const Text("This is already your current username"),
+          backgroundColor: Colors.orange.shade700,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.all(16),
         ),
       );
       return;
@@ -76,78 +74,56 @@ Future<void> _loadCurrentUsername() async {
       );
 
       if (success && mounted) {
-        // Clear form
         _usernameController.clear();
 
-        // Show success dialog
         showDialog(
           context: context,
           barrierDismissible: false,
           builder: (context) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
             title: const Row(
               children: [
-                Icon(Icons.check_circle, color: Colors.green, size: 28),
+                Icon(Icons.check_circle_rounded, color: Color(0xFF2E8B7B), size: 28),
                 SizedBox(width: 10),
-                Text("Success"),
+                Text("Success", style: TextStyle(fontWeight: FontWeight.w700)),
               ],
             ),
             content: Text(
               "Your username has been updated to '$newUsername'.",
-              style: const TextStyle(fontSize: 16),
+              style: const TextStyle(fontSize: 15),
             ),
             actions: [
-              TextButton(
+              ElevatedButton(
                 onPressed: () {
-                  Navigator.pop(context); // close dialog
-                  Navigator.pop(context); // go back
+                  Navigator.pop(context);
+                  Navigator.pop(context);
                 },
-                style: TextButton.styleFrom(
+                style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF2E8B7B),
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  elevation: 0,
                 ),
-                child: const Text(
-                  "OK",
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
+                child: const Text("Done", style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ],
           ),
         );
       }
     } finally {
-      if (mounted) {
-        setState(() => _loading = false);
-      }
+      if (mounted) setState(() => _loading = false);
     }
   }
 
   String? _validateUsername(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return "Username cannot be empty";
-    }
-    
+    if (value == null || value.trim().isEmpty) return "Username cannot be empty";
     final trimmed = value.trim();
-    
-    if (trimmed.length < 3) {
-      return "Username must be at least 3 characters";
-    }
-    
-    if (trimmed.length > 20) {
-      return "Username must be less than 20 characters";
-    }
-    
-    // Only allow alphanumeric and underscores
+    if (trimmed.length < 3) return "Username must be at least 3 characters";
+    if (trimmed.length > 20) return "Username must be less than 20 characters";
     if (!RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(trimmed)) {
-      return "Username can only contain letters, numbers, and underscores";
+      return "Only letters, numbers, and underscores allowed";
     }
-    
     return null;
   }
 
@@ -169,88 +145,291 @@ Future<void> _loadCurrentUsername() async {
         child: SafeArea(
           child: Column(
             children: [
-              _buildHeader(),
-              const SizedBox(height: 20),
+              /// ── HEADER ─────────────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () => Navigator.pop(context),
+                            borderRadius: BorderRadius.circular(50),
+                            child: Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.35),
+                                  width: 1.2,
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.arrow_back_ios_new_rounded,
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const Expanded(
+                          child: Center(
+                            child: Text(
+                              "Change Username",
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 44),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      height: 1,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.transparent,
+                            Colors.white.withOpacity(0.35),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 28),
+
+              /// ── CONTENT ─────────────────────────────────────────────────
               Expanded(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Form(
                     key: _formKey,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Show current username
-                        if (_currentUsername != null)
+
+                        /// Current Username Card
+                        if (_currentUsername != null) ...[
+                          _sectionLabel("Current Username"),
+                          const SizedBox(height: 8),
                           Container(
-                            padding: const EdgeInsets.all(16),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(12),
+                              color: Colors.white.withOpacity(0.18),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.28),
+                                width: 1,
+                              ),
                             ),
                             child: Row(
                               children: [
-                                const Icon(
-                                  Icons.person,
-                                  color: Colors.white,
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 10),
-                                const Text(
-                                  "Current username: ",
-                                  style: TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 14,
+                                Container(
+                                  width: 36,
+                                  height: 36,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(10),
                                   ),
-                                ),
-                                Text(
-                                  _currentUsername!,
-                                  style: const TextStyle(
+                                  child: const Icon(
+                                    Icons.person_rounded,
                                     color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
+                                    size: 20,
                                   ),
+                                ),
+                                const SizedBox(width: 14),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      "Username",
+                                      style: TextStyle(
+                                        color: Colors.white.withOpacity(0.65),
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                        letterSpacing: 0.3,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      _currentUsername!,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
                           ),
-                        const SizedBox(height: 20),
-                        
-                        _usernameField(),
-                        
-                        const SizedBox(height: 12),
-                        
-                        // Username guidelines
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
+                          const SizedBox(height: 28),
+                        ],
+
+                        /// New Username Field
+                        _sectionLabel("New Username"),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: _usernameController,
+                          validator: _validateUsername,
+                          enabled: !_loading,
+                          style: const TextStyle(
+                            color: Colors.black87,
+                            fontWeight: FontWeight.w500,
+                            fontSize: 15,
                           ),
-                          child: const Column(
+                          decoration: InputDecoration(
+                            hintText: "Enter new username",
+                            hintStyle: TextStyle(color: Colors.grey.shade400),
+                            prefixIcon: const Icon(
+                              Icons.alternate_email_rounded,
+                              color: Color(0xFF2E8B7B),
+                              size: 20,
+                            ),
+                            filled: true,
+                            fillColor: Colors.white.withOpacity(0.95),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 16,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide.none,
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(
+                                color: Colors.white.withOpacity(0.6),
+                                width: 1.2,
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: const BorderSide(
+                                color: Color(0xFF2E8B7B),
+                                width: 2,
+                              ),
+                            ),
+                            errorBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: const BorderSide(
+                                color: Colors.redAccent,
+                                width: 1.5,
+                              ),
+                            ),
+                            focusedErrorBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: const BorderSide(
+                                color: Colors.redAccent,
+                                width: 2,
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        /// Guidelines Card
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.2),
+                              width: 1,
+                            ),
+                          ),
+                          child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                "Username guidelines:",
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                ),
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.info_outline_rounded,
+                                    color: Colors.white.withOpacity(0.8),
+                                    size: 16,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    "Guidelines",
+                                    style: TextStyle(
+                                      color: Colors.white.withOpacity(0.9),
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13,
+                                      letterSpacing: 0.3,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              SizedBox(height: 6),
-                              Text(
-                                "• 3-20 characters\n• Letters, numbers, and underscores only\n• Must be unique",
-                                style: TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 12,
-                                ),
-                              ),
+                              const SizedBox(height: 10),
+                              _guidelineItem("3–20 characters long"),
+                              _guidelineItem("Letters, numbers, and underscores only"),
+                              _guidelineItem("Must be unique across all users"),
                             ],
                           ),
                         ),
-                        
-                        const SizedBox(height: 30),
-                        _buildUpdateButton(),
+
+                        const SizedBox(height: 36),
+
+                        /// Update Button
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: _loading ? null : _updateUsername,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: const Color(0xFF2E8B7B),
+                              disabledBackgroundColor: Colors.white.withOpacity(0.5),
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: _loading
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.5,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Color(0xFF2E8B7B),
+                                      ),
+                                    ),
+                                  )
+                                : const Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.check_rounded, size: 20),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        "Update Username",
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: 0.3,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 32),
                       ],
                     ),
                   ),
@@ -263,115 +442,43 @@ Future<void> _loadCurrentUsername() async {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _sectionLabel(String label) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      child: Column(
+      padding: const EdgeInsets.only(left: 4),
+      child: Text(
+        label.toUpperCase(),
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: Colors.white.withOpacity(0.65),
+          letterSpacing: 1.4,
+        ),
+      ),
+    );
+  }
+
+  Widget _guidelineItem(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 5),
+      child: Row(
         children: [
-          Row(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.white),
-                onPressed: () => Navigator.pop(context),
-              ),
-              const Expanded(
-                child: Center(
-                  child: Text(
-                    "Change Username",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 24,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 48),
-            ],
-          ),
           Container(
-            margin: const EdgeInsets.only(top: 4),
-            height: 1.5,
-            width: double.infinity,
-            color: Colors.white.withOpacity(0.3),
+            width: 5,
+            height: 5,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.6),
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            text,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.75),
+              fontSize: 13,
+            ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _usernameField() {
-    return TextFormField(
-      controller: _usernameController,
-      validator: _validateUsername,
-      enabled: !_loading,
-      decoration: InputDecoration(
-        labelText: "New Username",
-        hintText: "Enter new username",
-        prefixIcon: const Icon(Icons.person_outline, color: Colors.black54),
-        filled: true,
-        fillColor: Colors.white.withOpacity(0.9),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(
-            color: Color(0xFF2E8B7B),
-            width: 2,
-          ),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(
-            color: Colors.red,
-            width: 2,
-          ),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(
-            color: Colors.red,
-            width: 2,
-          ),
-        ),
-        labelStyle: const TextStyle(color: Colors.black87),
-      ),
-      style: const TextStyle(color: Colors.black87),
-    );
-  }
-
-  Widget _buildUpdateButton() {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed: _loading ? null : _updateUsername,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFFF5A962),
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(25),
-          ),
-          elevation: _loading ? 0 : 3,
-        ),
-        child: _loading
-            ? const SizedBox(
-                height: 20,
-                width: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
-              )
-            : const Text(
-                "Update Username",
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
       ),
     );
   }

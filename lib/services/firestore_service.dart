@@ -1138,6 +1138,227 @@ Future<void> markNotificationAsRead(String notificationId) async {
   }
 }
 
+
+
+// ============================================================================
+// ADD THESE METHODS TO YOUR FirestoreService class
+// Paste them just before the last closing } of the class
+// ============================================================================
+
+  /// Get upcoming calendar events for the user's barangay (today and future)
+  Stream<List<Map<String, dynamic>>> getUpcomingEventsStream({int limit = 3}) async* {
+    final user = _auth.currentUser;
+    if (user == null) {
+      yield <Map<String, dynamic>>[];
+      return;
+    }
+
+    final userDoc = await _firestore.collection('users').doc(user.uid).get();
+    final barangayId = userDoc.data()?['barangayId'] as String?;
+
+    if (barangayId == null || barangayId.isEmpty) {
+      yield <Map<String, dynamic>>[];
+      return;
+    }
+
+    final now = DateTime.now();
+    final startOfToday = DateTime(now.year, now.month, now.day);
+
+    yield* _firestore
+        .collection('barangays')
+        .doc(barangayId)
+        .collection('calendarEvents')
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfToday))
+        .orderBy('date', descending: false)
+        .limit(limit)
+        .snapshots()
+        .map((snap) => snap.docs.map((d) {
+              final data = d.data();
+              data['id'] = d.id;
+              return data;
+            }).toList());
+  }
+
+  /// Save a calendar event to the barangay's calendarEvents collection
+  Future<String> saveCalendarEvent(Map<String, dynamic> eventData) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw FirebaseAuthException(
+        code: 'no-current-user',
+        message: 'No authenticated user found',
+      );
+    }
+
+    final userDoc = await _firestore.collection('users').doc(user.uid).get();
+    final barangayId = userDoc.data()?['barangayId'] as String?;
+
+    if (barangayId == null || barangayId.isEmpty) {
+      throw Exception('User has no barangay assigned');
+    }
+
+    final creatorName = userDoc.data()?['fullName'] ??
+        userDoc.data()?['username'] ??
+        user.email ??
+        'Unknown';
+
+    final ref = _firestore
+        .collection('barangays')
+        .doc(barangayId)
+        .collection('calendarEvents')
+        .doc();
+
+    await ref.set({
+      ...eventData,
+      'createdAt': FieldValue.serverTimestamp(),
+      'createdBy': user.uid,
+      'createdByName': creatorName,
+      'barangayId': barangayId,
+    });
+
+    return ref.id;
+  }
+
+  /// Update an existing calendar event
+  Future<void> updateCalendarEvent(
+      String eventId, Map<String, dynamic> eventData) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    final userDoc = await _firestore.collection('users').doc(user.uid).get();
+    final barangayId = userDoc.data()?['barangayId'] as String?;
+    if (barangayId == null || barangayId.isEmpty) return;
+
+    await _firestore
+        .collection('barangays')
+        .doc(barangayId)
+        .collection('calendarEvents')
+        .doc(eventId)
+        .update({
+      ...eventData,
+      'updatedAt': FieldValue.serverTimestamp(),
+      'lastModifiedBy': user.uid,
+    });
+  }
+
+  /// Delete a calendar event
+  Future<void> deleteCalendarEvent(String eventId) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    final userDoc = await _firestore.collection('users').doc(user.uid).get();
+    final barangayId = userDoc.data()?['barangayId'] as String?;
+    if (barangayId == null || barangayId.isEmpty) return;
+
+    await _firestore
+        .collection('barangays')
+        .doc(barangayId)
+        .collection('calendarEvents')
+        .doc(eventId)
+        .delete();
+  }
+
+
+  // ============================================================================
+// ADD THESE 2 METHODS TO YOUR FirestoreService class
+// Paste just before the last closing } of the class
+// ============================================================================
+
+  /// Called when a calendar event is saved — creates a notification entry
+  /// in barangays/{barangayId}/calendarNotifications
+  Future<void> createCalendarEventNotification({
+    required String barangayId,
+    required String eventId,
+    required Map<String, dynamic> eventData,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    try {
+      final userDoc =
+          await _firestore.collection('users').doc(user.uid).get();
+      final creatorName = userDoc.data()?['fullName'] ??
+          userDoc.data()?['username'] ??
+          user.email ??
+          'Unknown';
+
+      await _firestore
+          .collection('barangays')
+          .doc(barangayId)
+          .collection('calendarNotifications')
+          .add({
+        'type': 'new_event',
+        'eventId': eventId,
+        'eventTitle': eventData['title'] ?? '',
+        'eventTime': eventData['time'] ?? '',
+        'eventDate': eventData['date'],
+        'eventDescription': eventData['description'] ?? '',
+        'colorValue': eventData['colorValue'] ?? 0xFFF5A962,
+        'createdBy': user.uid,
+        'createdByName': creatorName,
+        'createdAt': FieldValue.serverTimestamp(),
+        'barangayId': barangayId,
+        'read': false,
+      });
+
+      print('✅ Calendar event notification created');
+    } catch (e) {
+      print('❌ Error creating calendar event notification: $e');
+    }
+  }
+
+  /// Fetch calendar event notifications for the user's barangay
+  Future<List<Map<String, dynamic>>> getCalendarEventNotifications(
+      {int limit = 50}) async {
+    final user = _auth.currentUser;
+    if (user == null) return [];
+
+    try {
+      final userDoc =
+          await _firestore.collection('users').doc(user.uid).get();
+      final barangayId = userDoc.data()?['barangayId'] as String?;
+
+      if (barangayId == null || barangayId.isEmpty) return [];
+
+      final snapshot = await _firestore
+          .collection('barangays')
+          .doc(barangayId)
+          .collection('calendarNotifications')
+          .orderBy('createdAt', descending: true)
+          .limit(limit)
+          .get();
+
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        data['id'] = doc.id;
+        return data;
+      }).toList();
+    } catch (e) {
+      print('❌ Error getting calendar notifications: $e');
+      return [];
+    }
+  }
+
+  /// Mark a calendar notification as read
+  Future<void> markCalendarNotificationAsRead(String notificationId) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    try {
+      final userDoc =
+          await _firestore.collection('users').doc(user.uid).get();
+      final barangayId = userDoc.data()?['barangayId'] as String?;
+      if (barangayId == null) return;
+
+      await _firestore
+          .collection('barangays')
+          .doc(barangayId)
+          .collection('calendarNotifications')
+          .doc(notificationId)
+          .update({'read': true});
+    } catch (e) {
+      print('❌ Error marking calendar notification as read: $e');
+    }
+  }
 }
 
 

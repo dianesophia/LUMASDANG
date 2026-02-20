@@ -49,135 +49,156 @@ class MainSettings extends StatelessWidget {
         child: SafeArea(
           child: Column(
             children: [
-              /// HEADER
+              /// ── HEADER ──────────────────────────────────────────────────
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                padding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
                 child: Column(
                   children: [
                     Row(
                       children: [
-                        IconButton(
-                          icon: const Icon(Icons.arrow_back, color: Colors.black),
-                          onPressed: () => Navigator.pop(context),
+                        // Back button with frosted pill
+                        Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () => Navigator.pop(context),
+                            borderRadius: BorderRadius.circular(50),
+                            child: Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.35),
+                                  width: 1.2,
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.arrow_back_ios_new_rounded,
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                            ),
+                          ),
                         ),
                         const Expanded(
                           child: Center(
                             child: Text(
                               "Settings",
                               style: TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black,
+                                fontSize: 22,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                                letterSpacing: 0.4,
                               ),
                             ),
                           ),
                         ),
-                        const SizedBox(width: 48),
+                        // Placeholder to balance header
+                        const SizedBox(width: 44),
                       ],
                     ),
+
+                    const SizedBox(height: 16),
+
+                    // Subtle divider
                     Container(
-                      height: 1.5,
+                      height: 1,
                       width: double.infinity,
-                      color: Colors.white.withOpacity(0.3),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.transparent,
+                            Colors.white.withOpacity(0.35),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
 
-              /// SETTINGS LIST
+              /// ── SETTINGS LIST ────────────────────────────────────────────
               Expanded(
                 child: ListView(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
                   children: [
-                    // 🔍 DEBUG BUTTON - TEMPORARY - Remove after fixing
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 16),
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.red.shade100,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.red, width: 2),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(Icons.bug_report, color: Colors.red.shade700),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Debug Tools',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.red.shade700,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'If you\'re seeing permission errors, click below to check your account setup',
-                            style: TextStyle(fontSize: 12),
-                          ),
-                          const SizedBox(height: 12),
-                          const Center(child: DebugUserButton()),
-                        ],
-                      ),
-                    ),
-                    
-                    _settingsTile(
-                      icon: Icons.person_outline,
-                      text: "Change User Name",
-                      option: SettingsOption.changeUsername,
+                    // ── Section: Account ──────────────────────────────────
+                    _sectionLabel("Account"),
+                    const SizedBox(height: 8),
+
+                    _settingsGroup(
                       context: context,
+                      tiles: [
+                        _TileData(
+                          icon: Icons.person_outline_rounded,
+                          text: "Change Username",
+                          option: SettingsOption.changeUsername,
+                        ),
+                        _TileData(
+                          icon: Icons.edit_outlined,
+                          text: "Edit Profile",
+                          option: SettingsOption.editProfile,
+                        ),
+                        _TileData(
+                          icon: Icons.lock_outline_rounded,
+                          text: "Security",
+                          option: SettingsOption.security,
+                        ),
+                      ],
                     ),
 
-                    _settingsTile(
-                      icon: Icons.edit,
-                      text: "Edit Profile",
-                      option: SettingsOption.editProfile,
+                    const SizedBox(height: 24),
+
+                    // ── Section: Preferences ─────────────────────────────
+                    _sectionLabel("Preferences"),
+                    const SizedBox(height: 8),
+
+                    _settingsGroup(
                       context: context,
+                      tiles: [
+                        _TileData(
+                          icon: Icons.palette_outlined,
+                          text: "Customize Appearance",
+                          option: SettingsOption.customizeAppearance,
+                        ),
+                        _TileData(
+                          icon: Icons.delete_sweep_outlined,
+                          text: "Clear Cache",
+                          option: SettingsOption.clearCache,
+                        ),
+                      ],
                     ),
 
-                    _settingsTile(
-                      icon: Icons.lock_outline,
-                      text: "Security",
-                      option: SettingsOption.security,
+                    const SizedBox(height: 24),
+
+                    // ── Section: Info ────────────────────────────────────
+                    _sectionLabel("Info"),
+                    const SizedBox(height: 8),
+
+                    _settingsGroup(
                       context: context,
+                      tiles: [
+                        _TileData(
+                          icon: Icons.info_outline_rounded,
+                          text: "About Lumasdang",
+                          option: SettingsOption.about,
+                        ),
+                      ],
                     ),
 
-                    _settingsTile(
-                      icon: Icons.brush_outlined,
-                      text: "Customize Appearance",
-                      option: SettingsOption.customizeAppearance,
-                      context: context,
-                    ),
+                    const SizedBox(height: 36),
 
-                    _settingsTile(
-                      icon: Icons.delete_outline,
-                      text: "Clear Cache",
-                      option: SettingsOption.clearCache,
-                      context: context,
-                    ),
-
-                    _settingsTile(
-                      icon: Icons.info_outline,
-                      text: "About Lumasdang",
-                      option: SettingsOption.about,
-                      context: context,
-                    ),
-
-                    const SizedBox(height: 30),
-
-                    /// LOG OUT
-                    _bottomButton(
+                    /// ── LOG OUT BUTTON ───────────────────────────────────
+                    _actionButton(
                       text: "Log Out",
+                      icon: Icons.logout_rounded,
+                      color: Colors.white,
+                      textColor: const Color(0xFF2E8B7B),
                       onTap: () async {
                         await FirebaseAuth.instance.signOut();
-
                         Navigator.pushReplacement(
                           context,
                           MaterialPageRoute(builder: (_) => const LoginPage()),
@@ -185,13 +206,19 @@ class MainSettings extends StatelessWidget {
                       },
                     ),
 
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 12),
 
-                    /// DELETE ACCOUNT
-                    _bottomButton(
+                    /// ── DELETE ACCOUNT BUTTON ────────────────────────────
+                    _actionButton(
                       text: "Delete Account",
+                      icon: Icons.delete_forever_rounded,
+                      color: Colors.white.withOpacity(0.15),
+                      textColor: Colors.white,
+                      borderColor: Colors.white.withOpacity(0.4),
                       onTap: () => _showDeleteConfirmation(context),
                     ),
+
+                    const SizedBox(height: 32),
                   ],
                 ),
               ),
@@ -202,104 +229,192 @@ class MainSettings extends StatelessWidget {
     );
   }
 
-  /// ✅ SETTINGS TILE
+  // ── SECTION LABEL ──────────────────────────────────────────────────────────
+  Widget _sectionLabel(String label) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4),
+      child: Text(
+        label.toUpperCase(),
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: Colors.white.withOpacity(0.65),
+          letterSpacing: 1.4,
+        ),
+      ),
+    );
+  }
+
+  // ── GROUPED TILES CARD ─────────────────────────────────────────────────────
+  Widget _settingsGroup({
+    required BuildContext context,
+    required List<_TileData> tiles,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.18),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.28),
+          width: 1,
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Column(
+          children: List.generate(tiles.length, (index) {
+            final tile = tiles[index];
+            final isLast = index == tiles.length - 1;
+            return Column(
+              children: [
+                _settingsTile(
+                  icon: tile.icon,
+                  text: tile.text,
+                  option: tile.option,
+                  context: context,
+                ),
+                if (!isLast)
+                  Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: Colors.white.withOpacity(0.15),
+                    indent: 56,
+                    endIndent: 0,
+                  ),
+              ],
+            );
+          }),
+        ),
+      ),
+    );
+  }
+
+  // ── SINGLE SETTINGS TILE ───────────────────────────────────────────────────
   Widget _settingsTile({
     required IconData icon,
     required String text,
     required SettingsOption option,
     required BuildContext context,
   }) {
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      color: Colors.white.withOpacity(0.3),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: ListTile(
-        leading: Icon(icon, color: Colors.black),
-        title: Text(text,
-            style: const TextStyle(
-                color: Colors.black, fontWeight: FontWeight.w600)),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
         onTap: () => _handleNavigation(context, option),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              // Icon container
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 14),
+              // Label
+              Expanded(
+                child: Text(
+                  text,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              // Chevron
+              Icon(
+                Icons.chevron_right_rounded,
+                color: Colors.white.withOpacity(0.55),
+                size: 22,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  /// ✅ SWITCH CASE NAVIGATION
+  // ── NAVIGATION ─────────────────────────────────────────────────────────────
   void _handleNavigation(BuildContext context, SettingsOption option) {
     switch (option) {
       case SettingsOption.changeUsername:
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const ChangeUserName()),
-        );
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangeUserName()));
         break;
-
       case SettingsOption.editProfile:
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const EditProfile()),
-        );
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const EditProfile()));
         break;
-
       case SettingsOption.security:
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const MainSecurity()),
-        );
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const MainSecurity()));
         break;
-
       case SettingsOption.customizeAppearance:
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const CustomizeAppearance()),
-        );
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomizeAppearance()));
         break;
-
       case SettingsOption.clearCache:
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const ClearCache()),
-        );
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const ClearCache()));
         break;
-
       case SettingsOption.about:
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const MainAboutLumasdang()),
-        );
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const MainAboutLumasdang()));
         break;
     }
   }
 
-  /// BOTTOM BUTTON
-  Widget _bottomButton({
+  // ── ACTION BUTTON (Log Out / Delete) ───────────────────────────────────────
+  Widget _actionButton({
     required String text,
+    required IconData icon,
+    required Color color,
+    required Color textColor,
+    Color? borderColor,
     required VoidCallback onTap,
   }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16),
-        padding: const EdgeInsets.symmetric(vertical: 14),
+        padding: const EdgeInsets.symmetric(vertical: 15),
         decoration: BoxDecoration(
-          color: Colors.white70,
-          borderRadius: BorderRadius.circular(25),
+          color: color,
+          borderRadius: BorderRadius.circular(16),
+          border: borderColor != null
+              ? Border.all(color: borderColor, width: 1)
+              : null,
         ),
-        alignment: Alignment.center,
-        child: Text(text,
-            style: const TextStyle(
-                fontWeight: FontWeight.bold, fontSize: 16)),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: textColor, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              text,
+              style: TextStyle(
+                color: textColor,
+                fontWeight: FontWeight.w700,
+                fontSize: 15,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  /// DELETE CONFIRMATION
+  // ── DELETE CONFIRMATION DIALOG ─────────────────────────────────────────────
   void _showDeleteConfirmation(BuildContext context) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text("Delete Account"),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          "Delete Account",
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
         content: const Text(
-            "Are you sure you want to delete your account?"),
+          "This action is permanent and cannot be undone. Are you sure you want to delete your account?",
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -307,7 +422,12 @@ class MainSettings extends StatelessWidget {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.redAccent),
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
             onPressed: () async {
               Navigator.pop(ctx);
               await _deleteAccount(context);
@@ -334,8 +454,20 @@ class MainSettings extends StatelessWidget {
   }
 }
 
+// ── HELPER DATA CLASS ──────────────────────────────────────────────────────
+class _TileData {
+  final IconData icon;
+  final String text;
+  final SettingsOption option;
+  const _TileData({
+    required this.icon,
+    required this.text,
+    required this.option,
+  });
+}
+
 // ============================================================================
-// 🔍 DEBUG USER BUTTON - Add this at the bottom of the file
+// 🔍 DEBUG USER BUTTON
 // ============================================================================
 
 class DebugUserButton extends StatelessWidget {
@@ -344,18 +476,12 @@ class DebugUserButton extends StatelessWidget {
   Future<void> _debugUser(BuildContext context) async {
     try {
       final user = FirebaseAuth.instance.currentUser;
-      
+
       if (user == null) {
         _showDialog(context, '❌ ERROR', 'No user logged in');
         return;
       }
 
-      print('\n═══════════════════════════════════════');
-      print('🔍 DEBUG USER INFO');
-      print('═══════════════════════════════════════');
-      print('User UID: ${user.uid}');
-      print('User Email: ${user.email}');
-      
       final userDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
@@ -367,19 +493,8 @@ class DebugUserButton extends StatelessWidget {
       }
 
       final userData = userDoc.data()!;
-      print('\n📄 User Document Fields:');
-      userData.forEach((key, value) {
-        print('  $key: $value');
-      });
-
       final hasBarangayId = userData.containsKey('barangayId');
       final barangayId = userData['barangayId'];
-      
-      print('\n🔍 Critical Checks:');
-      print('  Has barangayId field: $hasBarangayId');
-      print('  barangayId value: $barangayId');
-      print('  barangayId is null: ${barangayId == null}');
-      print('  barangayId is empty: ${barangayId == ""}');
 
       String status = '';
       String message = '';
@@ -387,18 +502,17 @@ class DebugUserButton extends StatelessWidget {
       if (!hasBarangayId) {
         status = '❌ PROBLEM FOUND';
         message = 'User document is MISSING the "barangayId" field!\n\n'
-                  'Fix: Go to Firebase Console → Firestore → users → ${user.uid}\n'
-                  'Add field: barangayId = "barangay_talisay"';
+            'Fix: Go to Firebase Console → Firestore → users → ${user.uid}\n'
+            'Add field: barangayId = "barangay_talisay"';
       } else if (barangayId == null || barangayId == '') {
         status = '❌ PROBLEM FOUND';
         message = 'barangayId field is NULL or EMPTY!\n\n'
-                  'Current value: ${barangayId == null ? "null" : "empty string"}\n\n'
-                  'Fix: Update in Firebase Console';
+            'Current value: ${barangayId == null ? "null" : "empty string"}\n\n'
+            'Fix: Update in Firebase Console';
       } else {
         status = '✅ User Document OK';
         message = 'User has valid barangayId: $barangayId\n\n';
-        
-        print('\n🔍 Checking barangay document...');
+
         final barangayDoc = await FirebaseFirestore.instance
             .collection('barangays')
             .doc(barangayId)
@@ -406,13 +520,9 @@ class DebugUserButton extends StatelessWidget {
 
         if (!barangayDoc.exists) {
           status = '⚠️ BARANGAY MISSING';
-          message += 'BUT: Barangay document does NOT exist!\n\n'
-                     'barangays/$barangayId\n\n'
-                     'Fix: Create in Firebase Console';
+          message += 'BUT: Barangay document does NOT exist!\n\nbarangays/$barangayId\n\nFix: Create in Firebase Console';
         } else {
           message += 'Barangay document exists: ✅\n\n';
-          
-          print('\n🔍 Testing patient access...');
           try {
             final patientsSnapshot = await FirebaseFirestore.instance
                 .collection('barangays')
@@ -422,26 +532,16 @@ class DebugUserButton extends StatelessWidget {
                 .get();
 
             status = '✅ ALL CHECKS PASSED';
-            message += 'Can read patients: ✅\n'
-                       'Found ${patientsSnapshot.docs.length} patients\n\n'
-                       'Everything looks good!';
+            message += 'Can read patients: ✅\nFound ${patientsSnapshot.docs.length} patients\n\nEverything looks good!';
           } catch (e) {
             status = '❌ PERMISSION DENIED';
-            message += 'CANNOT read patients!\n\n'
-                       'Error: $e\n\n'
-                       'Fix: Update Firestore rules';
+            message += 'CANNOT read patients!\n\nError: $e\n\nFix: Update Firestore rules';
           }
         }
       }
 
-      print('\n═══════════════════════════════════════');
-      print('Result: $status');
-      print('═══════════════════════════════════════\n');
-
       _showDialog(context, status, message);
-
     } catch (e) {
-      print('❌ Debug error: $e');
       _showDialog(context, '❌ ERROR', 'Debug failed:\n\n$e');
     }
   }
@@ -450,10 +550,9 @@ class DebugUserButton extends StatelessWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(title),
-        content: SingleChildScrollView(
-          child: Text(message),
-        ),
+        content: SingleChildScrollView(child: Text(message)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -474,6 +573,7 @@ class DebugUserButton extends StatelessWidget {
         backgroundColor: Colors.red,
         foregroundColor: Colors.white,
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }

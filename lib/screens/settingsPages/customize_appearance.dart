@@ -12,7 +12,7 @@ class _CustomizeAppearanceState extends State<CustomizeAppearance> {
   Color selectedColor = Colors.black;
   String selectedFont = 'Roboto';
 
-  final List<Color> colors = [
+  final List<Color> presetColors = [
     Colors.white,
     Colors.black,
     const Color(0xFFFFF9C4),
@@ -25,42 +25,44 @@ class _CustomizeAppearanceState extends State<CustomizeAppearance> {
 
   final List<String> fonts = ['Roboto', 'Poppins', 'Montserrat', 'Open Sans'];
 
-  /// Detect dark color
-  bool _isDarkColor(Color color) {
-    return color.computeLuminance() < 0.5;
-  }
+  bool _isDarkColor(Color color) => color.computeLuminance() < 0.5;
+  Color _getContrastColor(Color color) =>
+      _isDarkColor(color) ? Colors.white : Colors.black;
 
-  Color _getContrastColor(Color color) {
-    return _isDarkColor(color) ? Colors.white : Colors.black;
-  }
-
-  /// ⭐ Color Picker Dialog
-  void openColorPicker() {
+  void _openColorPicker() {
     Color tempColor = selectedColor;
-
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Pick a color"),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          "Pick a Color",
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
         content: SingleChildScrollView(
           child: ColorPicker(
             pickerColor: selectedColor,
-            onColorChanged: (color) {
-              tempColor = color;
-            },
+            onColorChanged: (color) => tempColor = color,
           ),
         ),
         actions: [
           TextButton(
-            child: const Text("Cancel"),
             onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
           ),
-          TextButton(
-            child: const Text("Select"),
+          ElevatedButton(
             onPressed: () {
               setState(() => selectedColor = tempColor);
               Navigator.pop(context);
             },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2E8B7B),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+              elevation: 0,
+            ),
+            child: const Text("Select", style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -71,8 +73,6 @@ class _CustomizeAppearanceState extends State<CustomizeAppearance> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        width: double.infinity,
-        height: double.infinity,
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
@@ -84,176 +84,480 @@ class _CustomizeAppearanceState extends State<CustomizeAppearance> {
             ],
           ),
         ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        child: SafeArea(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              /// 🔹 Header
-              Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.black),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                  const Expanded(
-                    child: Center(
-                      child: Text(
-                        "Customize Appearance",
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black,
+
+              /// ── HEADER ─────────────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () => Navigator.pop(context),
+                            borderRadius: BorderRadius.circular(50),
+                            child: Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.35),
+                                  width: 1.2,
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.arrow_back_ios_new_rounded,
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const Expanded(
+                          child: Center(
+                            child: Text(
+                              "Appearance",
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 44),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      height: 1,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.transparent,
+                            Colors.white.withOpacity(0.35),
+                            Colors.transparent,
+                          ],
                         ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 48),
-                ],
-              ),
-
-              Container(
-                height: 1.5,
-                width: double.infinity,
-                color: Colors.white.withOpacity(0.3),
-              ),
-
-              const SizedBox(height: 20),
-
-              /// 🔹 Colors Grid
-              Center(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    double colorSize =
-                        ((constraints.maxWidth - 12 * 3) / 4) * 0.80;
-
-                    return Wrap(
-                      alignment: WrapAlignment.center,
-                      spacing: 12,
-                      runSpacing: 12,
-                      children: colors.map((color) {
-                        bool isSelected = color == selectedColor;
-                        Color contrastColor = _getContrastColor(color);
-
-                        return GestureDetector(
-                          onTap: () =>
-                              setState(() => selectedColor = color),
-                          child: Container(
-                            width: colorSize,
-                            height: colorSize,
-                            decoration: BoxDecoration(
-                              color: color,
-                              shape: BoxShape.circle,
-                              border: isSelected
-                                  ? Border.all(
-                                      color: contrastColor,
-                                      width: 3,
-                                    )
-                                  : null,
-                            ),
-                            child: isSelected
-                                ? Icon(Icons.check, color: contrastColor)
-                                : null,
-                          ),
-                        );
-                      }).toList(),
-                    );
-                  },
-                ),
-              ),
-
-              const SizedBox(height: 40),
-
-                 /// 🔹 Font Selector Card
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.4),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    const Text(
-                      "Aa",
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    const Text(
-                      "Font Family",
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const Spacer(),
-                    DropdownButton<String>(
-                      value: selectedFont,
-                      underline: const SizedBox(),
-                      items: fonts.map((font) {
-                        return DropdownMenuItem(
-                          value: font,
-                          child: Text(
-                            font,
-                            style: TextStyle(fontFamily: font),
-                          ),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        if (value != null) {
-                          setState(() => selectedFont = value);
-                        }
-                      },
                     ),
                   ],
                 ),
               ),
 
-              const SizedBox(height: 20),
-              /// ⭐ Open Full Color Picker
-              GestureDetector(
-                onTap: openColorPicker,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.4),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
+              const SizedBox(height: 28),
+
+              /// ── CONTENT ────────────────────────────────────────────────
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.palette),
-                      const SizedBox(width: 12),
-                      const Text(
-                        "Colors",
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
+
+                      /// ── Color Theme ─────────────────────────────────────
+                      _sectionLabel("Color Theme"),
+                      const SizedBox(height: 12),
+
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.18),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.28),
+                            width: 1,
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+
+                            // Preset color circles
+                            LayoutBuilder(
+                              builder: (context, constraints) {
+                                final size =
+                                    ((constraints.maxWidth - 12 * 7) / 8)
+                                        .clamp(32.0, 48.0);
+                                return Wrap(
+                                  spacing: 12,
+                                  runSpacing: 12,
+                                  children: presetColors.map((color) {
+                                    final isSelected = color == selectedColor;
+                                    final contrast = _getContrastColor(color);
+                                    return GestureDetector(
+                                      onTap: () =>
+                                          setState(() => selectedColor = color),
+                                      child: AnimatedContainer(
+                                        duration: const Duration(milliseconds: 180),
+                                        width: size,
+                                        height: size,
+                                        decoration: BoxDecoration(
+                                          color: color,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: isSelected
+                                                ? contrast
+                                                : Colors.white.withOpacity(0.3),
+                                            width: isSelected ? 2.5 : 1,
+                                          ),
+                                          boxShadow: isSelected
+                                              ? [
+                                                  BoxShadow(
+                                                    color: color.withOpacity(0.5),
+                                                    blurRadius: 8,
+                                                    spreadRadius: 1,
+                                                  )
+                                                ]
+                                              : null,
+                                        ),
+                                        child: isSelected
+                                            ? Icon(Icons.check_rounded,
+                                                color: contrast, size: 18)
+                                            : null,
+                                      ),
+                                    );
+                                  }).toList(),
+                                );
+                              },
+                            ),
+
+                            const SizedBox(height: 14),
+
+                            // Divider
+                            Divider(
+                              color: Colors.white.withOpacity(0.2),
+                              height: 1,
+                            ),
+
+                            const SizedBox(height: 14),
+
+                            // Custom color picker row
+                            GestureDetector(
+                              onTap: _openColorPicker,
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 36,
+                                    height: 36,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: const Icon(
+                                      Icons.palette_outlined,
+                                      color: Colors.white,
+                                      size: 20,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 14),
+                                  Text(
+                                    "Custom Color",
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Container(
+                                    width: 26,
+                                    height: 26,
+                                    decoration: BoxDecoration(
+                                      color: selectedColor,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: Colors.white.withOpacity(0.5),
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Icon(
+                                    Icons.chevron_right_rounded,
+                                    color: Colors.white.withOpacity(0.55),
+                                    size: 22,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const Spacer(),
+
+                      const SizedBox(height: 28),
+
+                      /// ── Font Family ──────────────────────────────────────
+                      _sectionLabel("Font Family"),
+                      const SizedBox(height: 12),
+
                       Container(
-                        width: 28,
-                        height: 28,
                         decoration: BoxDecoration(
-                          color: selectedColor,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.black12),
+                          color: Colors.white.withOpacity(0.18),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.28),
+                            width: 1,
+                          ),
                         ),
-                      )
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: Column(
+                            children: List.generate(fonts.length, (index) {
+                              final font = fonts[index];
+                              final isSelected = font == selectedFont;
+                              final isLast = index == fonts.length - 1;
+                              return Column(
+                                children: [
+                                  Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      onTap: () =>
+                                          setState(() => selectedFont = font),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 16, vertical: 14),
+                                        child: Row(
+                                          children: [
+                                            Container(
+                                              width: 36,
+                                              height: 36,
+                                              decoration: BoxDecoration(
+                                                color: isSelected
+                                                    ? Colors.white
+                                                        .withOpacity(0.3)
+                                                    : Colors.white
+                                                        .withOpacity(0.15),
+                                                borderRadius:
+                                                    BorderRadius.circular(10),
+                                              ),
+                                              child: Center(
+                                                child: Text(
+                                                  "Aa",
+                                                  style: TextStyle(
+                                                    fontFamily: font,
+                                                    color: Colors.white,
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w700,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 14),
+                                            Text(
+                                              font,
+                                              style: TextStyle(
+                                                fontFamily: font,
+                                                color: Colors.white,
+                                                fontSize: 15,
+                                                fontWeight: isSelected
+                                                    ? FontWeight.w700
+                                                    : FontWeight.w400,
+                                              ),
+                                            ),
+                                            const Spacer(),
+                                            AnimatedOpacity(
+                                              opacity: isSelected ? 1 : 0,
+                                              duration: const Duration(
+                                                  milliseconds: 200),
+                                              child: Container(
+                                                width: 22,
+                                                height: 22,
+                                                decoration: const BoxDecoration(
+                                                  color: Colors.white,
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: const Icon(
+                                                  Icons.check_rounded,
+                                                  color: Color(0xFF2E8B7B),
+                                                  size: 14,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  if (!isLast)
+                                    Divider(
+                                      height: 1,
+                                      thickness: 1,
+                                      color: Colors.white.withOpacity(0.15),
+                                      indent: 66,
+                                    ),
+                                ],
+                              );
+                            }),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 28),
+
+                      /// ── Live Preview ─────────────────────────────────────
+                      _sectionLabel("Preview"),
+                      const SizedBox(height: 12),
+
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.18),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.28),
+                            width: 1,
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  width: 36,
+                                  height: 36,
+                                  decoration: BoxDecoration(
+                                    color: selectedColor,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Colors.white.withOpacity(0.4),
+                                      width: 1.5,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      "Sample Name",
+                                      style: TextStyle(
+                                        fontFamily: selectedFont,
+                                        color: Colors.white,
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    Text(
+                                      "Sample subtitle text",
+                                      style: TextStyle(
+                                        fontFamily: selectedFont,
+                                        color: Colors.white.withOpacity(0.65),
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+                            Text(
+                              "The quick brown fox jumps over the lazy dog.",
+                              style: TextStyle(
+                                fontFamily: selectedFont,
+                                color: Colors.white.withOpacity(0.8),
+                                fontSize: 13,
+                                height: 1.5,
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: selectedColor,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                "Button Preview",
+                                style: TextStyle(
+                                  fontFamily: selectedFont,
+                                  color: _getContrastColor(selectedColor),
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 36),
+
+                      /// ── Save Button ──────────────────────────────────────
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: const Text("Appearance saved!"),
+                                backgroundColor: const Color(0xFF2E8B7B),
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12)),
+                                margin: const EdgeInsets.all(16),
+                              ),
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: const Color(0xFF2E8B7B),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.check_rounded, size: 20),
+                              SizedBox(width: 8),
+                              Text(
+                                "Save Appearance",
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 32),
                     ],
                   ),
                 ),
               ),
-
-              const SizedBox(height: 20),
-          
-              const Spacer(),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _sectionLabel(String label) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4),
+      child: Text(
+        label.toUpperCase(),
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: Colors.white.withOpacity(0.65),
+          letterSpacing: 1.4,
         ),
       ),
     );

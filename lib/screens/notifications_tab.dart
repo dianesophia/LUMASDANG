@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/firestore_service.dart';
 import '../services/local_db_service.dart';
 import '../services/connectivity_service.dart';
+import '../screens/calendar_events_page.dart';
+import '../screens/patient_list.dart';
 
 class NotificationsTab extends StatefulWidget {
   const NotificationsTab({super.key});
@@ -12,156 +14,744 @@ class NotificationsTab extends StatefulWidget {
 }
 
 class _NotificationsTabState extends State<NotificationsTab> {
-  List<Map<String, dynamic>> _notifications = [];
-  bool _isLoading = true;
-  String? _errorMessage;
+  String _activeFilter = 'all';
+  bool _isOnline = true;
+  List<Map<String, dynamic>> _offlineNotifications = [];
+  bool _offlineLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _loadNotifications();
+    _checkConnectivity();
   }
 
-  Future<void> _loadNotifications() async {
-  print('📱 Loading notifications...');
-  setState(() {
-    _isLoading = true;
-    _errorMessage = null;
-  });
-
-  try {
+  Future<void> _checkConnectivity() async {
     final online = await ConnectivityService.instance.checkOnline();
-    print('🌐 Online: $online');
-    
-    if (online) {
-      // Load from Firestore - GET BARANGAY NOTIFICATIONS
-      print('☁️ Loading barangay notifications from Firestore...');
-      final notifications = await FirestoreService().getBarangayNotifications();
-      print('✅ Loaded ${notifications.length} notifications from Firestore');
-      
-      setState(() {
-        _notifications = notifications;
-        _isLoading = false;
-      });
-    } else {
-      // Load from local database
-      print('💾 Loading from local database...');
-      await LocalDbService.instance.init();
-      final localRecords = await LocalDbService.instance.getAllRecords();
-      print('✅ Loaded ${localRecords.length} records from local DB');
-      
-      // Convert local records to notification format
-      final notifications = localRecords.map((record) {
-        final data = record['data'] as Map<String, dynamic>;
-        return {
-          'id': record['id'],
-          'type': 'new_patient',
-          'patientName': '${data['demographic']?['firstName'] ?? ''} ${data['demographic']?['lastName'] ?? ''}',
-          'patientAge': data['demographic']?['age'] ?? '',
-          'patientSex': data['demographic']?['sex'] ?? '',
-          'createdAt': record['timestamp'],
-          'read': record['synced'] ?? false,
-        };
-      }).toList();
-      
-      // Sort by timestamp descending
-      notifications.sort((a, b) {
-        final aTime = a['createdAt'];
-        final bTime = b['createdAt'];
-        if (aTime is String && bTime is String) {
-          return bTime.compareTo(aTime);
-        }
-        return 0;
-      });
-      
-      setState(() {
-        _notifications = notifications;
-        _isLoading = false;
-      });
-    }
-  } catch (e, stackTrace) {
-    print('❌ Error loading notifications: $e');
-    print('Stack trace: $stackTrace');
-    setState(() {
-      _isLoading = false;
-      _errorMessage = e.toString();
+    if (mounted) setState(() => _isOnline = online);
+    if (!online) _loadOffline();
+    ConnectivityService.instance.startMonitoring((online) {
+      if (mounted) setState(() => _isOnline = online);
+      if (!online) _loadOffline();
     });
   }
-}
+
+  Future<void> _loadOffline() async {
+    setState(() => _offlineLoading = true);
+    await LocalDbService.instance.init();
+    final localRecords = await LocalDbService.instance.getAllRecords();
+    final notifications = localRecords.map((record) {
+      final data = record['data'] as Map<String, dynamic>;
+      return {
+        'id': record['id'],
+        'type': 'new_patient',
+        'patientName':
+            '${data['demographic']?['firstName'] ?? ''} ${data['demographic']?['lastName'] ?? ''}',
+        'patientAge': data['demographic']?['age'] ?? '',
+        'patientSex': data['demographic']?['sex'] ?? '',
+        'createdAt': record['timestamp'],
+        'read': record['synced'] ?? false,
+      };
+    }).toList();
+
+    notifications.sort((a, b) {
+      final aTime = a['createdAt'];
+      final bTime = b['createdAt'];
+      if (aTime is String && bTime is String) return bTime.compareTo(aTime);
+      return 0;
+    });
+
+    if (mounted) {
+      setState(() {
+        _offlineNotifications = notifications;
+        _offlineLoading = false;
+      });
+    }
+  }
+
+  // ── Streams ────────────────────────────────────────────────────────────────
+  Stream<List<Map<String, dynamic>>> _patientNotifsStream() async* {
+    final barangayId = await FirestoreService().getCurrentUserBarangayId();
+    if (barangayId == null || barangayId.isEmpty) {
+      yield <Map<String, dynamic>>[];
+      return;
+    }
+    yield* FirebaseFirestore.instance
+        .collection('barangays')
+        .doc(barangayId)
+        .collection('notifications')
+        .orderBy('createdAt', descending: true)
+        .limit(50)
+        .snapshots()
+        .map((snap) => snap.docs.map((d) {
+              final data = d.data();
+              data['id'] = d.id;
+              return data;
+            }).toList());
+  }
+
+  Stream<List<Map<String, dynamic>>> _eventNotifsStream() async* {
+    final barangayId = await FirestoreService().getCurrentUserBarangayId();
+    if (barangayId == null || barangayId.isEmpty) {
+      yield <Map<String, dynamic>>[];
+      return;
+    }
+    yield* FirebaseFirestore.instance
+        .collection('barangays')
+        .doc(barangayId)
+        .collection('calendarNotifications')
+        .orderBy('createdAt', descending: true)
+        .limit(50)
+        .snapshots()
+        .map((snap) => snap.docs.map((d) {
+              final data = d.data();
+              data['id'] = d.id;
+              return data;
+            }).toList());
+  }
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  List<Map<String, dynamic>> _merged(
+    List<Map<String, dynamic>> patients,
+    List<Map<String, dynamic>> events,
+  ) {
+    final all = [...patients, ...events];
+    all.sort((a, b) {
+      final aTs = a['createdAt'];
+      final bTs = b['createdAt'];
+      if (aTs is Timestamp && bTs is Timestamp) return bTs.compareTo(aTs);
+      return 0;
+    });
+    return all;
+  }
+
+  List<Map<String, dynamic>> _filtered(List<Map<String, dynamic>> all) {
+    if (_activeFilter == 'all') return all;
+    return all.where((n) => n['type'] == _activeFilter).toList();
+  }
+
+  int _unreadCount(List<Map<String, dynamic>> all) =>
+      all.where((n) => n['read'] == false).length;
 
   String _formatTimestamp(dynamic timestamp) {
     try {
-      DateTime dateTime;
-      
+      DateTime dt;
       if (timestamp is Timestamp) {
-        dateTime = timestamp.toDate();
+        dt = timestamp.toDate();
       } else if (timestamp is String) {
-        dateTime = DateTime.parse(timestamp);
-      } else if (timestamp == null) {
-        return 'Unknown time';
+        dt = DateTime.parse(timestamp);
       } else {
         return 'Unknown time';
       }
-
-      final now = DateTime.now();
-      final difference = now.difference(dateTime);
-
-      if (difference.inMinutes < 1) {
-        return 'Just now';
-      } else if (difference.inMinutes < 60) {
-        return '${difference.inMinutes}m ago';
-      } else if (difference.inHours < 24) {
-        return '${difference.inHours}h ago';
-      } else if (difference.inDays < 7) {
-        return '${difference.inDays}d ago';
-      } else {
-        final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        return '${months[dateTime.month - 1]} ${dateTime.day}, ${dateTime.year}';
-      }
-    } catch (e) {
-      print('Error formatting timestamp: $e');
+      final diff = DateTime.now().difference(dt);
+      if (diff.inMinutes < 1) return 'Just now';
+      if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+      if (diff.inHours < 24) return '${diff.inHours}h ago';
+      if (diff.inDays < 7) return '${diff.inDays}d ago';
+      const m = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      return '${m[dt.month - 1]} ${dt.day}, ${dt.year}';
+    } catch (_) {
       return 'Unknown time';
     }
   }
 
-  Color _getAvatarColor(String sex) {
-    if (sex.toLowerCase() == 'male' || sex.toLowerCase() == 'm') {
-      return const Color(0xFF5CAA7F);
-    } else if (sex.toLowerCase() == 'female' || sex.toLowerCase() == 'f') {
-      return const Color(0xFFF5A962);
-    }
+  Color _avatarColor(String sex) {
+    final s = sex.toLowerCase();
+    if (s == 'male' || s == 'm') return const Color(0xFF5CAA7F);
+    if (s == 'female' || s == 'f') return const Color(0xFFF5A962);
     return const Color(0xFF8BC88A);
   }
 
-  IconData _getAvatarIcon(String sex) {
-    if (sex.toLowerCase() == 'male' || sex.toLowerCase() == 'm') {
-      return Icons.boy;
-    } else if (sex.toLowerCase() == 'female' || sex.toLowerCase() == 'f') {
-      return Icons.girl;
-    }
+  IconData _avatarIcon(String sex) {
+    final s = sex.toLowerCase();
+    if (s == 'male' || s == 'm') return Icons.boy;
+    if (s == 'female' || s == 'f') return Icons.girl;
     return Icons.person;
   }
 
+  // ── Navigation ─────────────────────────────────────────────────────────────
+  void _navigateToCalendar() {
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            const CalendarEventsPage(),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          final tween = Tween(begin: const Offset(1.0, 0.0), end: Offset.zero)
+              .chain(CurveTween(curve: Curves.easeInOutCubic));
+          return SlideTransition(position: animation.drive(tween), child: child);
+        },
+        transitionDuration: const Duration(milliseconds: 350),
+      ),
+    );
+  }
+
+  void _navigateToPatientList() {
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => Scaffold(
+          body: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0xFF2E8B7B), Color(0xFF5CAA7F), Color(0xFF8BC88A)],
+              ),
+            ),
+            child: SafeArea(
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(4, 8, 16, 4),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                              color: Colors.white, size: 20),
+                        ),
+                        const Text(
+                          'Patient List',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Expanded(child: PatientListTab()),
+                ],
+              ),
+            ),
+          ),
+        ),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          final tween = Tween(begin: const Offset(1.0, 0.0), end: Offset.zero)
+              .chain(CurveTween(curve: Curves.easeInOutCubic));
+          return SlideTransition(position: animation.drive(tween), child: child);
+        },
+        transitionDuration: const Duration(milliseconds: 350),
+      ),
+    );
+  }
+
+  // ── Build ──────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
+    if (!_isOnline) return _buildOfflineView();
+
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: _patientNotifsStream(),
+      builder: (context, patientSnap) {
+        return StreamBuilder<List<Map<String, dynamic>>>(
+          stream: _eventNotifsStream(),
+          builder: (context, eventSnap) {
+            final patients = patientSnap.data ?? [];
+            final events = eventSnap.data ?? [];
+            final all = _merged(patients, events);
+            final filtered = _filtered(all);
+            final unread = _unreadCount(all);
+            final isLoading = patientSnap.connectionState ==
+                    ConnectionState.waiting ||
+                eventSnap.connectionState == ConnectionState.waiting;
+
+            return Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0xFF2E8B7B), Color(0xFF5CAA7F), Color(0xFF8BC88A)],
+                ),
+              ),
+              child: Column(
+                children: [
+                  _buildHeader(unread),
+                  _buildFilterChips(all),
+                  if (isLoading)
+                    const LinearProgressIndicator(
+                      backgroundColor: Colors.transparent,
+                      color: Colors.white54,
+                    ),
+                  Expanded(child: _buildList(filtered)),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // ── Header ─────────────────────────────────────────────────────────────────
+  Widget _buildHeader(int unread) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(Icons.notifications_active, color: Colors.white, size: 28),
+                if (unread > 0)
+                  Positioned(
+                    top: -5,
+                    right: -5,
+                    child: Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: const BoxDecoration(
+                          color: Color(0xFFF08030), shape: BoxShape.circle),
+                      child: Text('$unread',
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Notifications',
+                    style: TextStyle(
+                        fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
+                Text('Shared with your barangay team',
+                    style: TextStyle(fontSize: 13, color: Colors.white70)),
+              ],
+            ),
+          ),
+          // Live indicator
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: const BoxDecoration(
+                      color: Color(0xFF8BC88A), shape: BoxShape.circle),
+                ),
+                const SizedBox(width: 4),
+                const Text('Live',
+                    style: TextStyle(
+                        color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Filter chips ────────────────────────────────────────────────────────────
+  Widget _buildFilterChips(List<Map<String, dynamic>> all) {
+    final patientCount = all.where((n) => n['type'] == 'new_patient').length;
+    final eventCount = all.where((n) => n['type'] == 'new_event').length;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      child: Row(
+        children: [
+          _chip('All', 'all', all.length),
+          const SizedBox(width: 8),
+          _chip('Patients', 'new_patient', patientCount),
+          const SizedBox(width: 8),
+          _chip('Events', 'new_event', eventCount),
+        ],
+      ),
+    );
+  }
+
+  Widget _chip(String label, String filter, int count) {
+    final isActive = _activeFilter == filter;
+    return GestureDetector(
+      onTap: () => setState(() => _activeFilter = filter),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          color: isActive ? Colors.white : Colors.white.withValues(alpha: 0.2),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(label,
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: isActive ? const Color(0xFF2E8B7B) : Colors.white)),
+            if (count > 0) ...[
+              const SizedBox(width: 5),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(
+                  color: isActive
+                      ? const Color(0xFF2E8B7B)
+                      : Colors.white.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text('$count',
+                    style: const TextStyle(
+                        color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── List ────────────────────────────────────────────────────────────────────
+  Widget _buildList(List<Map<String, dynamic>> items) {
+    if (items.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.notifications_none,
+                size: 72, color: Colors.white.withValues(alpha: 0.4)),
+            const SizedBox(height: 12),
+            Text('No notifications yet',
+                style: TextStyle(
+                    fontSize: 17,
+                    color: Colors.white.withValues(alpha: 0.7),
+                    fontWeight: FontWeight.w500)),
+            const SizedBox(height: 6),
+            Text(
+              _activeFilter == 'new_patient'
+                  ? 'Patient assessments will appear here'
+                  : _activeFilter == 'new_event'
+                      ? 'Calendar events will appear here'
+                      : 'New activity from your barangay\nteam will appear here in real-time',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontSize: 13, color: Colors.white.withValues(alpha: 0.5)),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      itemCount: items.length,
+      itemBuilder: (context, i) {
+        final n = items[i];
+        return n['type'] == 'new_event'
+            ? _buildEventCard(n)
+            : _buildPatientCard(n);
+      },
+    );
+  }
+
+  // ── Patient card ────────────────────────────────────────────────────────────
+  Widget _buildPatientCard(Map<String, dynamic> n) {
+    final isRead = n['read'] ?? false;
+    final patientName = n['patientName'] ?? '';
+    final patientAge = n['patientAge'] ?? '';
+    final patientSex = n['patientSex'] ?? '';
+    final createdBy = n['createdByName'] ?? 'Unknown';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isRead ? Colors.transparent : const Color(0xFF2E8B7B),
+          width: 2,
+        ),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 8,
+              offset: const Offset(0, 2)),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () async {
+            // Mark as read
+            if (!isRead && n['id'] != null) {
+              await FirestoreService().markNotificationAsRead(n['id']);
+            }
+            // Navigate to Patient List
+            if (mounted) _navigateToPatientList();
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                      color: _avatarColor(patientSex), shape: BoxShape.circle),
+                  child: Icon(_avatarIcon(patientSex), color: Colors.white, size: 28),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text('New Assessment',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: isRead
+                                        ? Colors.grey
+                                        : const Color(0xFF2E8B7B))),
+                          ),
+                          if (!isRead)
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: const BoxDecoration(
+                                  color: Color(0xFF2E8B7B), shape: BoxShape.circle),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Text(patientName,
+                          style: TextStyle(
+                              fontSize: 15,
+                              fontWeight:
+                                  isRead ? FontWeight.normal : FontWeight.bold,
+                              color: Colors.black87)),
+                      const SizedBox(height: 2),
+                      Text('Added by $createdBy',
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey.shade600,
+                              fontStyle: FontStyle.italic)),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(Icons.cake, size: 11, color: Colors.grey.shade500),
+                          const SizedBox(width: 3),
+                          Text(
+                              patientAge.isNotEmpty ? '$patientAge yrs' : 'Age N/A',
+                              style: TextStyle(
+                                  fontSize: 11, color: Colors.grey.shade600)),
+                          const SizedBox(width: 10),
+                          Icon(_avatarIcon(patientSex),
+                              size: 11, color: Colors.grey.shade500),
+                          const SizedBox(width: 3),
+                          Text(patientSex.isNotEmpty ? patientSex : 'N/A',
+                              style: TextStyle(
+                                  fontSize: 11, color: Colors.grey.shade600)),
+                          const Spacer(),
+                          Icon(Icons.access_time,
+                              size: 11, color: Colors.grey.shade400),
+                          const SizedBox(width: 3),
+                          Text(_formatTimestamp(n['createdAt']),
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.grey.shade500,
+                                  fontStyle: FontStyle.italic)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                // Destination hint
+                Column(
+                  children: [
+                    Icon(Icons.people_rounded,
+                        color: const Color(0xFF2E8B7B).withValues(alpha: 0.4),
+                        size: 16),
+                    const SizedBox(height: 2),
+                    Icon(Icons.chevron_right,
+                        color: Colors.grey.shade300, size: 20),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Event card ──────────────────────────────────────────────────────────────
+  Widget _buildEventCard(Map<String, dynamic> n) {
+    final isRead = n['read'] ?? false;
+    final eventTitle = n['eventTitle'] ?? 'Untitled Event';
+    final eventTime = n['eventTime'] ?? '';
+    final eventDate = n['eventDate'];
+    final createdBy = n['createdByName'] ?? 'Unknown';
+    final eventColor = Color(n['colorValue'] ?? 0xFFF5A962);
+
+    String dateLabel = '';
+    if (eventDate is Timestamp) {
+      final d = eventDate.toDate();
+      const months = ['Jan','Feb','Mar','Apr','May','Jun',
+                      'Jul','Aug','Sep','Oct','Nov','Dec'];
+      dateLabel = '${months[d.month - 1]} ${d.day}, ${d.year}';
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isRead ? Colors.transparent : eventColor,
+          width: 2,
+        ),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 8,
+              offset: const Offset(0, 2)),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () async {
+            // Mark as read
+            if (!isRead && n['id'] != null) {
+              await FirestoreService().markCalendarNotificationAsRead(n['id']);
+            }
+            // Navigate to Calendar
+            if (mounted) _navigateToCalendar();
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: eventColor.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: eventColor, width: 2),
+                  ),
+                  child: Icon(Icons.event_rounded, color: eventColor, size: 24),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text('New Event Added',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: isRead ? Colors.grey : eventColor)),
+                          ),
+                          if (!isRead)
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                  color: eventColor, shape: BoxShape.circle),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Text(eventTitle,
+                          style: TextStyle(
+                              fontSize: 15,
+                              fontWeight:
+                                  isRead ? FontWeight.normal : FontWeight.bold,
+                              color: Colors.black87)),
+                      const SizedBox(height: 2),
+                      Text('Added by $createdBy',
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey.shade600,
+                              fontStyle: FontStyle.italic)),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(Icons.calendar_today_rounded,
+                              size: 11, color: Colors.grey.shade500),
+                          const SizedBox(width: 3),
+                          Text(dateLabel,
+                              style: TextStyle(
+                                  fontSize: 11, color: Colors.grey.shade600)),
+                          if (eventTime.isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            Icon(Icons.access_time_rounded,
+                                size: 11, color: Colors.grey.shade500),
+                            const SizedBox(width: 3),
+                            Text(eventTime,
+                                style: TextStyle(
+                                    fontSize: 11, color: Colors.grey.shade600)),
+                          ],
+                          const Spacer(),
+                          Icon(Icons.access_time,
+                              size: 11, color: Colors.grey.shade400),
+                          const SizedBox(width: 3),
+                          Text(_formatTimestamp(n['createdAt']),
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.grey.shade500,
+                                  fontStyle: FontStyle.italic)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                // Destination hint
+                Column(
+                  children: [
+                    Icon(Icons.calendar_month_rounded,
+                        color: eventColor.withValues(alpha: 0.4), size: 16),
+                    const SizedBox(height: 2),
+                    Icon(Icons.chevron_right,
+                        color: Colors.grey.shade300, size: 20),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Offline view ────────────────────────────────────────────────────────────
+  Widget _buildOfflineView() {
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFF2E8B7B),
-            Color(0xFF5CAA7F),
-            Color(0xFF8BC88A),
-          ],
+          colors: [Color(0xFF2E8B7B), Color(0xFF5CAA7F), Color(0xFF8BC88A)],
         ),
       ),
       child: Column(
         children: [
-          // Header
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: Row(
               children: [
                 Container(
@@ -170,331 +760,85 @@ class _NotificationsTabState extends State<NotificationsTab> {
                     color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(
-                    Icons.notifications_active,
-                    color: Colors.white,
-                    size: 28,
-                  ),
+                  child: const Icon(Icons.notifications_active,
+                      color: Colors.white, size: 28),
                 ),
                 const SizedBox(width: 12),
                 const Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Notifications',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                      Text(
-                        'Recent patient assessments',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.white70,
-                        ),
-                      ),
+                      Text('Notifications',
+                          style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white)),
+                      Text('Offline mode — local records only',
+                          style: TextStyle(fontSize: 13, color: Colors.white70)),
                     ],
                   ),
                 ),
-                IconButton(
-                  onPressed: _loadNotifications,
-                  icon: const Icon(Icons.refresh, color: Colors.white),
-                  tooltip: 'Refresh',
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.wifi_off, color: Colors.white, size: 12),
+                      SizedBox(width: 4),
+                      Text('Offline',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600)),
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
-
-          // Error Message
-          if (_errorMessage != null)
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.red.shade100,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.red, width: 2),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.error, color: Colors.red),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Error loading notifications',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.red,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _errorMessage!,
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-          // Notifications List
           Expanded(
-            child: _isLoading
+            child: _offlineLoading
                 ? const Center(
                     child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  )
-                : _notifications.isEmpty
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white)))
+                : _offlineNotifications.isEmpty
                     ? Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(
-                              Icons.notifications_none,
-                              size: 80,
-                              color: Colors.white.withValues(alpha: 0.5),
-                            ),
-                            const SizedBox(height: 16),
+                            Icon(Icons.wifi_off,
+                                size: 64,
+                                color: Colors.white.withValues(alpha: 0.4)),
+                            const SizedBox(height: 12),
+                            Text('You are offline',
+                                style: TextStyle(
+                                    fontSize: 17,
+                                    color: Colors.white.withValues(alpha: 0.7),
+                                    fontWeight: FontWeight.w500)),
+                            const SizedBox(height: 6),
                             Text(
-                              'No notifications yet',
+                              'Connect to the internet to see\nshared barangay notifications',
+                              textAlign: TextAlign.center,
                               style: TextStyle(
-                                fontSize: 18,
-                                color: Colors.white.withValues(alpha: 0.7),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'New patient assessments will appear here',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.white.withValues(alpha: 0.5),
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                            ElevatedButton.icon(
-                              onPressed: _loadNotifications,
-                              icon: const Icon(Icons.refresh),
-                              label: const Text('Refresh'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.white,
-                                foregroundColor: const Color(0xFF2E8B7B),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 24,
-                                  vertical: 12,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(25),
-                                ),
-                              ),
+                                  fontSize: 13,
+                                  color: Colors.white.withValues(alpha: 0.5)),
                             ),
                           ],
                         ),
                       )
-                    : RefreshIndicator(
-                        onRefresh: _loadNotifications,
-                        color: const Color(0xFF2E8B7B),
-                        child: ListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemCount: _notifications.length,
-                          itemBuilder: (context, index) {
-                            final notification = _notifications[index];
-                            return _buildNotificationCard(notification);
-                          },
-                        ),
+                    : ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        itemCount: _offlineNotifications.length,
+                        itemBuilder: (context, i) =>
+                            _buildPatientCard(_offlineNotifications[i]),
                       ),
           ),
         ],
       ),
     );
   }
-
- Widget _buildNotificationCard(Map<String, dynamic> notification) {
-  final type = notification['type'] ?? 'new_patient';
-  final patientName = notification['patientName'] ?? '';
-  final patientAge = notification['patientAge'] ?? '';
-  final patientSex = notification['patientSex'] ?? '';
-  final createdBy = notification['createdByName'] ?? 'Unknown';
-  final timestamp = notification['createdAt'];
-  final isRead = notification['read'] ?? false;
-
-  return Container(
-    margin: const EdgeInsets.only(bottom: 12),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(
-        color: isRead ? Colors.transparent : const Color(0xFF2E8B7B),
-        width: 2,
-      ),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withValues(alpha: 0.1),
-          blurRadius: 8,
-          offset: const Offset(0, 2),
-        ),
-      ],
-    ),
-    child: Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () async {
-          // Mark as read
-          final notifId = notification['id'];
-          if (notifId != null && !isRead) {
-            await FirestoreService().markNotificationAsRead(notifId);
-            _loadNotifications(); // Refresh
-          }
-          
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('View details for $patientName'),
-              backgroundColor: const Color(0xFF2E8B7B),
-            ),
-          );
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              // Avatar
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: _getAvatarColor(patientSex),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  _getAvatarIcon(patientSex),
-                  color: Colors.white,
-                  size: 32,
-                ),
-              ),
-              const SizedBox(width: 16),
-              
-              // Details
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'New Assessment',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: isRead ? Colors.grey : const Color(0xFF2E8B7B),
-                            ),
-                          ),
-                        ),
-                        if (!isRead)
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFF2E8B7B),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      patientName,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: isRead ? FontWeight.normal : FontWeight.bold,
-                        color: const Color(0xFF5D4037),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Added by $createdBy',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey.shade600,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.cake,
-                          size: 14,
-                          color: Colors.grey.shade600,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          patientAge.isNotEmpty ? '$patientAge years old' : 'Age not specified',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade700,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Icon(
-                          _getAvatarIcon(patientSex),
-                          size: 14,
-                          color: Colors.grey.shade600,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          patientSex.isNotEmpty ? patientSex : 'Not specified',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade700,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.access_time,
-                          size: 14,
-                          color: Colors.grey.shade500,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          _formatTimestamp(timestamp),
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey.shade600,
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              
-              // Arrow
-              Icon(
-                Icons.chevron_right,
-                color: Colors.grey.shade400,
-                size: 28,
-              ),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
-}
 }

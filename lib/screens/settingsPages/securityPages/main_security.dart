@@ -1,14 +1,8 @@
 import 'package:flutter/material.dart';
-
-// Import your pages
 import 'change_password.dart';
-
 
 class MainSecurity extends StatelessWidget {
   const MainSecurity({super.key});
-
-  final Color buttonColor = const Color.fromRGBO(255, 255, 255, 0.3);
-  final Color textColor = Colors.black;
 
   @override
   Widget build(BuildContext context) {
@@ -31,74 +25,169 @@ class MainSecurity extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
 
-              /// HEADER
+              /// ── HEADER ────────────────────────────────────────────────
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                padding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
                 child: Column(
                   children: [
                     Row(
                       children: [
-                        IconButton(
-                          icon: const Icon(Icons.arrow_back, color: Colors.black),
-                          onPressed: () => Navigator.pop(context),
+                        Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () => Navigator.pop(context),
+                            borderRadius: BorderRadius.circular(50),
+                            child: Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.35),
+                                  width: 1.2,
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.arrow_back_ios_new_rounded,
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                            ),
+                          ),
                         ),
-
                         const Expanded(
                           child: Center(
                             child: Text(
                               "Security",
                               style: TextStyle(
-                                color: Colors.black,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 24,
+                                fontSize: 22,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                                letterSpacing: 0.4,
                               ),
                             ),
                           ),
                         ),
-
-                        const SizedBox(width: 48),
+                        const SizedBox(width: 44),
                       ],
                     ),
-
-                    /// Divider Line
+                    const SizedBox(height: 16),
                     Container(
-                      margin: const EdgeInsets.only(top: 4),
-                      height: 1.5,
-                      width: double.infinity,
-                      color: Colors.white.withOpacity(0.3),
+                      height: 1,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.transparent,
+                            Colors.white.withOpacity(0.35),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 28),
 
-              /// MENU ITEMS
+              /// ── MENU ITEMS ────────────────────────────────────────────
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildMenuItem(
-                        context,
-                        "Change Password",
-                        Icons.lock_open, // ✅ padlock open icon
+
+                      // Section label
+                      _sectionLabel("Authentication"),
+                      const SizedBox(height: 8),
+
+                      // Grouped card
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.18),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.28),
+                            width: 1,
+                          ),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: Column(
+                            children: [
+                              _menuItem(
+                                context: context,
+                                title: "Change Password",
+                                subtitle: "Update your account password",
+                                icon: Icons.lock_reset_rounded,
+                                showDivider: true,
+                                onTap: () => Navigator.of(context)
+                                    .push(_slideFadeRoute(const ChangePassword())),
+                              ),
+                              _menuItem(
+                                context: context,
+                                title: "Face ID / Touch ID",
+                                subtitle: "Manage biometric login",
+                                icon: Icons.face_rounded,
+                                showDivider: true,
+                                onTap: () => Navigator.of(context).push(
+                                  _slideFadeRoute(
+                                    const PlaceholderScreen(title: "Face ID / Touch ID"),
+                                  ),
+                                ),
+                              ),
+                              _menuItem(
+                                context: context,
+                                title: "Fingerprint",
+                                subtitle: "Set up fingerprint authentication",
+                                icon: Icons.fingerprint_rounded,
+                                showDivider: false,
+                                onTap: () => Navigator.of(context).push(
+                                  _slideFadeRoute(
+                                    const PlaceholderScreen(title: "Fingerprint Authentication"),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
 
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 28),
 
-                      _buildMenuItem(
-                        context,
-                        "Face ID / Touch ID",
-                        Icons.face,
-                      ),
-
-                      const SizedBox(height: 10),
-
-                      _buildMenuItem(
-                        context,
-                        "Fingerprint Authentication",
-                        Icons.fingerprint,
+                      // Info notice
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.2),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              Icons.shield_outlined,
+                              color: Colors.white.withOpacity(0.8),
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                "Keep your account secure by using a strong password and enabling biometric authentication.",
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.75),
+                                  fontSize: 13,
+                                  height: 1.5,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -111,76 +200,107 @@ class MainSecurity extends StatelessWidget {
     );
   }
 
-  /// MENU ITEM BUILDER
-  Widget _buildMenuItem(BuildContext context, String title, IconData icon) {
-    return InkWell(
-      onTap: () {
-        Widget page;
-
-        switch (title) {
-          case "Change Password":
-            page = const ChangePassword();
-            break;
-
-          /*case "Face ID / Touch ID":
-            page = const FaceIDTouchID();
-            break;
-
-          case "Fingerprint Authentication":
-            page = const FingerprintAuthentication();
-            break;*/
-
-          default:
-            page = PlaceholderScreen(title: title);
-        }
-
-        Navigator.of(context).push(_slideFadeRoute(page));
-      },
-
-      borderRadius: BorderRadius.circular(8),
-
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
-        decoration: BoxDecoration(
-          color: buttonColor,
-          borderRadius: BorderRadius.circular(8),
-        ),
-
-        child: Row(
-          children: [
-
-            /// ICON
-            Icon(icon, color: textColor),
-
-            const SizedBox(width: 12),
-
-            /// TITLE
-            Text(
-              title,
-              style: TextStyle(
-                color: textColor,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-            ),
-          ],
+  /// ── SECTION LABEL ────────────────────────────────────────────────────────
+  Widget _sectionLabel(String label) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4),
+      child: Text(
+        label.toUpperCase(),
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: Colors.white.withOpacity(0.65),
+          letterSpacing: 1.4,
         ),
       ),
     );
   }
 
-  /// SLIDE + FADE ANIMATION
+  /// ── MENU ITEM ─────────────────────────────────────────────────────────────
+  Widget _menuItem({
+    required BuildContext context,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required bool showDivider,
+    required VoidCallback onTap,
+  }) {
+    return Column(
+      children: [
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(
+                children: [
+                  // Icon container
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(icon, color: Colors.white, size: 20),
+                  ),
+                  const SizedBox(width: 14),
+                  // Text
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.6),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Chevron
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: Colors.white.withOpacity(0.55),
+                    size: 22,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (showDivider)
+          Divider(
+            height: 1,
+            thickness: 1,
+            color: Colors.white.withOpacity(0.15),
+            indent: 66,
+          ),
+      ],
+    );
+  }
+
+  /// ── SLIDE + FADE ANIMATION ────────────────────────────────────────────────
   PageRouteBuilder _slideFadeRoute(Widget page) {
     return PageRouteBuilder(
       pageBuilder: (_, __, ___) => page,
-
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
-        const begin = Offset(0.0, 1.0);
-        const end = Offset.zero;
-
-        final tween =
-            Tween(begin: begin, end: end).chain(CurveTween(curve: Curves.ease));
+        final tween = Tween(
+          begin: const Offset(0.0, 1.0),
+          end: Offset.zero,
+        ).chain(CurveTween(curve: Curves.ease));
 
         final fadeTween = Tween<double>(begin: 0.0, end: 1.0);
 
@@ -196,19 +316,16 @@ class MainSecurity extends StatelessWidget {
   }
 }
 
-/// PLACEHOLDER SCREEN
+/// ── PLACEHOLDER SCREEN ────────────────────────────────────────────────────
 class PlaceholderScreen extends StatelessWidget {
   final String title;
-
   const PlaceholderScreen({super.key, required this.title});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(title)),
-      body: Center(
-        child: Text("This is the $title page"),
-      ),
+      body: Center(child: Text("This is the $title page")),
     );
   }
 }
