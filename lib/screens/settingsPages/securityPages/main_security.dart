@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:lumasdang/screens/settingsPages/securityPages/biometric_settings.dart';
 import 'change_password.dart';
+import '../../../services/BiometricAuthService.dart';
 
 class MainSecurity extends StatelessWidget {
   const MainSecurity({super.key});
@@ -98,11 +100,9 @@ class MainSecurity extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
 
-                      // Section label
                       _sectionLabel("Authentication"),
                       const SizedBox(height: 8),
 
-                      // Grouped card
                       Container(
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.18),
@@ -125,28 +125,16 @@ class MainSecurity extends StatelessWidget {
                                 onTap: () => Navigator.of(context)
                                     .push(_slideFadeRoute(const ChangePassword())),
                               ),
+                              // Both Face ID and Fingerprint now go to the same
+                              // BiometricSettingsPage which handles both.
                               _menuItem(
                                 context: context,
-                                title: "Face ID / Touch ID",
+                                title: "Face ID / Fingerprint",
                                 subtitle: "Manage biometric login",
-                                icon: Icons.face_rounded,
-                                showDivider: true,
-                                onTap: () => Navigator.of(context).push(
-                                  _slideFadeRoute(
-                                    const PlaceholderScreen(title: "Face ID / Touch ID"),
-                                  ),
-                                ),
-                              ),
-                              _menuItem(
-                                context: context,
-                                title: "Fingerprint",
-                                subtitle: "Set up fingerprint authentication",
                                 icon: Icons.fingerprint_rounded,
                                 showDivider: false,
                                 onTap: () => Navigator.of(context).push(
-                                  _slideFadeRoute(
-                                    const PlaceholderScreen(title: "Fingerprint Authentication"),
-                                  ),
+                                  _slideFadeRoute(const BiometricSettingsPage()),
                                 ),
                               ),
                             ],
@@ -156,7 +144,6 @@ class MainSecurity extends StatelessWidget {
 
                       const SizedBox(height: 28),
 
-                      // Info notice
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -200,7 +187,6 @@ class MainSecurity extends StatelessWidget {
     );
   }
 
-  /// ── SECTION LABEL ────────────────────────────────────────────────────────
   Widget _sectionLabel(String label) {
     return Padding(
       padding: const EdgeInsets.only(left: 4),
@@ -216,7 +202,6 @@ class MainSecurity extends StatelessWidget {
     );
   }
 
-  /// ── MENU ITEM ─────────────────────────────────────────────────────────────
   Widget _menuItem({
     required BuildContext context,
     required String title,
@@ -235,7 +220,6 @@ class MainSecurity extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               child: Row(
                 children: [
-                  // Icon container
                   Container(
                     width: 36,
                     height: 36,
@@ -246,7 +230,6 @@ class MainSecurity extends StatelessWidget {
                     child: Icon(icon, color: Colors.white, size: 20),
                   ),
                   const SizedBox(width: 14),
-                  // Text
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -270,7 +253,6 @@ class MainSecurity extends StatelessWidget {
                       ],
                     ),
                   ),
-                  // Chevron
                   Icon(
                     Icons.chevron_right_rounded,
                     color: Colors.white.withOpacity(0.55),
@@ -292,7 +274,6 @@ class MainSecurity extends StatelessWidget {
     );
   }
 
-  /// ── SLIDE + FADE ANIMATION ────────────────────────────────────────────────
   PageRouteBuilder _slideFadeRoute(Widget page) {
     return PageRouteBuilder(
       pageBuilder: (_, __, ___) => page,
@@ -301,9 +282,7 @@ class MainSecurity extends StatelessWidget {
           begin: const Offset(0.0, 1.0),
           end: Offset.zero,
         ).chain(CurveTween(curve: Curves.ease));
-
         final fadeTween = Tween<double>(begin: 0.0, end: 1.0);
-
         return SlideTransition(
           position: animation.drive(tween),
           child: FadeTransition(
@@ -312,20 +291,6 @@ class MainSecurity extends StatelessWidget {
           ),
         );
       },
-    );
-  }
-}
-
-/// ── PLACEHOLDER SCREEN ────────────────────────────────────────────────────
-class PlaceholderScreen extends StatelessWidget {
-  final String title;
-  const PlaceholderScreen({super.key, required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: Center(child: Text("This is the $title page")),
     );
   }
 }

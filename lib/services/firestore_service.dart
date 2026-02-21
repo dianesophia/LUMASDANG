@@ -1359,6 +1359,51 @@ Future<void> markNotificationAsRead(String notificationId) async {
       print('❌ Error marking calendar notification as read: $e');
     }
   }
+
+
+  Future<Map<String, int>> getTodayStatusCounts() async {
+  final user = _auth.currentUser;
+  if (user == null) return {};
+
+  try {
+    final userDoc = await _firestore.collection('users').doc(user.uid).get();
+    final barangayId = userDoc.data()?['barangayId'] as String?;
+    if (barangayId == null || barangayId.isEmpty) return {};
+
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
+    final endOfDay = startOfDay.add(const Duration(days: 1));
+
+    final snapshot = await _firestore
+        .collection('barangays')
+        .doc(barangayId)
+        .collection('patients')
+        .where('isDeleted', isEqualTo: false)
+        .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
+        .where('createdAt', isLessThan: Timestamp.fromDate(endOfDay))
+        .get();
+
+    final counts = {
+      'Underweight': 0,
+      'Overweight': 0,
+      'Stunted': 0,
+      'At Risk': 0,
+    };
+
+    for (final doc in snapshot.docs) {
+      // Adjust 'nutritionalStatus' to whatever field name you use
+      final status = doc.data()['nutritionalStatus'] as String? ?? '';
+      if (counts.containsKey(status)) {
+        counts[status] = counts[status]! + 1;
+      }
+    }
+
+    return counts;
+  } catch (e) {
+    print('❌ Error getting status counts: $e');
+    return {};
+  }
+}
 }
 
 

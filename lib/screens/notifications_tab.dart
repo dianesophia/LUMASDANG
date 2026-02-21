@@ -550,7 +550,7 @@ class _NotificationsTabState extends State<NotificationsTab> {
                           Icon(Icons.cake, size: 11, color: Colors.grey.shade500),
                           const SizedBox(width: 3),
                           Text(
-                              patientAge.isNotEmpty ? '$patientAge yrs' : 'Age N/A',
+                              patientAge.isNotEmpty ? '$patientAge months' : 'Age N/A',
                               style: TextStyle(
                                   fontSize: 11, color: Colors.grey.shade600)),
                           const SizedBox(width: 10),
