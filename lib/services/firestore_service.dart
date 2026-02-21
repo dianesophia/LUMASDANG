@@ -1361,7 +1361,7 @@ Future<void> markNotificationAsRead(String notificationId) async {
   }
 
 
-  Future<Map<String, int>> getTodayStatusCounts() async {
+Future<Map<String, int>> getTodayStatusCounts() async {
   final user = _auth.currentUser;
   if (user == null) return {};
 
@@ -1391,14 +1391,46 @@ Future<void> markNotificationAsRead(String notificationId) async {
     };
 
     for (final doc in snapshot.docs) {
-      // Adjust 'nutritionalStatus' to whatever field name you use
-      final status = doc.data()['nutritionalStatus'] as String? ?? '';
-      if (counts.containsKey(status)) {
-        counts[status] = counts[status]! + 1;
+      final anthropometric = doc.data()['anthropometric'] as Map<String, dynamic>?;
+      if (anthropometric == null) continue;
+
+      final weightForAge   = (anthropometric['weightForAge']   as String? ?? '').toLowerCase();
+      final heightForAge   = (anthropometric['heightForAge']   as String? ?? '').toLowerCase();
+      final weightForHeight= (anthropometric['weightForHeight'] as String? ?? '').toLowerCase();
+      final bmi            = (anthropometric['bmi']            as String? ?? '').toLowerCase();
+
+      // ── Underweight ───────────────────────────────────────────────
+      if (weightForAge.contains('underweight') ||
+          weightForAge.contains('severely underweight')) {
+        counts['Underweight'] = counts['Underweight']! + 1;
+      }
+
+      // ── Overweight / Obese ────────────────────────────────────────
+      if (weightForAge.contains('overweight') ||
+          weightForAge.contains('obese') ||
+          weightForHeight.contains('overweight') ||
+          weightForHeight.contains('obese') ||
+          bmi.contains('overweight') ||
+          bmi.contains('obese')) {
+        counts['Overweight'] = counts['Overweight']! + 1;
+      }
+
+      // ── Stunted ───────────────────────────────────────────────────
+      if (heightForAge.contains('stunted')) {
+        counts['Stunted'] = counts['Stunted']! + 1;
+      }
+
+      // ── At Risk ───────────────────────────────────────────────────
+      if (weightForAge.contains('at risk') ||
+          weightForHeight.contains('at risk') ||
+          bmi.contains('at risk')) {
+        counts['At Risk'] = counts['At Risk']! + 1;
       }
     }
 
+    print('✅ Status counts: $counts');
     return counts;
+
   } catch (e) {
     print('❌ Error getting status counts: $e');
     return {};
