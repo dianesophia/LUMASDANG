@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Widget displaying an Overall Nutritional Status summary card
-/// based on the latest assessment data (Weight-for-Age, Height-for-Age, MUAC, Risk Classification).
+/// Overall Nutritional Status summary card — styled to match ProfileInfoCard.
 class OverallNutritionalStatusSection extends StatelessWidget {
   final List<Map<String, dynamic>> assessments;
 
@@ -10,10 +9,36 @@ class OverallNutritionalStatusSection extends StatelessWidget {
     required this.assessments,
   });
 
-  /// Get the most recent assessment that has anthropometric data
+  // ─── Design Tokens (matches ProfileInfoCard) ────────────────────────────────
+  static const Color _orange      = Color(0xFFF08030);
+  static const Color _orangeLight = Color(0xFFF5A962);
+  static const Color _surface     = Color(0xFFFFFFFF);
+  static const Color _surfaceDim  = Color(0xFFFAFAFA);
+  static const Color _border      = Color(0xFFE8E8ED);
+  static const Color _ink         = Color(0xFF1C1C1E);
+  static const Color _inkMid      = Color(0xFF6C6C70);
+  static const Color _green       = Color(0xFF34C759);
+  static const Color _greenBg     = Color(0xFFEDF7F1);
+  static const Color _greenText   = Color(0xFF1A7A3C);
+  static const Color _red         = Color(0xFFDC2626);
+  static const Color _redBg       = Color(0xFFFEF2F2);
+  static const Color _amber       = Color(0xFFF08030);
+  static const Color _amberBg     = Color(0xFFFFF6EE);
+
+  static const double _r  = 18;
+  static const double _ri = 12;
+
+  static List<BoxShadow> get _shadow => [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.07),
+          blurRadius: 20,
+          offset: const Offset(0, 6),
+        ),
+      ];
+
+  // ─── Data helpers ───────────────────────────────────────────────────────────
+
   Map<String, dynamic>? _getLatestAssessment() {
-    if (assessments.isEmpty) return null;
-    // Assessments are sorted ascending by date, so last one is most recent
     for (var i = assessments.length - 1; i >= 0; i--) {
       final a = assessments[i];
       if ((a['weightForAge'] ?? '').toString().isNotEmpty ||
@@ -25,378 +50,379 @@ class OverallNutritionalStatusSection extends StatelessWidget {
     return null;
   }
 
-  /// Format a DateTime for display
-  String _formatDate(DateTime? date) {
-    if (date == null) return 'N/A';
-    const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-    ];
-    return '${months[date.month - 1]} ${date.day.toString().padLeft(2, '0')}, ${date.year}';
+  String _formatDate(DateTime? d) {
+    if (d == null) return 'N/A';
+    const m = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return '${m[d.month - 1]} ${d.day.toString().padLeft(2, '0')}, ${d.year}';
   }
 
-  /// Extract the interpretation text from a z-score string like "-1.50 (Underweight)"
-  String _extractInterpretation(String? zScoreStr) {
-    if (zScoreStr == null || zScoreStr.isEmpty) return '';
-    final match = RegExp(r'\(([^)]+)\)').firstMatch(zScoreStr);
-    return match?.group(1) ?? '';
+  String _extractInterp(String? s) {
+    if (s == null || s.isEmpty) return '';
+    return RegExp(r'\(([^)]+)\)').firstMatch(s)?.group(1) ?? '';
   }
 
-  /// Extract the z-score value from a z-score string like "-1.50 (Underweight)"
-  double? _extractZScore(String? zScoreStr) {
-    if (zScoreStr == null || zScoreStr.isEmpty) return null;
-    final match = RegExp(r'^-?[\d.]+').firstMatch(zScoreStr.trim());
-    if (match != null) {
-      return double.tryParse(match.group(0)!);
-    }
-    return null;
+  String _wfaStatus(String? wfa) {
+    final i = _extractInterp(wfa);
+    return i.isEmpty ? '' : '$i (Weight-for-Age)';
   }
 
-  /// Get a friendly Weight-for-Age description
-  String _getWeightForAgeStatus(String? wfa) {
-    final interp = _extractInterpretation(wfa);
-    if (interp.isEmpty) return '';
-    return '$interp (Weight-for-Age)';
-  }
-
-  /// Get a friendly Height-for-Age description
-  String _getHeightForAgeStatus(String? hfa) {
-    final interp = _extractInterpretation(hfa);
-    if (interp.isEmpty) return '';
-
-    // Map interpretation to friendly text matching the design
-    switch (interp.toLowerCase()) {
-      case 'severely stunted':
-        return 'Severely Stunted (Height-for-Age)';
-      case 'stunted':
-        return 'Stunted (Height-for-Age)';
-      case 'normal':
-        return 'Normal Height (Height-for-Age)';
-      default:
-        return '$interp (Height-for-Age)';
+  String _hfaStatus(String? hfa) {
+    final i = _extractInterp(hfa);
+    if (i.isEmpty) return '';
+    switch (i.toLowerCase()) {
+      case 'severely stunted': return 'Severely Stunted (Height-for-Age)';
+      case 'stunted':          return 'Stunted (Height-for-Age)';
+      case 'normal':           return 'Normal Height (Height-for-Age)';
+      default:                 return '$i (Height-for-Age)';
     }
   }
 
-  /// Get MUAC classification based on the value
-  /// WHO guidelines for children 6-59 months:
-  /// < 11.5 cm = Severe Acute Malnutrition (SAM)
-  /// 11.5–12.4 cm = Moderate Acute Malnutrition (MAM)
-  /// 12.5–13.4 cm = At Risk
-  /// >= 13.5 cm = Normal
-  String _getMuacStatus(String? muacStr) {
+  String _muacStatus(String? muacStr) {
     if (muacStr == null || muacStr.isEmpty) return '';
     final muac = double.tryParse(muacStr.trim());
     if (muac == null) return '';
-
-    String classification;
-    if (muac < 11.5) {
-      classification = 'SAM';
-    } else if (muac < 12.5) {
-      classification = 'MAM';
-    } else if (muac < 13.5) {
-      classification = 'At Risk';
-    } else {
-      classification = 'Normal';
-    }
-
-    return 'MUAC $classification ($muac cm)';
+    final cls = muac < 11.5 ? 'SAM' : muac < 12.5 ? 'MAM' : muac < 13.5 ? 'At Risk' : 'Normal';
+    return 'MUAC $cls (${muac}cm)';
   }
 
-  /// Determine overall nutritional risk classification
-  /// Based on the combination of all indicators
-  _RiskLevel _calculateRiskClassification(Map<String, dynamic> assessment) {
-    final wfaInterp = _extractInterpretation(assessment['weightForAge']?.toString());
-    final hfaInterp = _extractInterpretation(assessment['heightForAge']?.toString());
-    final wfhInterp = _extractInterpretation(assessment['weightForHeight']?.toString());
-    final muacStr = assessment['muac']?.toString() ?? '';
-    final muac = double.tryParse(muacStr.trim());
-
-    bool hasSevere = false;
-    bool hasModerate = false;
-
-    // Check for severe conditions
-    final severeTerms = ['severely underweight', 'severely stunted', 'severe wasting', 'obese'];
-    final moderateTerms = ['underweight', 'stunted', 'wasted', 'overweight', 'at risk of overweight'];
-
-    for (final interp in [wfaInterp, hfaInterp, wfhInterp]) {
-      final lower = interp.toLowerCase();
-      if (severeTerms.any((t) => lower.contains(t))) {
-        hasSevere = true;
-      } else if (moderateTerms.any((t) => lower == t)) {
-        hasModerate = true;
-      }
-    }
-
-    // Check MUAC
+  _RiskLevel _calcRisk(Map<String, dynamic> a) {
+    final interps = [
+      _extractInterp(a['weightForAge']?.toString()).toLowerCase(),
+      _extractInterp(a['heightForAge']?.toString()).toLowerCase(),
+      _extractInterp(a['weightForHeight']?.toString()).toLowerCase(),
+    ];
+    final muac = double.tryParse(a['muac']?.toString().trim() ?? '');
+    final severeTerms  = ['severely', 'obese'];
+    final modTerms     = ['underweight','stunted','wasted','overweight','at risk'];
+    bool severe = interps.any((s) => severeTerms.any((t) => s.contains(t)));
+    bool mod    = interps.any((s) => modTerms.any((t) => s == t));
     if (muac != null) {
-      if (muac < 11.5) {
-        hasSevere = true;
-      } else if (muac < 13.5) {
-        hasModerate = true;
-      }
+      if (muac < 11.5) severe = true;
+      else if (muac < 13.5) mod = true;
     }
+    return severe ? _RiskLevel.high : mod ? _RiskLevel.moderate : _RiskLevel.low;
+  }
 
-    if (hasSevere) {
-      return _RiskLevel.high;
-    } else if (hasModerate) {
-      return _RiskLevel.moderate;
-    } else {
-      return _RiskLevel.low;
+  _Severity _interpSeverity(String interp) {
+    final l = interp.toLowerCase();
+    if (l.contains('severe')) return _Severity.severe;
+    if (l == 'normal') return _Severity.normal;
+    return _Severity.warning;
+  }
+
+  _Severity _muacSeverity(String? muacStr) {
+    final muac = double.tryParse(muacStr?.trim() ?? '');
+    if (muac == null) return _Severity.normal;
+    if (muac < 11.5) return _Severity.severe;
+    if (muac < 13.5) return _Severity.warning;
+    return _Severity.normal;
+  }
+
+  Color _severityFg(_Severity s) {
+    switch (s) {
+      case _Severity.severe:  return _red;
+      case _Severity.warning: return _amber;
+      case _Severity.normal:  return _greenText;
     }
   }
+
+  Color _severityBg(_Severity s) {
+    switch (s) {
+      case _Severity.severe:  return _redBg;
+      case _Severity.warning: return _amberBg;
+      case _Severity.normal:  return _greenBg;
+    }
+  }
+
+  Color _riskFg(_RiskLevel r) {
+    switch (r) {
+      case _RiskLevel.high:     return _red;
+      case _RiskLevel.moderate: return _amber;
+      case _RiskLevel.low:      return _greenText;
+    }
+  }
+
+  Color _riskBg(_RiskLevel r) {
+    switch (r) {
+      case _RiskLevel.high:     return _redBg;
+      case _RiskLevel.moderate: return _amberBg;
+      case _RiskLevel.low:      return _greenBg;
+    }
+  }
+
+  String _riskLabel(_RiskLevel r) {
+    switch (r) {
+      case _RiskLevel.high:     return 'High Nutritional Risk';
+      case _RiskLevel.moderate: return 'Moderate Nutritional Risk';
+      case _RiskLevel.low:      return 'Low Nutritional Risk';
+    }
+  }
+
+  // ─── Build ──────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     final latest = _getLatestAssessment();
 
-    if (latest == null) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: const Color(0xFFB8E6D5),
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: _surface,
+        borderRadius: BorderRadius.circular(_r),
+        border: Border.all(color: _border, width: 1),
+        boxShadow: _shadow,
+      ),
+      clipBehavior: Clip.hardEdge,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Accent bar
+          Container(
+            height: 5,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(colors: [_orangeLight, _orange]),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(_r)),
             ),
-          ],
-        ),
-        child: Column(
+          ),
+          _buildHeader(),
+          const Divider(height: 1, color: _border),
+          if (latest == null) _buildEmptyState() else _buildContent(latest),
+        ],
+      ),
+    );
+  }
+
+  // ─── Header ─────────────────────────────────────────────────────────────────
+
+  Widget _buildHeader() => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        child: Row(
           children: [
-            _buildTitleBar(),
-            const SizedBox(height: 16),
+            _iconBox(Icons.monitor_heart_rounded),
+            const SizedBox(width: 12),
             const Text(
-              'No assessment data available yet.',
+              'Overall Nutritional Status',
               style: TextStyle(
-                fontSize: 14,
-                color: Colors.black54,
-                fontStyle: FontStyle.italic,
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: _ink,
+                letterSpacing: -0.3,
               ),
             ),
           ],
         ),
       );
-    }
 
-    final date = latest['date'] as DateTime?;
-    final wfaStatus = _getWeightForAgeStatus(latest['weightForAge']?.toString());
-    final hfaStatus = _getHeightForAgeStatus(latest['heightForAge']?.toString());
-    final muacStatus = _getMuacStatus(latest['muac']?.toString());
-    final riskLevel = _calculateRiskClassification(latest);
+  Widget _iconBox(IconData icon) => Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: _orange.withOpacity(0.10),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, color: _orange, size: 20),
+      );
 
-    // Collect all non-empty status items
-    final statusItems = <_StatusItem>[];
+  Widget _buildEmptyState() => Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          children: [
+            Icon(Icons.assessment_outlined, size: 40, color: _orange.withOpacity(0.35)),
+            const SizedBox(height: 12),
+            const Text(
+              'No assessment data available yet.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 14, color: _inkMid),
+            ),
+          ],
+        ),
+      );
 
-    if (wfaStatus.isNotEmpty) {
-      final wfaInterp = _extractInterpretation(latest['weightForAge']?.toString()).toLowerCase();
-      statusItems.add(_StatusItem(
-        text: wfaStatus,
-        severity: wfaInterp.contains('severe')
-            ? _Severity.severe
-            : (wfaInterp == 'normal' ? _Severity.normal : _Severity.warning),
-      ));
-    }
+  // ─── Content ────────────────────────────────────────────────────────────────
 
-    if (hfaStatus.isNotEmpty) {
-      final hfaInterp = _extractInterpretation(latest['heightForAge']?.toString()).toLowerCase();
-      statusItems.add(_StatusItem(
-        text: hfaStatus,
-        severity: hfaInterp.contains('severe')
-            ? _Severity.severe
-            : (hfaInterp == 'normal' ? _Severity.normal : _Severity.warning),
-      ));
-    }
+  Widget _buildContent(Map<String, dynamic> latest) {
+    final date      = latest['date'] as DateTime?;
+    final wfa       = latest['weightForAge']?.toString();
+    final hfa       = latest['heightForAge']?.toString();
+    final muac      = latest['muac']?.toString();
+    final riskLevel = _calcRisk(latest);
 
-    if (muacStatus.isNotEmpty) {
-      final muac = double.tryParse(latest['muac']?.toString().trim() ?? '');
-      _Severity muacSeverity = _Severity.normal;
-      if (muac != null) {
-        if (muac < 11.5) {
-          muacSeverity = _Severity.severe;
-        } else if (muac < 13.5) {
-          muacSeverity = _Severity.warning;
-        }
-      }
-      statusItems.add(_StatusItem(
-        text: muacStatus,
-        severity: muacSeverity,
-      ));
-    }
+    final items = <_StatusItem>[
+      if (_wfaStatus(wfa).isNotEmpty)
+        _StatusItem(_wfaStatus(wfa), _interpSeverity(_extractInterp(wfa))),
+      if (_hfaStatus(hfa).isNotEmpty)
+        _StatusItem(_hfaStatus(hfa), _interpSeverity(_extractInterp(hfa))),
+      if (_muacStatus(muac).isNotEmpty)
+        _StatusItem(_muacStatus(muac), _muacSeverity(muac)),
+    ];
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFFB8E6D5),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Title bar
-          _buildTitleBar(),
-          const SizedBox(height: 6),
+          // Date pill
+          _datePill('Last Assessment: ${_formatDate(date)}'),
+          const SizedBox(height: 16),
 
-          // Last Assessment date
-          Center(
-            child: Text(
-              'Last Assessment: ${_formatDate(date)}',
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: Color(0xFF2E8B7B),
-                fontStyle: FontStyle.italic,
+          // Status tiles
+          if (items.isNotEmpty) ...[
+            const Text(
+              'INDICATORS',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: _inkMid,
+                letterSpacing: 1.2,
               ),
             ),
-          ),
-          const SizedBox(height: 18),
+            const SizedBox(height: 8),
+            ...items.map((item) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _statusTile(item),
+                )),
+            const SizedBox(height: 8),
+          ],
 
-          // Status items with checkmarks
-          ...statusItems.map((item) => Padding(
-                padding: const EdgeInsets.only(bottom: 12, left: 4),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      Icons.check,
-                      size: 20,
-                      color: _getSeverityColor(item.severity),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        item.text,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black.withOpacity(0.8),
-                          height: 1.3,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              )),
-
-          // Risk Classification
-          Padding(
-            padding: const EdgeInsets.only(bottom: 4, left: 4),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.check,
-                  size: 20,
-                  color: _getRiskColor(riskLevel),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: RichText(
-                    text: TextSpan(
-                      children: [
-                        TextSpan(
-                          text: 'Risk Classification:\n',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black.withOpacity(0.8),
-                            height: 1.4,
-                          ),
-                        ),
-                        TextSpan(
-                          text: _getRiskLabel(riskLevel),
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: _getRiskColor(riskLevel),
-                            height: 1.4,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
+          // Risk classification tile
+          _riskTile(riskLevel),
         ],
       ),
     );
   }
 
-  Widget _buildTitleBar() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFD4F1E3),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: const Center(
-        child: Text(
-          'Overall Nutritional Status',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
-            letterSpacing: 0.5,
-          ),
+  Widget _datePill(String label) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: _orange.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(color: _orange.withOpacity(0.20), width: 1),
         ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.calendar_today_rounded, size: 13, color: _orange),
+            const SizedBox(width: 7),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: _orange,
+                letterSpacing: 0.1,
+              ),
+            ),
+          ],
+        ),
+      );
+
+  Widget _statusTile(_StatusItem item) {
+    final fg = _severityFg(item.severity);
+    final bg = _severityBg(item.severity);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      decoration: BoxDecoration(
+        color: _surfaceDim,
+        borderRadius: BorderRadius.circular(_ri),
+        border: Border.all(color: _border, width: 1),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(5),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              item.severity == _Severity.normal
+                  ? Icons.check_rounded
+                  : item.severity == _Severity.warning
+                      ? Icons.warning_amber_rounded
+                      : Icons.error_rounded,
+              size: 14,
+              color: fg,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              item.text,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: _ink,
+              ),
+            ),
+          ),
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: fg, shape: BoxShape.circle),
+          ),
+        ],
       ),
     );
   }
 
-  Color _getSeverityColor(_Severity severity) {
-    switch (severity) {
-      case _Severity.normal:
-        return const Color(0xFF4CAF50);
-      case _Severity.warning:
-        return const Color(0xFFFF9800);
-      case _Severity.severe:
-        return const Color(0xFFE53935);
-    }
-  }
-
-  Color _getRiskColor(_RiskLevel risk) {
-    switch (risk) {
-      case _RiskLevel.low:
-        return const Color(0xFF4CAF50);
-      case _RiskLevel.moderate:
-        return const Color(0xFFFF9800);
-      case _RiskLevel.high:
-        return const Color(0xFFE53935);
-    }
-  }
-
-  String _getRiskLabel(_RiskLevel risk) {
-    switch (risk) {
-      case _RiskLevel.low:
-        return 'Low Nutritional Risk';
-      case _RiskLevel.moderate:
-        return 'Moderate Nutritional Risk';
-      case _RiskLevel.high:
-        return 'High Nutritional Risk';
-    }
+  Widget _riskTile(_RiskLevel risk) {
+    final fg = _riskFg(risk);
+    final bg = _riskBg(risk);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(_ri),
+        border: Border.all(color: fg.withOpacity(0.25), width: 1),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: fg.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(Icons.shield_rounded, size: 16, color: fg),
+          ),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Risk Classification',
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w500,
+                  color: _inkMid,
+                  letterSpacing: 0.3,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                _riskLabel(risk),
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: fg,
+                  letterSpacing: -0.1,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }
 
-enum _RiskLevel { low, moderate, high }
+// ─── Enums & helpers ─────────────────────────────────────────────────────────
 
-enum _Severity { normal, warning, severe }
+enum _RiskLevel { low, moderate, high }
+enum _Severity  { normal, warning, severe }
 
 class _StatusItem {
   final String text;
   final _Severity severity;
-
-  _StatusItem({required this.text, required this.severity});
+  const _StatusItem(this.text, this.severity);
 }

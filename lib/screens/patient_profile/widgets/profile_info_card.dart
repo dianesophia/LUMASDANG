@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../patient_list.dart';
 
-/// Patient information card with modern UI styling.
+/// Patient information card — clean clinical dark-accent style.
 class ProfileInfoCard extends StatelessWidget {
   final Patient patient;
 
@@ -11,124 +11,156 @@ class ProfileInfoCard extends StatelessWidget {
   });
 
   // ─── Design Tokens ─────────────────────────────────────────────
-  static const Color _cardBg     = Color(0xFFB8E6D5);
-  static const Color _headerBg   = Color(0xFFD4F1E3);
-  static const Color _accentTeal = Color(0xFF2E8B7B);
-  static const Color _darkText   = Color(0xFF1A3C34);
-  static const Color _bodyText   = Color(0xFF2A4F47);
+  static const Color _orange      = Color(0xFFF08030);
+  static const Color _orangeLight = Color(0xFFF5A962);
+  static const Color _surface     = Color(0xFFFFFFFF);
+  static const Color _border      = Color(0xFFE8E8ED);
 
-  static const double _cardRadius = 20;
-
-  static List<BoxShadow> get _cardShadow => [
-        BoxShadow(
-          color: _accentTeal.withOpacity(0.18),
-          blurRadius: 18,
-          spreadRadius: 1,
-          offset: const Offset(0, 6),
-        ),
-        BoxShadow(
-          color: Colors.white.withOpacity(0.6),
-          blurRadius: 1,
-          offset: const Offset(0, -1),
-        ),
-      ];
+  static const double _r = 18;
 
   @override
   Widget build(BuildContext context) {
+    final int ageMonths = patient.age; // age displayed in months
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [_cardBg, _headerBg],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(_cardRadius),
-        boxShadow: _cardShadow,
+        color: _surface,
+        borderRadius: BorderRadius.circular(_r),
+        border: Border.all(color: _border, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.07),
+            blurRadius: 20,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ───────── HEADER ─────────
+          // ── Top accent bar ──
           Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-            decoration: const BoxDecoration(
-              color: _headerBg,
-              borderRadius:
-                  BorderRadius.vertical(top: Radius.circular(_cardRadius)),
+            height: 5,
+            decoration: BoxDecoration(
+              //gradient: const LinearGradient(
+                //colors: [_orangeLight, _orange],
+              //),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(_r),
+              ),
             ),
+          ),
+
+          // ── Header row ──
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                const Icon(Icons.person, color: _accentTeal),
-                const SizedBox(width: 10),
+                // Avatar
+                _Avatar(patient: patient),
+
+                const SizedBox(width: 16),
+
+                // Name + tags
                 Expanded(
-                  child: Text(
-                    '${patient.firstName} ${patient.lastName}',
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      color: _darkText,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${patient.firstName} ${patient.lastName}',
+                        style: const TextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1C1C1E),
+                          letterSpacing: -0.4,
+                          height: 1.1,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          _Tag(label: patient.sex, color: _orange),
+                          const SizedBox(width: 6),
+                          _Tag(label: '$ageMonths mo', color: _orangeLight),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Active pill
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEDF7F1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF34C759),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      const Text(
+                        'Active',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1A7A3C),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
 
-          const Divider(height: 1, thickness: 1),
+          // ── Divider ──
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Divider(height: 1, color: _border),
+          ),
 
-          // ───────── BODY ─────────
+          // ── Info Grid ──
           Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+            child: Column(
               children: [
-                // ── Avatar with Glow ──
-                Container(
-                  width: 90,
-                  height: 90,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: const LinearGradient(
-                      colors: [_accentTeal, _cardBg],
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: _accentTeal.withOpacity(0.3),
-                        blurRadius: 15,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  padding: const EdgeInsets.all(3),
-                  child: ClipOval(
-                    child: Image.network(
-                      'https://ui-avatars.com/api/?name=${patient.firstName}+${patient.lastName}'
-                      '&background=D4F1E3&color=2E8B7B&size=200&bold=true',
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Icon(
-                        Icons.person_rounded,
-                        size: 40,
-                        color: _accentTeal,
+                Row(
+                  children: [
+                    Expanded(
+                      child: _InfoTile(
+                        icon: Icons.cake_outlined,
+                        label: 'Date of Birth',
+                        value: patient.dateOfBirth,
                       ),
                     ),
-                  ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _InfoTile(
+                        icon: Icons.child_care_outlined,
+                        label: 'Age',
+                        value: '$ageMonths months',
+                      ),
+                    ),
+                  ],
                 ),
-
-                const SizedBox(width: 20),
-
-                // ── Info Chips Section ──
-                Expanded(
-                  child: Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    children: [
-                      _infoChip(Icons.location_on, patient.address),
-                      _infoChip(Icons.cake, patient.dateOfBirth),
-                      _infoChip(Icons.calendar_today, '${patient.age} yrs'),
-                      _infoChip(Icons.wc, patient.sex),
-                    ],
-                  ),
+                const SizedBox(height: 10),
+                _InfoTile(
+                  icon: Icons.location_on_outlined,
+                  label: 'Address',
+                  value: patient.address,
+                  fullWidth: true,
                 ),
               ],
             ),
@@ -137,30 +169,139 @@ class ProfileInfoCard extends StatelessWidget {
       ),
     );
   }
+}
 
-  // ───────── INFO CHIP WIDGET ─────────
-  Widget _infoChip(IconData icon, String value) {
+// ─── Avatar ────────────────────────────────────────────────────────────────
+class _Avatar extends StatelessWidget {
+  final Patient patient;
+  const _Avatar({required this.patient});
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+      width: 64,
+      height: 64,
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.75),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _accentTeal.withOpacity(0.25)),
+        shape: BoxShape.circle,
+        gradient: const LinearGradient(
+          colors: [Color(0xFFF5A962), Color(0xFFF08030)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFF08030).withOpacity(0.28),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(2.5),
+      child: ClipOval(
+        child: Image.network(
+          'https://ui-avatars.com/api/?name=${patient.firstName}+${patient.lastName}'
+          '&background=F5A962&color=ffffff&size=200&bold=true',
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => const Icon(
+            Icons.person_rounded,
+            size: 32,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Tag Badge ─────────────────────────────────────────────────────────────
+class _Tag extends StatelessWidget {
+  final String label;
+  final Color color;
+  const _Tag({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11.5,
+          fontWeight: FontWeight.w700,
+          color: color,
+          letterSpacing: 0.2,
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Info Tile ─────────────────────────────────────────────────────────────
+class _InfoTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final bool fullWidth;
+
+  const _InfoTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.fullWidth = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: fullWidth ? double.infinity : null,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFAFAFA),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE8E8ED), width: 1),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 16, color: _accentTeal),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              value.isNotEmpty ? value : "N/A",
-              style: const TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w600,
-                color: _bodyText,
-              ),
-              overflow: TextOverflow.ellipsis,
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF08030).withOpacity(0.10),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, size: 15, color: const Color(0xFFF08030)),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF6C6C70),
+                    letterSpacing: 0.3,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value.isNotEmpty ? value : 'N/A',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1C1C1E),
+                    letterSpacing: -0.1,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
+                ),
+              ],
             ),
           ),
         ],

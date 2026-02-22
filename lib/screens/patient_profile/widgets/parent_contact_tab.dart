@@ -18,6 +18,21 @@ class ParentContactTab extends StatelessWidget {
     required this.onSMSChanged,
   });
 
+  // ─── Design Tokens (matches ProfileInfoCard) ────────────────────────────────
+  static const Color _orange      = Color(0xFFF08030);
+  static const Color _orangeLight = Color(0xFFF5A962);
+  static const Color _surface     = Color(0xFFFFFFFF);
+  static const Color _surfaceDim  = Color(0xFFFAFAFA);
+  static const Color _border      = Color(0xFFE8E8ED);
+  static const Color _ink         = Color(0xFF1C1C1E);
+  static const Color _inkMid      = Color(0xFF6C6C70);
+  static const Color _green       = Color(0xFF34C759);
+  static const Color _greenBg     = Color(0xFFEDF7F1);
+  static const Color _greenText   = Color(0xFF1A7A3C);
+
+  static const double _r  = 18;
+  static const double _ri = 12;
+
   // ── Derived fields ────────────────────────────────────────────────────────
   String get _guardianName =>
       patient.motherName.isNotEmpty ? patient.motherName :
@@ -56,63 +71,49 @@ class ParentContactTab extends StatelessWidget {
           ProfileInfoCard(patient: patient),
           const SizedBox(height: 20),
 
-          // ── Section label ─────────────────────────────────────────────
           _sectionLabel('GUARDIAN INFORMATION'),
-          const SizedBox(height: 10),
-
-          // ── Guardian details card ─────────────────────────────────────
-          _frostedCard(
-            children: [
-              _infoRow(Icons.person_outline_rounded, 'Name', _guardianName),
-              _divider(),
-              _infoRow(Icons.family_restroom_outlined, 'Relationship', _relationship),
-              _divider(),
-              _infoRow(Icons.phone_outlined, 'Primary Phone', _primaryPhone),
-              _divider(),
-              _infoRow(Icons.phone_in_talk_outlined, 'Secondary Phone', _secondaryPhone),
-              _divider(),
-              _infoRow(Icons.location_on_outlined, 'Address', _guardianAddress),
-            ],
-          ),
+          const SizedBox(height: 8),
+          _card(children: [
+            _infoTile(Icons.person_outline_rounded,       'Name',            _guardianName),
+            _divider(),
+            _infoTile(Icons.family_restroom_outlined,     'Relationship',    _relationship),
+            _divider(),
+            _infoTile(Icons.phone_outlined,               'Primary Phone',   _primaryPhone),
+            _divider(),
+            _infoTile(Icons.phone_in_talk_outlined,       'Secondary Phone', _secondaryPhone),
+            _divider(),
+            _infoTile(Icons.location_on_outlined,         'Address',         _guardianAddress),
+          ]),
 
           const SizedBox(height: 20),
 
-          // ── Section label ─────────────────────────────────────────────
           _sectionLabel('EMERGENCY CONTACT'),
-          const SizedBox(height: 10),
-
-          _frostedCard(
-            children: [
-              _infoRow(Icons.emergency_outlined, 'Name', _emergencyName),
-              _divider(),
-              _infoRow(Icons.phone_outlined, 'Phone', _emergencyPhone),
-            ],
-          ),
+          const SizedBox(height: 8),
+          _card(children: [
+            _infoTile(Icons.emergency_outlined, 'Name',  _emergencyName),
+            _divider(),
+            _infoTile(Icons.phone_outlined,     'Phone', _emergencyPhone),
+          ]),
 
           const SizedBox(height: 20),
 
-          // ── Section label ─────────────────────────────────────────────
           _sectionLabel('PREFERRED CONTACT METHOD'),
-          const SizedBox(height: 10),
-
-          // ── Preferred contact toggle ──────────────────────────────────
-          _frostedCard(
-            children: [
-              _contactToggle(
-                icon: Icons.phone_outlined,
-                label: 'Phone Call',
-                value: preferPhoneCall,
-                onChanged: onPhoneCallChanged,
-              ),
-              _divider(),
-              _contactToggle(
-                icon: Icons.sms_outlined,
-                label: 'SMS / Text Message',
-                value: preferSMS,
-                onChanged: onSMSChanged,
-              ),
-            ],
-          ),
+          const SizedBox(height: 8),
+          _card(children: [
+            _toggleTile(
+              icon: Icons.phone_outlined,
+              label: 'Phone Call',
+              value: preferPhoneCall,
+              onChanged: onPhoneCallChanged,
+            ),
+            _divider(),
+            _toggleTile(
+              icon: Icons.sms_outlined,
+              label: 'SMS / Text Message',
+              value: preferSMS,
+              onChanged: onSMSChanged,
+            ),
+          ]),
         ],
       ),
     );
@@ -121,24 +122,31 @@ class ParentContactTab extends StatelessWidget {
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   Widget _sectionLabel(String text) => Padding(
-        padding: const EdgeInsets.only(left: 4),
+        padding: const EdgeInsets.only(left: 2),
         child: Text(
           text,
-          style: TextStyle(
-            fontSize: 11,
+          style: const TextStyle(
+            fontSize: 10,
             fontWeight: FontWeight.w700,
-            color: Colors.white.withOpacity(0.65),
-            letterSpacing: 1.4,
+            color: _inkMid,
+            letterSpacing: 1.2,
           ),
         ),
       );
 
-  Widget _frostedCard({required List<Widget> children}) => Container(
+  Widget _card({required List<Widget> children}) => Container(
         width: double.infinity,
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.18),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withOpacity(0.28), width: 1),
+          color: _surface,
+          borderRadius: BorderRadius.circular(_r),
+          border: Border.all(color: _border, width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         clipBehavior: Clip.hardEdge,
         child: Column(children: children),
@@ -147,23 +155,21 @@ class ParentContactTab extends StatelessWidget {
   Widget _divider() => Container(
         height: 1,
         margin: const EdgeInsets.symmetric(horizontal: 16),
-        color: Colors.white.withOpacity(0.15),
+        color: _border,
       );
 
-  Widget _infoRow(IconData icon, String label, String value) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+  Widget _infoTile(IconData icon, String label, String value) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Icon badge
             Container(
-              width: 34,
-              height: 34,
+              padding: const EdgeInsets.all(7),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(8),
+                color: _orange.withOpacity(0.10),
+                borderRadius: BorderRadius.circular(9),
               ),
-              child: Icon(icon, color: Colors.white, size: 17),
+              child: Icon(icon, color: _orange, size: 16),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -172,33 +178,30 @@ class ParentContactTab extends StatelessWidget {
                 children: [
                   Text(
                     label,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white.withOpacity(0.55),
-                      letterSpacing: 0.4,
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w500,
+                      color: _inkMid,
+                      letterSpacing: 0.3,
                     ),
                   ),
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 2),
                   Text(
                     value,
                     style: const TextStyle(
-                      fontSize: 14,
+                      fontSize: 13.5,
                       fontWeight: FontWeight.w600,
-                      color: Colors.white,
+                      color: _ink,
                     ),
                   ),
                 ],
               ),
             ),
-            // Chevron hint
-            Icon(Icons.chevron_right_rounded,
-                color: Colors.white.withOpacity(0.25), size: 20),
           ],
         ),
       );
 
-  Widget _contactToggle({
+  Widget _toggleTile({
     required IconData icon,
     required String label,
     required bool value,
@@ -208,62 +211,59 @@ class ParentContactTab extends StatelessWidget {
         onTap: () => onChanged(!value),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          color: value ? Colors.white.withOpacity(0.1) : Colors.transparent,
+          color: value ? _orange.withOpacity(0.04) : Colors.transparent,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
           child: Row(
             children: [
-              Container(
-                width: 34,
-                height: 34,
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                padding: const EdgeInsets.all(7),
                 decoration: BoxDecoration(
-                  color: value
-                      ? Colors.white.withOpacity(0.3)
-                      : Colors.white.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(8),
+                  color: value ? _orange.withOpacity(0.15) : _surfaceDim,
+                  borderRadius: BorderRadius.circular(9),
+                  border: Border.all(
+                    color: value ? _orange.withOpacity(0.30) : _border,
+                    width: 1,
+                  ),
                 ),
-                child: Icon(icon,
-                    color: value ? Colors.white : Colors.white.withOpacity(0.5),
-                    size: 17),
+                child: Icon(icon, color: value ? _orange : _inkMid, size: 16),
               ),
               const SizedBox(width: 14),
               Expanded(
                 child: Text(
                   label,
                   style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: value ? FontWeight.w700 : FontWeight.w400,
-                    color: value ? Colors.white : Colors.white.withOpacity(0.6),
+                    fontSize: 13.5,
+                    fontWeight: value ? FontWeight.w700 : FontWeight.w500,
+                    color: value ? _ink : _inkMid,
                   ),
                 ),
               ),
               // Toggle pill
               AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
+                duration: const Duration(milliseconds: 200),
                 width: 44,
-                height: 24,
+                height: 26,
                 decoration: BoxDecoration(
-                  color: value ? Colors.white : Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: value
-                        ? Colors.white
-                        : Colors.white.withOpacity(0.35),
-                    width: 1,
-                  ),
+                  gradient: value
+                      ? const LinearGradient(colors: [_orangeLight, _orange])
+                      : null,
+                  color: value ? null : _border,
+                  borderRadius: BorderRadius.circular(13),
                 ),
                 child: AnimatedAlign(
-                  duration: const Duration(milliseconds: 180),
-                  alignment:
-                      value ? Alignment.centerRight : Alignment.centerLeft,
+                  duration: const Duration(milliseconds: 200),
+                  alignment: value ? Alignment.centerRight : Alignment.centerLeft,
                   child: Container(
-                    width: 18,
-                    height: 18,
+                    width: 20,
+                    height: 20,
                     margin: const EdgeInsets.symmetric(horizontal: 3),
-                    decoration: BoxDecoration(
-                      color: value
-                          ? const Color(0xFF2E8B7B)
-                          : Colors.white.withOpacity(0.5),
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
                       shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 1)),
+                      ],
                     ),
                   ),
                 ),

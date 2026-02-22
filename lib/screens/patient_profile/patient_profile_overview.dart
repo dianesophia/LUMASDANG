@@ -497,7 +497,7 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
   }
 
   // ── Add assessment sheet ───────────────────────────────────────────────────
-  void _showAddAssessmentSheet() {
+  /*void _showAddAssessmentSheet() {
     final dateCtrl = TextEditingController();
     final weightCtrl = TextEditingController();
     final heightCtrl = TextEditingController();
@@ -736,7 +736,7 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
                                   Icon(Icons.save_outlined,
                                       color: Colors.white, size: 18),
                                   SizedBox(width: 8),
-                                  Text('Save Assessment',
+                                  Text('Save Assessmentdd',
                                       style: TextStyle(
                                           color: Colors.white,
                                           fontWeight: FontWeight.w700,
@@ -754,7 +754,323 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
         });
       },
     );
-  }
+  }*/
+
+  void _showAddAssessmentSheet() {
+  final dateCtrl = TextEditingController();
+  final weightCtrl = TextEditingController();
+  final heightCtrl = TextEditingController();
+  final muacCtrl = TextEditingController();
+
+  bool saving = false;
+  String? errorMessage;
+
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) {
+      return StatefulBuilder(
+        builder: (ctx, setSheetState) {
+          return Container(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).viewInsets.bottom,
+            ),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xFF2E8B7B),
+                  Color(0xFF5CAA7F),
+                ],
+              ),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(24),
+                topRight: Radius.circular(24),
+              ),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.28),
+                width: 1,
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Drag handle
+                  Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.4),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+
+                  // Header
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.35),
+                            width: 1,
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.add_chart_outlined,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'New Assessment',
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                            Text(
+                              '${widget.patient.firstName} ${widget.patient.lastName}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.white.withOpacity(0.7),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (widget.isSharedPatient)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.35),
+                              width: 1,
+                            ),
+                          ),
+                          child: const Text(
+                            'SHARED',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+
+                  // Divider
+                  Container(
+                    height: 1,
+                    margin: const EdgeInsets.symmetric(vertical: 16),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.transparent,
+                          Colors.white.withOpacity(0.35),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // Error message
+                  if (errorMessage != null) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFDC2626).withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: const Color(0xFFDC2626).withOpacity(0.5),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.error_outline,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              errorMessage!,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+
+                  // Fields
+                  _buildSheetField(
+                    ctx: ctx,
+                    controller: dateCtrl,
+                    label: 'Date of Measurement',
+                    hint: 'MM/DD/YYYY',
+                    icon: Icons.calendar_today_outlined,
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: ctx,
+                        initialDate: DateTime.now(),
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime.now(),
+                      );
+                      if (picked != null) {
+                        dateCtrl.text =
+                            '${picked.month.toString().padLeft(2, '0')}/${picked.day.toString().padLeft(2, '0')}/${picked.year}';
+                        if (errorMessage != null) {
+                          setSheetState(() => errorMessage = null);
+                        }
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 10),
+
+                  _buildSheetField(
+                    ctx: ctx,
+                    controller: weightCtrl,
+                    label: 'Weight (kg)',
+                    hint: 'e.g. 9.5',
+                    icon: Icons.monitor_weight_outlined,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                  ),
+                  const SizedBox(height: 10),
+
+                  _buildSheetField(
+                    ctx: ctx,
+                    controller: heightCtrl,
+                    label: 'Height (cm)',
+                    hint: 'e.g. 80',
+                    icon: Icons.height,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                  ),
+                  const SizedBox(height: 10),
+
+                  _buildSheetField(
+                    ctx: ctx,
+                    controller: muacCtrl,
+                    label: 'MUAC (cm)',
+                    hint: 'e.g. 16',
+                    icon: Icons.straighten,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                  ),
+
+                  const SizedBox(height: 22),
+
+                  // ✅ ElevatedButton
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: saving
+                          ? null
+                          : () async {
+                              if (dateCtrl.text.trim().isEmpty ||
+                                  weightCtrl.text.trim().isEmpty ||
+                                  heightCtrl.text.trim().isEmpty) {
+                                setSheetState(() => errorMessage =
+                                    'Please fill in date, weight, and height.');
+                                return;
+                              }
+
+                              setSheetState(() {
+                                errorMessage = null;
+                                saving = true;
+                              });
+
+                              await _saveNewAssessment(
+                                date: dateCtrl.text.trim(),
+                                weight: weightCtrl.text.trim(),
+                                height: heightCtrl.text.trim(),
+                                muac: muacCtrl.text.trim(),
+                              );
+
+                              if (ctx.mounted) Navigator.pop(ctx);
+                            },
+                      style: ElevatedButton.styleFrom(
+                       // backgroundColor:
+                           // saving ? _orange.withOpacity(0.6) : _orange,
+                            backgroundColor: saving
+                              ? const Color(0xFFF59E0B).withOpacity(0.6)
+                              : const Color(0xFFF59E0B),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: saving
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.save_outlined, size: 18),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Save Assessment',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.4,
+                                  ),
+                                ),
+                              ],
+                            ),
+                    ),
+                  ),*/
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    },
+  );
+}
 
   Widget _buildSheetField({
     required BuildContext ctx,

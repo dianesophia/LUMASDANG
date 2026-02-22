@@ -710,6 +710,16 @@ Future<String> savePatientToBarangay(Map<String, dynamic> patientData) async {
   }
 
   print('💾 Saving patient to barangay...');
+
+   print('💾 Saving patient to barangay...');
+  
+  // ── ADD THIS BLOCK ──────────────────────────────────────────
+  final userDocDebug = await _firestore.collection('users').doc(user.uid).get();
+  print('🔍 User UID: ${user.uid}');
+  print('🔍 User doc exists: ${userDocDebug.exists}');
+  print('🔍 User doc fields: ${userDocDebug.data()?.keys.toList()}');
+  print('🔍 barangayId: ${userDocDebug.data()?['barangayId']}');
+  // ── END ADD ─────────────────────────────────────────────────
   
   // Get user's barangay
   final userDoc = await _firestore.collection('users').doc(user.uid).get();

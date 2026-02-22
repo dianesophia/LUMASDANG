@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart'; // add intl to pubspec.yaml
 
 class DewormingForm extends StatefulWidget {
   final ValueChanged<Map<String, dynamic>>? onSave;
@@ -46,12 +47,68 @@ class _DewormingFormState extends State<DewormingForm> {
     });
   }
 
+  // ── Calendar helper ─────────────────────────────────────────────────────
+  Future<void> _pickDate({
+    required TextEditingController controller,
+    DateTime? firstDate,
+    DateTime? lastDate,
+  }) async {
+    final effectiveFirst = firstDate ?? DateTime(2000);
+    final effectiveLast =
+        lastDate ?? DateTime.now().add(const Duration(days: 365 * 5));
+
+    DateTime initialDate = DateTime.now();
+    final existing = controller.text.trim();
+    if (existing.isNotEmpty) {
+      try {
+        final parsed = DateFormat('MM-dd-yyyy').parse(existing);
+        if (!parsed.isBefore(effectiveFirst) &&
+            !parsed.isAfter(effectiveLast)) {
+          initialDate = parsed;
+        }
+      } catch (_) {}
+    }
+    // Clamp initialDate within bounds
+    if (initialDate.isBefore(effectiveFirst)) initialDate = effectiveFirst;
+    if (initialDate.isAfter(effectiveLast)) initialDate = effectiveLast;
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: effectiveFirst,
+      lastDate: effectiveLast,
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: const ColorScheme.light(
+            primary: Color(0xFFF5A962),
+            onPrimary: Colors.white,
+            surface: Colors.white,
+            onSurface: Color(0xFF1A1A1A),
+          ),
+          textButtonTheme: TextButtonThemeData(
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFFF5A962),
+            ),
+          ),
+        ),
+        child: child!,
+      ),
+    );
+
+    if (picked != null) {
+      controller.text = DateFormat('MM-dd-yyyy').format(picked);
+      _notifyParent();
+    }
+  }
+
   Widget _buildField({
     required String label,
     required TextEditingController controller,
     TextInputType keyboardType = TextInputType.text,
     String? hint,
     bool readOnly = false,
+    bool hasCalendar = false,
+    VoidCallback? onTap,
     String? Function(String?)? validator,
     IconData? icon,
   }) {
@@ -71,7 +128,8 @@ class _DewormingFormState extends State<DewormingForm> {
         TextFormField(
           controller: controller,
           keyboardType: keyboardType,
-          readOnly: readOnly,
+          readOnly: readOnly || hasCalendar,
+          onTap: onTap,
           validator: validator,
           style: TextStyle(
             fontSize: 13,
@@ -84,6 +142,10 @@ class _DewormingFormState extends State<DewormingForm> {
             prefixIcon: icon != null
                 ? Icon(icon, size: 16, color: Colors.black38)
                 : null,
+            suffixIcon: hasCalendar && !readOnly
+                ? const Icon(Icons.calendar_month_outlined,
+                    size: 18, color: Color(0xFFF5A962))
+                : null,
             filled: true,
             fillColor: readOnly
                 ? const Color(0xFFF5F5F5)
@@ -92,7 +154,8 @@ class _DewormingFormState extends State<DewormingForm> {
                 const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFFEEEEEE), width: 1.5),
+              borderSide:
+                  const BorderSide(color: Color(0xFFEEEEEE), width: 1.5),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
@@ -254,19 +317,25 @@ class _DewormingFormState extends State<DewormingForm> {
             const SizedBox(height: 14),
           ],
 
+          // ── Date of Last Deworming ────────────────────────────────────
           _buildField(
             label: 'DATE OF LAST DEWORMING',
             controller: _dateController,
-            keyboardType: TextInputType.datetime,
-            hint: 'MM-DD-YYYY',
+            hint: 'Tap to select date',
             readOnly: _isNA,
+            hasCalendar: true,
             icon: Icons.calendar_today_outlined,
+            onTap: _isNA
+                ? null
+                : () => _pickDate(
+                      controller: _dateController,
+                      lastDate: DateTime.now(),
+                    ),
             validator: (v) {
               if (_isNA) return null;
-              if (v == null || v.trim().isEmpty)
-                return 'Enter a date or select N/A';
-              if (!RegExp(r'^\d{2}-\d{2}-\d{4}$').hasMatch(v.trim()))
-                return 'Use format MM-DD-YYYY';
+              if (v == null || v.trim().isEmpty) {
+                return 'Select a date or tick N/A';
+              }
               return null;
             },
           ),
@@ -355,19 +424,27 @@ class _DewormingFormState extends State<DewormingForm> {
 
           const SizedBox(height: 12),
 
+          // ── Next Deworming Date ───────────────────────────────────────
           _buildField(
             label: 'NEXT DEWORMING DATE',
             controller: _nextDateController,
-            keyboardType: TextInputType.datetime,
-            hint: 'MM-DD-YYYY',
+            hint: 'Tap to select date',
             readOnly: _isNA,
+            hasCalendar: true,
             icon: Icons.event_outlined,
+            onTap: _isNA
+                ? null
+                : () => _pickDate(
+                      controller: _nextDateController,
+                      firstDate: DateTime.now(),
+                      lastDate:
+                          DateTime.now().add(const Duration(days: 365 * 5)),
+                    ),
             validator: (v) {
               if (_isNA) return null;
-              if (v == null || v.trim().isEmpty)
+              if (v == null || v.trim().isEmpty) {
                 return 'Next deworming date is required';
-              if (!RegExp(r'^\d{2}-\d{2}-\d{4}$').hasMatch(v.trim()))
-                return 'Use format MM-DD-YYYY';
+              }
               return null;
             },
           ),

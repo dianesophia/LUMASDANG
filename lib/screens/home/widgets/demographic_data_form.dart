@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart'; // add intl to pubspec.yaml
 
-class DemographicDataForm extends StatelessWidget {
+class DemographicDataForm extends StatefulWidget {
   final TextEditingController firstNameController;
   final TextEditingController lastNameController;
   final TextEditingController ageController;
@@ -28,6 +29,70 @@ class DemographicDataForm extends StatelessWidget {
     required this.fatherContactController,
   });
 
+  @override
+  State<DemographicDataForm> createState() => _DemographicDataFormState();
+}
+
+class _DemographicDataFormState extends State<DemographicDataForm> {
+  // ── Phone number validation ─────────────────────────────────────────────
+  // Accepts: 09XXXXXXXXX  (11 digits) OR +639XXXXXXXXX (13 chars)
+  static final _phoneRegex = RegExp(r'^(09\d{9}|\+639\d{9})$');
+
+  String? _validatePhone(String? v) {
+    if (v == null || v.trim().isEmpty) return 'Contact number is required';
+    if (!_phoneRegex.hasMatch(v.trim())) {
+      return 'Enter a valid PH number (09XXXXXXXXX or +639XXXXXXXXX)';
+    }
+    return null;
+  }
+
+  // ── Calendar date picker ────────────────────────────────────────────────
+  Future<void> _pickDate(BuildContext context) async {
+    // Parse existing value so the picker opens on the already-set date
+    DateTime initialDate = DateTime.now();
+    final existing = widget.dobController.text.trim();
+    if (existing.isNotEmpty) {
+      try {
+        initialDate = DateFormat('MM-dd-yyyy').parse(existing);
+      } catch (_) {}
+    }
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      // Children can be at most 5 years old (60 months) — allow up to today
+      firstDate: DateTime(DateTime.now().year - 6),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFFF5A962),
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: Color(0xFF1A1A1A),
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFFF5A962),
+              ),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      widget.dobController.text = DateFormat('MM-dd-yyyy').format(picked);
+
+      // Auto-calculate age in months
+      final now = DateTime.now();
+      final months = (now.year - picked.year) * 12 + (now.month - picked.month);
+      widget.ageController.text = months.clamp(0, 60).toString();
+    }
+  }
+
   // ── Shared field builder ────────────────────────────────────────────────
   Widget _buildField({
     required String label,
@@ -36,6 +101,8 @@ class DemographicDataForm extends StatelessWidget {
     String? hint,
     String? Function(String?)? validator,
     IconData? icon,
+    bool readOnly = false,
+    VoidCallback? onTap,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -54,6 +121,8 @@ class DemographicDataForm extends StatelessWidget {
           controller: controller,
           keyboardType: keyboardType,
           validator: validator,
+          readOnly: readOnly,
+          onTap: onTap,
           style: const TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w500,
@@ -65,8 +134,15 @@ class DemographicDataForm extends StatelessWidget {
             prefixIcon: icon != null
                 ? Icon(icon, size: 16, color: Colors.black38)
                 : null,
+            // Show calendar icon suffix for the DOB field
+            suffixIcon: onTap != null
+                ? const Icon(Icons.calendar_month_outlined,
+                    size: 18, color: Color(0xFFF5A962))
+                : null,
             filled: true,
-            fillColor: const Color(0xFFFAFAFA),
+            fillColor: readOnly
+                ? const Color(0xFFF5F5F5) // slightly different for read-only
+                : const Color(0xFFFAFAFA),
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
             enabledBorder: OutlineInputBorder(
@@ -96,7 +172,7 @@ class DemographicDataForm extends StatelessWidget {
     );
   }
 
-  // ── Card wrapper (same shadow/radius as stats_row & upcoming_events) ────
+  // ── Card wrapper ────────────────────────────────────────────────────────
   Widget _buildCard({required Widget child}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
@@ -115,7 +191,7 @@ class DemographicDataForm extends StatelessWidget {
     );
   }
 
-  // ── Section header row (icon + title) — same as stats/events labels ────
+  // ── Section header ──────────────────────────────────────────────────────
   Widget _buildSectionHeader(String title, IconData icon) {
     return Row(
       children: [
@@ -171,7 +247,7 @@ class DemographicDataForm extends StatelessWidget {
                   Expanded(
                     child: _buildField(
                       label: 'FIRST NAME',
-                      controller: firstNameController,
+                      controller: widget.firstNameController,
                       icon: Icons.badge_outlined,
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) return 'Required';
@@ -184,7 +260,7 @@ class DemographicDataForm extends StatelessWidget {
                   Expanded(
                     child: _buildField(
                       label: 'LAST NAME',
-                      controller: lastNameController,
+                      controller: widget.lastNameController,
                       icon: Icons.badge_outlined,
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) return 'Required';
@@ -204,10 +280,11 @@ class DemographicDataForm extends StatelessWidget {
                   Expanded(
                     child: _buildField(
                       label: 'AGE (MONTHS)',
-                      controller: ageController,
+                      controller: widget.ageController,
                       keyboardType: TextInputType.number,
                       hint: '0 – 60',
                       icon: Icons.cake_outlined,
+                      // Age is auto-filled from DOB; still allow manual entry
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) return 'Required';
                         final age = int.tryParse(v.trim());
@@ -221,7 +298,7 @@ class DemographicDataForm extends StatelessWidget {
                   Expanded(
                     child: _buildField(
                       label: 'SEX',
-                      controller: sexController,
+                      controller: widget.sexController,
                       hint: 'M or F',
                       icon: Icons.wc_outlined,
                       validator: (v) {
@@ -239,17 +316,17 @@ class DemographicDataForm extends StatelessWidget {
 
               const SizedBox(height: 12),
 
-              // Date of Birth
+              // ── Date of Birth — tap to open calendar ─────────────────
               _buildField(
                 label: 'DATE OF BIRTH',
-                controller: dobController,
-                keyboardType: TextInputType.datetime,
-                hint: 'MM-DD-YYYY',
+                controller: widget.dobController,
+                hint: 'Tap to select date',
                 icon: Icons.calendar_today_outlined,
+                readOnly: true,
+                onTap: () => _pickDate(context),
                 validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Date of birth is required';
-                  if (!RegExp(r'^\d{2}-\d{2}-\d{4}$').hasMatch(v.trim())) {
-                    return 'Use format MM-DD-YYYY';
+                  if (v == null || v.trim().isEmpty) {
+                    return 'Date of birth is required';
                   }
                   return null;
                 },
@@ -270,7 +347,7 @@ class DemographicDataForm extends StatelessWidget {
 
               _buildField(
                 label: 'ADDRESS',
-                controller: addressController,
+                controller: widget.addressController,
                 icon: Icons.home_outlined,
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return 'Address is required';
@@ -282,7 +359,7 @@ class DemographicDataForm extends StatelessWidget {
 
               _buildField(
                 label: 'PLACE OF BIRTH',
-                controller: placeOfBirthController,
+                controller: widget.placeOfBirthController,
                 icon: Icons.location_on_outlined,
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return 'Place of birth is required';
@@ -305,7 +382,7 @@ class DemographicDataForm extends StatelessWidget {
 
               _buildField(
                 label: "MOTHER'S FULL NAME",
-                controller: motherController,
+                controller: widget.motherController,
                 icon: Icons.person_outline,
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return "Mother's name is required";
@@ -317,15 +394,11 @@ class DemographicDataForm extends StatelessWidget {
 
               _buildField(
                 label: 'CONTACT NUMBER',
-                controller: motherContactController,
+                controller: widget.motherContactController,
                 keyboardType: TextInputType.phone,
                 hint: '09XXXXXXXXX',
                 icon: Icons.phone_outlined,
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Contact number is required';
-                  if (v.trim().length != 11) return 'Enter a valid 11-digit number';
-                  return null;
-                },
+                validator: _validatePhone,
               ),
             ],
           ),
@@ -343,7 +416,7 @@ class DemographicDataForm extends StatelessWidget {
 
               _buildField(
                 label: "FATHER'S FULL NAME",
-                controller: fatherController,
+                controller: widget.fatherController,
                 icon: Icons.person_outline,
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return "Father's name is required";
@@ -355,15 +428,11 @@ class DemographicDataForm extends StatelessWidget {
 
               _buildField(
                 label: 'CONTACT NUMBER',
-                controller: fatherContactController,
+                controller: widget.fatherContactController,
                 keyboardType: TextInputType.phone,
                 hint: '09XXXXXXXXX',
                 icon: Icons.phone_outlined,
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Contact number is required';
-                  if (v.trim().length != 11) return 'Enter a valid 11-digit number';
-                  return null;
-                },
+                validator: _validatePhone,
               ),
             ],
           ),

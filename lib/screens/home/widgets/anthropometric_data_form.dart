@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart'; // add intl to pubspec.yaml
 import '../../../services/anthropometric_calculator.dart';
 
 class AnthropometricDataForm extends StatefulWidget {
@@ -82,17 +83,59 @@ class _AnthropometricDataFormState extends State<AnthropometricDataForm> {
     super.dispose();
   }
 
-  // ── Shared builders (identical to DemographicDataForm) ─────────────────
+  // ── Calendar helper ─────────────────────────────────────────────────────
+  Future<void> _pickMeasurementDate() async {
+    DateTime initialDate = DateTime.now();
+    final existing = widget.dateController.text.trim();
+    if (existing.isNotEmpty) {
+      try {
+        initialDate = DateFormat('MM-dd-yyyy').parse(existing);
+      } catch (_) {}
+    }
+    if (initialDate.isAfter(DateTime.now())) initialDate = DateTime.now();
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now(),
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: const ColorScheme.light(
+            primary: Color(0xFFF5A962),
+            onPrimary: Colors.white,
+            surface: Colors.white,
+            onSurface: Color(0xFF1A1A1A),
+          ),
+          textButtonTheme: TextButtonThemeData(
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFFF5A962),
+            ),
+          ),
+        ),
+        child: child!,
+      ),
+    );
+
+    if (picked != null) {
+      widget.dateController.text = DateFormat('MM-dd-yyyy').format(picked);
+      // _recalculate() fires via listener automatically
+    }
+  }
+
+  // ── Shared builders ─────────────────────────────────────────────────────
   Widget _buildField({
     required String label,
     required TextEditingController controller,
     TextInputType keyboardType = TextInputType.text,
     String? hint,
     bool readOnly = false,
+    bool hasCalendar = false,
+    VoidCallback? onTap,
     String? Function(String?)? validator,
     IconData? icon,
   }) {
-    final isResult = readOnly;
+    final isResult = readOnly && !hasCalendar;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -109,7 +152,8 @@ class _AnthropometricDataFormState extends State<AnthropometricDataForm> {
         TextFormField(
           controller: controller,
           keyboardType: keyboardType,
-          readOnly: readOnly,
+          readOnly: readOnly || hasCalendar,
+          onTap: onTap,
           validator: validator,
           style: TextStyle(
             fontSize: 13,
@@ -120,8 +164,13 @@ class _AnthropometricDataFormState extends State<AnthropometricDataForm> {
             hintText: hint,
             hintStyle: const TextStyle(fontSize: 12, color: Colors.black26),
             prefixIcon: icon != null
-                ? Icon(icon, size: 16,
+                ? Icon(icon,
+                    size: 16,
                     color: isResult ? const Color(0xFF2E8B7B) : Colors.black38)
+                : null,
+            suffixIcon: hasCalendar
+                ? const Icon(Icons.calendar_month_outlined,
+                    size: 18, color: Color(0xFFF5A962))
                 : null,
             filled: true,
             fillColor: isResult
@@ -165,8 +214,7 @@ class _AnthropometricDataFormState extends State<AnthropometricDataForm> {
   }
 
   Widget _buildCard({required Widget child}) => Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
@@ -184,7 +232,7 @@ class _AnthropometricDataFormState extends State<AnthropometricDataForm> {
   Widget _buildSectionHeader(String title, IconData icon,
       {List<Color> gradientColors = const [
         Color(0xFFF5A962),
-        Color(0xFFF08030)
+        Color(0xFFF08030),
       ]}) {
     return Row(
       children: [
@@ -226,7 +274,6 @@ class _AnthropometricDataFormState extends State<AnthropometricDataForm> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── Card 1: Measurements ──────────────────────────────────────
         _buildCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -235,17 +282,18 @@ class _AnthropometricDataFormState extends State<AnthropometricDataForm> {
                   'ANTHROPOMETRIC DATA', Icons.monitor_weight_outlined),
               const SizedBox(height: 14),
 
+              // ── Date of Measurement — tap to open calendar ────────────
               _buildField(
                 label: 'DATE OF MEASUREMENT',
                 controller: widget.dateController,
-                keyboardType: TextInputType.datetime,
-                hint: 'MM-DD-YYYY',
+                hint: 'Tap to select date',
+                hasCalendar: true,
                 icon: Icons.calendar_today_outlined,
+                onTap: _pickMeasurementDate,
                 validator: (v) {
-                  if (v == null || v.trim().isEmpty)
+                  if (v == null || v.trim().isEmpty) {
                     return 'Date of measurement is required';
-                  if (!RegExp(r'^\d{2}-\d{2}-\d{4}$').hasMatch(v.trim()))
-                    return 'Use format MM-DD-YYYY';
+                  }
                   return null;
                 },
               ),
@@ -315,7 +363,6 @@ class _AnthropometricDataFormState extends State<AnthropometricDataForm> {
 
         const SizedBox(height: 10),
 
-        // ── Card 2: WHO Z-Score Results ────────────────────────────────
         _buildCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

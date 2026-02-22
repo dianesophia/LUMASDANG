@@ -7,12 +7,7 @@ class _Vaccine {
   final String key;
   final String displayName;
   final List<String> possibleDoses;
-
-  const _Vaccine({
-    required this.key,
-    required this.displayName,
-    required this.possibleDoses,
-  });
+  const _Vaccine({required this.key, required this.displayName, required this.possibleDoses});
 }
 
 const _vaccines = [
@@ -25,11 +20,7 @@ const _vaccines = [
   _Vaccine(key: 'mmr',        displayName: 'MMR',         possibleDoses: ['Pending', '1st dose', '2nd dose']),
 ];
 
-/// Widget displaying the Vaccination Status card in the patient profile.
-///
-/// Supports two storage modes:
-/// 1. Personal  – `users/{uid}/vaccinations/{patientKey}`
-/// 2. Shared    – `barangays/{barangayId}/patients/{patientId}/vaccination/record`
+/// Vaccination Status card — styled to match ProfileInfoCard.
 class VaccinationStatusSection extends StatefulWidget {
   final String firstName;
   final String lastName;
@@ -47,61 +38,30 @@ class VaccinationStatusSection extends StatefulWidget {
   });
 
   @override
-  State<VaccinationStatusSection> createState() =>
-      _VaccinationStatusSectionState();
+  State<VaccinationStatusSection> createState() => _VaccinationStatusSectionState();
 }
 
 class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
-  // ─── Design tokens ──────────────────────────────────────────────────────────
-  static const Color _cardBg        = Color(0xFFB8E6D5);
-  static const Color _headerBg      = Color(0xFFD4F1E3);
-  static const Color _accentTeal    = Color(0xFF2E8B7B);
-  static const Color _positiveGreen = Color(0xFF27AE60);
-  static const Color _pendingAmber  = Color(0xFFFF9800);
-  static const Color _dividerColor  = Color(0xFFA0D8C5);
+  // ─── Design Tokens (matches ProfileInfoCard) ────────────────────────────────
+  static const Color _orange      = Color(0xFFF08030);
+  static const Color _orangeLight = Color(0xFFF5A962);
+  static const Color _surface     = Color(0xFFFFFFFF);
+  static const Color _surfaceDim  = Color(0xFFFAFAFA);
+  static const Color _border      = Color(0xFFE8E8ED);
+  static const Color _ink         = Color(0xFF1C1C1E);
+  static const Color _inkMid      = Color(0xFF6C6C70);
+  static const Color _green       = Color(0xFF34C759);
+  static const Color _greenBg     = Color(0xFFEDF7F1);
+  static const Color _greenText   = Color(0xFF1A7A3C);
+  static const Color _amber       = Color(0xFFF08030);
+  static const Color _amberBg     = Color(0xFFFFF6EE);
 
-  static const double _cardRadius  = 20;
-  static const double _innerRadius = 12;
-  static const double _pillRadius  = 30;
-  static const double _iconRadius  = 10;
-  static const double _bodyPadH    = 16;
-  static const double _bodyPadV    = 20;
-  static const double _sectionGap  = 16;
+  static const double _r  = 18;
+  static const double _ri = 12;
 
-  static List<BoxShadow> get _cardShadow => [
-    BoxShadow(
-      color: _accentTeal.withOpacity(0.18),
-      blurRadius: 16,
-      spreadRadius: 1,
-      offset: const Offset(0, 4),
-    ),
-    BoxShadow(
-      color: Colors.white.withOpacity(0.6),
-      blurRadius: 1,
-      offset: const Offset(0, -1),
-    ),
-  ];
-
-  static const TextStyle _headerTitleStyle = TextStyle(
-    fontSize: 17,
-    fontWeight: FontWeight.w800,
-    color: Colors.black87,
-    letterSpacing: 0.3,
-  );
-
-  static const TextStyle _sectionLabelStyle = TextStyle(
-    fontSize: 10,
-    fontWeight: FontWeight.w800,
-    color: _accentTeal,
-    letterSpacing: 1.4,
-  );
-
-  static const TextStyle _pillTextStyle = TextStyle(
-    fontSize: 12.5,
-    fontWeight: FontWeight.w600,
-    color: _accentTeal,
-    letterSpacing: 0.2,
-  );
+  static List<BoxShadow> get _shadow => [
+        BoxShadow(color: Colors.black.withOpacity(0.07), blurRadius: 20, offset: const Offset(0, 6)),
+      ];
 
   // ─── State ──────────────────────────────────────────────────────────────────
 
@@ -116,9 +76,7 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
       '${widget.firstName.trim().toLowerCase()}_${widget.lastName.trim().toLowerCase()}';
 
   DocumentReference get _docRef {
-    if (widget.useSharedStorage &&
-        widget.patientId != null &&
-        widget.barangayId != null) {
+    if (widget.useSharedStorage && widget.patientId != null && widget.barangayId != null) {
       return FirebaseFirestore.instance
           .collection('barangays')
           .doc(widget.barangayId)
@@ -128,11 +86,7 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
           .doc('record');
     }
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
-    return FirebaseFirestore.instance
-        .collection('users')
-        .doc(uid)
-        .collection('vaccinations')
-        .doc(_patientKey);
+    return FirebaseFirestore.instance.collection('users').doc(uid).collection('vaccinations').doc(_patientKey);
   }
 
   @override
@@ -152,11 +106,9 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
           if (value is bool) {
             loaded[v.key] = value ? v.possibleDoses.last : 'Pending';
           } else if (value is String) {
-            if (value == 'Completed' && !v.possibleDoses.contains('Completed')) {
-              loaded[v.key] = v.possibleDoses.last;
-            } else {
-              loaded[v.key] = value;
-            }
+            loaded[v.key] = (value == 'Completed' && !v.possibleDoses.contains('Completed'))
+                ? v.possibleDoses.last
+                : value;
           } else {
             loaded[v.key] = 'Pending';
           }
@@ -184,31 +136,20 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
     try {
       final now         = DateTime.now();
       final currentUser = FirebaseAuth.instance.currentUser;
-
-      String userName = 'Unknown';
+      String userName   = 'Unknown';
       if (currentUser != null) {
-        final userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(currentUser.uid)
-            .get();
-        userName = userDoc.data()?['fullName'] ??
-            userDoc.data()?['username'] ??
-            currentUser.email ??
-            'Unknown';
+        final userDoc = await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).get();
+        userName = userDoc.data()?['fullName'] ?? userDoc.data()?['username'] ?? currentUser.email ?? 'Unknown';
       }
-
-      final payload = <String, dynamic>{
-        'firstName':          widget.firstName,
-        'lastName':           widget.lastName,
+      await _docRef.set({
+        'firstName': widget.firstName,
+        'lastName':  widget.lastName,
         'lastReviewDate':     Timestamp.fromDate(now),
         'lastModifiedBy':     currentUser?.uid ?? '',
         'lastModifiedByName': userName,
         'updatedAt':          Timestamp.fromDate(now),
         ...updated,
-      };
-
-      await _docRef.set(payload, SetOptions(merge: true));
-
+      }, SetOptions(merge: true));
       setState(() {
         _statuses           = Map.from(updated);
         _lastReviewDate     = now;
@@ -218,30 +159,22 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
       debugPrint('Error saving vaccination: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to save vaccination: $e'),
-            backgroundColor: Colors.redAccent,
-          ),
+          SnackBar(content: Text('Failed to save: $e'), backgroundColor: Colors.redAccent),
         );
       }
     }
   }
 
-  // ─── Computed props ──────────────────────────────────────────────────────────
+  // ─── Computed ───────────────────────────────────────────────────────────────
 
   bool _isCompleted(String dose) => dose != 'Pending' && dose.isNotEmpty;
+  int  get _completedCount => _statuses.values.where(_isCompleted).length;
+  bool get _allCompleted   => _statuses.values.every(_isCompleted);
 
-  int get _completedCount => _statuses.values.where(_isCompleted).length;
-
-  bool get _allCompleted => _statuses.values.every(_isCompleted);
-
-  String _formatDate(DateTime? date) {
-    if (date == null) return 'N/A';
-    const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December',
-    ];
-    return '${months[date.month - 1]} ${date.day.toString().padLeft(2, '0')}, ${date.year}';
+  String _formatDate(DateTime? d) {
+    if (d == null) return 'N/A';
+    const m = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    return '${m[d.month - 1]} ${d.day.toString().padLeft(2, '0')}, ${d.year}';
   }
 
   // ─── Build ──────────────────────────────────────────────────────────────────
@@ -251,55 +184,68 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: _cardBg,
-        borderRadius: BorderRadius.circular(_cardRadius),
-        boxShadow: _cardShadow,
+        color: _surface,
+        borderRadius: BorderRadius.circular(_r),
+        border: Border.all(color: _border, width: 1),
+        boxShadow: _shadow,
       ),
+      clipBehavior: Clip.hardEdge,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Accent bar
+          Container(
+            height: 5,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(colors: [_orangeLight, _orange]),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(_r)),
+            ),
+          ),
           _buildHeader(),
+          const Divider(height: 1, color: _border),
           _loading ? _buildLoading() : _buildBody(),
         ],
       ),
     );
   }
 
-  // ─── Structural widgets ─────────────────────────────────────────────────────
+  // ─── Header ─────────────────────────────────────────────────────────────────
 
-  Widget _buildHeader() => Container(
-        width: double.infinity,
+  Widget _buildHeader() => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        decoration: const BoxDecoration(
-          color: _headerBg,
-          borderRadius:
-              BorderRadius.vertical(top: Radius.circular(_cardRadius)),
-        ),
         child: Row(
           children: [
-            _buildIconBox(Icons.health_and_safety_rounded),
+            _iconBox(Icons.health_and_safety_rounded),
             const SizedBox(width: 12),
             const Expanded(
-              child: Text('Vaccination Status', style: _headerTitleStyle),
+              child: Text(
+                'Vaccination Status',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                  color: _ink,
+                  letterSpacing: -0.3,
+                ),
+              ),
             ),
-            if (widget.useSharedStorage) _buildSharedBadge(),
+            if (widget.useSharedStorage) _sharedBadge(),
           ],
         ),
       );
 
-  Widget _buildIconBox(IconData icon) => Container(
+  Widget _iconBox(IconData icon) => Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: _accentTeal.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(_iconRadius),
+          color: _orange.withOpacity(0.10),
+          borderRadius: BorderRadius.circular(10),
         ),
-        child: Icon(icon, color: _accentTeal, size: 22),
+        child: Icon(icon, color: _orange, size: 20),
       );
 
-  Widget _buildSharedBadge() => Container(
+  Widget _sharedBadge() => Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          color: _accentTeal,
+          gradient: const LinearGradient(colors: [_orangeLight, _orange]),
           borderRadius: BorderRadius.circular(20),
         ),
         child: const Row(
@@ -307,149 +253,117 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
           children: [
             Icon(Icons.people_rounded, size: 12, color: Colors.white),
             SizedBox(width: 4),
-            Text(
-              'Shared',
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
+            Text('Shared', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white)),
           ],
         ),
       );
 
   Widget _buildLoading() => const Padding(
-        padding: EdgeInsets.all(32),
-        child: Center(
-          child: CircularProgressIndicator(color: _accentTeal),
-        ),
-      );
-
-  Widget _buildDatePill(String label) => Center(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-          decoration: BoxDecoration(
-            color: _accentTeal.withOpacity(0.12),
-            borderRadius: BorderRadius.circular(_pillRadius),
-            border: Border.all(color: _accentTeal.withOpacity(0.25), width: 1),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.calendar_today_rounded,
-                  size: 13, color: _accentTeal),
-              const SizedBox(width: 6),
-              Text(label, style: _pillTextStyle),
-            ],
-          ),
-        ),
-      );
-
-  Widget _buildActionButton({
-    required String label,
-    required IconData icon,
-    required VoidCallback onTap,
-  }) =>
-      Center(
-        child: GestureDetector(
-          onTap: onTap,
-          child: Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 28, vertical: 11),
-            decoration: BoxDecoration(
-              color: _accentTeal,
-              borderRadius: BorderRadius.circular(_pillRadius),
-              boxShadow: [
-                BoxShadow(
-                  color: _accentTeal.withOpacity(0.35),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, size: 16, color: Colors.white),
-                const SizedBox(width: 8),
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                    letterSpacing: 0.3,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+        padding: EdgeInsets.all(36),
+        child: Center(child: CircularProgressIndicator(color: _orange)),
       );
 
   // ─── Body ───────────────────────────────────────────────────────────────────
 
   Widget _buildBody() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(_bodyPadH, 4, _bodyPadH, _bodyPadV),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildDatePill('Last Review: ${_formatDate(_lastReviewDate)}'),
+          // Date pill
+          _datePill('Last Review: ${_formatDate(_lastReviewDate)}'),
           if (_lastModifiedByName != null && widget.useSharedStorage) ...[
             const SizedBox(height: 6),
-            Center(
-              child: Text(
-                'Updated by: $_lastModifiedByName',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.black.withOpacity(0.45),
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
+            Text(
+              'Updated by: $_lastModifiedByName',
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: _inkMid, fontStyle: FontStyle.italic),
             ),
           ],
-          const SizedBox(height: _sectionGap),
+          const SizedBox(height: 14),
 
-          // ── Progress card ──
+          // Progress card
           _buildProgressCard(),
-          const SizedBox(height: _sectionGap),
+          const SizedBox(height: 16),
 
-          // ── Vaccine list ──
-          const Divider(color: _dividerColor, thickness: 1.2),
+          // Vaccine list
+          const Divider(height: 1, color: _border),
           const SizedBox(height: 12),
-          const Text('IMMUNIZATION RECORD', style: _sectionLabelStyle),
+          const Text(
+            'IMMUNIZATION RECORD',
+            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: _inkMid, letterSpacing: 1.2),
+          ),
           const SizedBox(height: 10),
           ..._vaccines.map((v) {
             final dose      = _statuses[v.key] ?? 'Pending';
             final completed = _isCompleted(dose);
-            return _buildVaccineRow(v.displayName, dose, completed);
+            return _vaccineRow(v.displayName, dose, completed);
           }),
-          const SizedBox(height: _sectionGap),
+          const SizedBox(height: 16),
 
-          _buildActionButton(
-            icon: Icons.edit_rounded,
-            label: 'Update Record',
-            onTap: () => _showUpdateSheet(context),
+          // Update button
+          Center(
+            child: GestureDetector(
+              onTap: () => _showUpdateSheet(context),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 11),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(colors: [_orangeLight, _orange]),
+                  borderRadius: BorderRadius.circular(30),
+                  boxShadow: [
+                    BoxShadow(color: _orange.withOpacity(0.28), blurRadius: 12, offset: const Offset(0, 4)),
+                  ],
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.edit_rounded, size: 16, color: Colors.white),
+                    SizedBox(width: 8),
+                    Text(
+                      'Update Record',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 0.3),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
+  Widget _datePill(String label) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: _orange.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(color: _orange.withOpacity(0.20), width: 1),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.calendar_today_rounded, size: 13, color: _orange),
+            const SizedBox(width: 7),
+            Text(
+              label,
+              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: _orange, letterSpacing: 0.1),
+            ),
+          ],
+        ),
+      );
+
   Widget _buildProgressCard() {
-    final total    = _vaccines.length;
+    final total     = _vaccines.length;
     final completed = _completedCount;
     final progress  = total == 0 ? 0.0 : completed / total;
 
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.45),
-        borderRadius: BorderRadius.circular(_innerRadius + 2),
-        border: Border.all(color: Colors.white.withOpacity(0.7), width: 1),
+        color: _surfaceDim,
+        borderRadius: BorderRadius.circular(_ri),
+        border: Border.all(color: _border, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -459,22 +373,25 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
             children: [
               Row(
                 children: [
-                  Icon(
-                    _allCompleted
-                        ? Icons.check_circle_rounded
-                        : Icons.timelapse_rounded,
-                    size: 18,
-                    color: _allCompleted ? _positiveGreen : _accentTeal,
+                  Container(
+                    padding: const EdgeInsets.all(5),
+                    decoration: BoxDecoration(
+                      color: _allCompleted ? _greenBg : _amberBg,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      _allCompleted ? Icons.check_circle_rounded : Icons.timelapse_rounded,
+                      size: 14,
+                      color: _allCompleted ? _greenText : _amber,
+                    ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 10),
                   Text(
-                    _allCompleted
-                        ? 'All vaccinations complete'
-                        : '$completed of $total vaccines completed',
+                    _allCompleted ? 'All vaccinations complete' : '$completed of $total completed',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: _allCompleted ? _positiveGreen : Colors.black87,
+                      color: _allCompleted ? _greenText : _ink,
                     ),
                   ),
                 ],
@@ -484,7 +401,7 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w800,
-                  color: _allCompleted ? _positiveGreen : _accentTeal,
+                  color: _allCompleted ? _greenText : _orange,
                 ),
               ),
             ],
@@ -494,10 +411,10 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
             borderRadius: BorderRadius.circular(6),
             child: LinearProgressIndicator(
               value: progress,
-              minHeight: 8,
-              backgroundColor: _dividerColor.withOpacity(0.5),
+              minHeight: 7,
+              backgroundColor: _border,
               valueColor: AlwaysStoppedAnimation<Color>(
-                _allCompleted ? _positiveGreen : _accentTeal,
+                _allCompleted ? _green : _orange,
               ),
             ),
           ),
@@ -506,54 +423,58 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
     );
   }
 
-  Widget _buildVaccineRow(String name, String dose, bool completed) {
+  Widget _vaccineRow(String name, String dose, bool completed) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          Icon(
-            completed
-                ? Icons.check_circle_rounded
-                : Icons.radio_button_unchecked_rounded,
-            size: 18,
-            color: completed
-                ? _positiveGreen
-                : _pendingAmber.withOpacity(0.8),
-          ),
-          const SizedBox(width: 10),
-          SizedBox(
-            width: 110,
-            child: Text(
-              name,
-              style: TextStyle(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w600,
-                color: Colors.black.withOpacity(0.8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: _surfaceDim,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: _border, width: 1),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: completed ? _greenBg : _amberBg,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Icon(
+                completed ? Icons.check_rounded : Icons.schedule_rounded,
+                size: 12,
+                color: completed ? _greenText : _amber,
               ),
             ),
-          ),
-          Expanded(
-            child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: completed
-                    ? _positiveGreen.withOpacity(0.12)
-                    : _pendingAmber.withOpacity(0.10),
-                borderRadius: BorderRadius.circular(_pillRadius),
-              ),
+            const SizedBox(width: 10),
+            SizedBox(
+              width: 100,
               child: Text(
-                dose,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w700,
-                  color: completed ? _positiveGreen : _pendingAmber,
+                name,
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _ink),
+              ),
+            ),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: completed ? _greenBg : _amberBg,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  dose,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: completed ? _greenText : _amber,
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -568,10 +489,8 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) => Container(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(ctx).size.height * 0.85,
-          ),
+        builder: (ctx, setSheet) => Container(
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.85),
           decoration: const BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
@@ -581,16 +500,12 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
             children: [
               // Handle
               Container(
-                width: 40,
-                height: 4,
+                width: 40, height: 4,
                 margin: const EdgeInsets.only(top: 14, bottom: 20),
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
-                ),
+                decoration: BoxDecoration(color: _border, borderRadius: BorderRadius.circular(2)),
               ),
 
-              // Header
+              // Sheet header
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: Row(
@@ -598,11 +513,10 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
                     Container(
                       padding: const EdgeInsets.all(9),
                       decoration: BoxDecoration(
-                        color: _accentTeal.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(_iconRadius),
+                        color: _orange.withOpacity(0.10),
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(Icons.edit_rounded,
-                          color: _accentTeal, size: 20),
+                      child: const Icon(Icons.edit_rounded, color: _orange, size: 20),
                     ),
                     const SizedBox(width: 12),
                     Column(
@@ -610,19 +524,11 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
                       children: [
                         const Text(
                           'Update Vaccination Record',
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w800,
-                            color: _accentTeal,
-                          ),
+                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: _ink),
                         ),
                         Text(
                           '${widget.firstName} ${widget.lastName}',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.black54,
-                          ),
+                          style: const TextStyle(fontSize: 13, color: _inkMid),
                         ),
                       ],
                     ),
@@ -632,37 +538,32 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
 
               if (widget.useSharedStorage) ...[
                 const SizedBox(height: 10),
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 24),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE8F5E9),
-                    borderRadius: BorderRadius.circular(_innerRadius),
-                    border: Border.all(
-                        color: _accentTeal.withOpacity(0.25)),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.people_rounded,
-                          size: 14, color: _accentTeal),
-                      SizedBox(width: 6),
-                      Text(
-                        'Changes will be shared with barangay team',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: _accentTeal,
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: _amberBg,
+                      borderRadius: BorderRadius.circular(_ri),
+                      border: Border.all(color: _orange.withOpacity(0.25)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.people_rounded, size: 14, color: _orange),
+                        SizedBox(width: 6),
+                        Text(
+                          'Changes will be shared with barangay team',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _orange),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ],
 
               const SizedBox(height: 16),
-              const Divider(height: 1, color: Color(0xFFEEEEEE)),
+              const Divider(height: 1, color: _border),
 
               // Vaccine rows
               Flexible(
@@ -670,41 +571,28 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
                   shrinkWrap: true,
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
                   children: _vaccines.map((v) {
-                    final currentDose = draft[v.key] ?? 'Pending';
-                    final dropdownValue = (currentDose == 'Completed' &&
-                            !v.possibleDoses.contains('Completed'))
+                    final current     = draft[v.key] ?? 'Pending';
+                    final dropVal     = (current == 'Completed' && !v.possibleDoses.contains('Completed'))
                         ? v.possibleDoses.last
-                        : (v.possibleDoses.contains(currentDose)
-                            ? currentDose
-                            : v.possibleDoses.first);
-                    final isCompleted = _isCompleted(currentDose);
+                        : (v.possibleDoses.contains(current) ? current : v.possibleDoses.first);
+                    final isCompleted = _isCompleted(current);
 
                     return Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.only(bottom: 10),
                       child: Container(
                         padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
                         decoration: BoxDecoration(
-                          color: isCompleted
-                              ? _positiveGreen.withOpacity(0.07)
-                              : _pendingAmber.withOpacity(0.07),
-                          borderRadius:
-                              BorderRadius.circular(_innerRadius + 2),
+                          color: isCompleted ? _greenBg : _amberBg,
+                          borderRadius: BorderRadius.circular(_ri),
                           border: Border.all(
-                            color: isCompleted
-                                ? _positiveGreen.withOpacity(0.3)
-                                : _pendingAmber.withOpacity(0.3),
-                            width: 1,
+                            color: isCompleted ? _green.withOpacity(0.35) : _amber.withOpacity(0.35),
                           ),
                         ),
                         child: Row(
                           children: [
                             Icon(
-                              isCompleted
-                                  ? Icons.check_circle_rounded
-                                  : Icons.radio_button_unchecked_rounded,
-                              color: isCompleted
-                                  ? _positiveGreen
-                                  : _pendingAmber,
+                              isCompleted ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                              color: isCompleted ? _greenText : _amber,
                               size: 20,
                             ),
                             const SizedBox(width: 12),
@@ -712,79 +600,48 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
                               flex: 2,
                               child: Text(
                                 v.displayName,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.black87,
-                                ),
+                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _ink),
                               ),
                             ),
                             Expanded(
                               flex: 3,
                               child: DropdownButtonFormField<String>(
-                                value: dropdownValue,
+                                value: dropVal,
                                 isExpanded: true,
                                 decoration: InputDecoration(
-                                  contentPadding:
-                                      const EdgeInsets.symmetric(
-                                          horizontal: 12, vertical: 8),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                   border: OutlineInputBorder(
-                                    borderRadius:
-                                        BorderRadius.circular(10),
-                                    borderSide: BorderSide(
-                                      color: isCompleted
-                                          ? _positiveGreen
-                                          : _pendingAmber,
-                                    ),
+                                    borderRadius: BorderRadius.circular(10),
+                                    borderSide: BorderSide(color: isCompleted ? _green : _amber),
                                   ),
                                   enabledBorder: OutlineInputBorder(
-                                    borderRadius:
-                                        BorderRadius.circular(10),
+                                    borderRadius: BorderRadius.circular(10),
                                     borderSide: BorderSide(
-                                      color: isCompleted
-                                          ? _positiveGreen
-                                              .withOpacity(0.5)
-                                          : _pendingAmber.withOpacity(0.5),
+                                      color: isCompleted ? _green.withOpacity(0.5) : _amber.withOpacity(0.5),
                                     ),
                                   ),
                                   focusedBorder: OutlineInputBorder(
-                                    borderRadius:
-                                        BorderRadius.circular(10),
-                                    borderSide: const BorderSide(
-                                      color: _accentTeal,
-                                      width: 2,
-                                    ),
+                                    borderRadius: BorderRadius.circular(10),
+                                    borderSide: const BorderSide(color: _orange, width: 2),
                                   ),
                                   filled: true,
                                   fillColor: Colors.white,
                                 ),
-                                items: v.possibleDoses.map((dose) {
-                                  return DropdownMenuItem<String>(
-                                    value: dose,
-                                    child: Text(
-                                      dose,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: dose == 'Pending'
-                                            ? FontWeight.w500
-                                            : FontWeight.w700,
-                                        color: dose == 'Pending'
-                                            ? _pendingAmber
-                                            : Colors.black87,
-                                      ),
+                                items: v.possibleDoses.map((dose) => DropdownMenuItem(
+                                  value: dose,
+                                  child: Text(
+                                    dose,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: dose == 'Pending' ? FontWeight.w500 : FontWeight.w700,
+                                      color: dose == 'Pending' ? _amber : _ink,
                                     ),
-                                  );
-                                }).toList(),
-                                onChanged: (value) {
-                                  if (value != null) {
-                                    setSheetState(
-                                        () => draft[v.key] = value);
-                                  }
+                                  ),
+                                )).toList(),
+                                onChanged: (val) {
+                                  if (val != null) setSheet(() => draft[v.key] = val);
                                 },
-                                icon: const Icon(
-                                  Icons.keyboard_arrow_down_rounded,
-                                  color: _accentTeal,
-                                ),
+                                icon: const Icon(Icons.keyboard_arrow_down_rounded, color: _orange),
                               ),
                             ),
                           ],
@@ -806,30 +663,25 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
                       if (ctx.mounted) Navigator.pop(ctx);
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Vaccination record updated.'),
-                            backgroundColor: _accentTeal,
+                          SnackBar(
+                            content: const Text('Vaccination record updated.'),
+                            backgroundColor: _orange,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
                         );
                       }
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _accentTeal,
+                      backgroundColor: _orange,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(_pillRadius),
-                      ),
-                      elevation: 4,
-                      shadowColor: _accentTeal.withOpacity(0.4),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                      elevation: 0,
                     ),
                     child: const Text(
                       'Save Changes',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.5,
-                      ),
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, letterSpacing: 0.5),
                     ),
                   ),
                 ),
