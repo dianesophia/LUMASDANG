@@ -55,7 +55,7 @@ class AboutLumasdang extends StatelessWidget {
                         const Expanded(
                           child: Center(
                             child: Text(
-                              "About Lumasdang",
+                              "About Lµmasdαng",
                               style: TextStyle(
                                 fontSize: 22,
                                 fontWeight: FontWeight.w700,
@@ -137,7 +137,7 @@ class AboutLumasdang extends StatelessWidget {
                                         ),
                                         const SizedBox(height: 12),
                                         const Text(
-                                          "Lumasdang",
+                                          "Lµmasdαng",
                                           style: TextStyle(
                                             fontSize: 22,
                                             fontWeight: FontWeight.w800,
@@ -147,7 +147,7 @@ class AboutLumasdang extends StatelessWidget {
                                         ),
                                         const SizedBox(height: 4),
                                         Text(
-                                          "Nutrition Monitoring App · v1.0.0",
+                                          "Malnutrition Monitoring MHealth App · v1.0.0",
                                           style: TextStyle(
                                             fontSize: 12,
                                             color: Colors.grey.shade500,

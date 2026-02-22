@@ -1394,36 +1394,34 @@ Future<Map<String, int>> getTodayStatusCounts() async {
       final anthropometric = doc.data()['anthropometric'] as Map<String, dynamic>?;
       if (anthropometric == null) continue;
 
-      final weightForAge   = (anthropometric['weightForAge']   as String? ?? '').toLowerCase();
-      final heightForAge   = (anthropometric['heightForAge']   as String? ?? '').toLowerCase();
-      final weightForHeight= (anthropometric['weightForHeight'] as String? ?? '').toLowerCase();
-      final bmi            = (anthropometric['bmi']            as String? ?? '').toLowerCase();
+      final wfa  = (anthropometric['weightForAge']    as String? ?? '').toLowerCase();
+      final hfa  = (anthropometric['heightForAge']    as String? ?? '').toLowerCase();
+      final wfh  = (anthropometric['weightForHeight'] as String? ?? '').toLowerCase();
+      final bmi  = (anthropometric['bmi']             as String? ?? '').toLowerCase();
 
-      // ── Underweight ───────────────────────────────────────────────
-      if (weightForAge.contains('underweight') ||
-          weightForAge.contains('severely underweight')) {
+      // ── Underweight (includes severely underweight) ───────────────
+      if (wfa.contains('underweight') || bmi.contains('underweight')) {
         counts['Underweight'] = counts['Underweight']! + 1;
       }
 
-      // ── Overweight / Obese ────────────────────────────────────────
-      if (weightForAge.contains('overweight') ||
-          weightForAge.contains('obese') ||
-          weightForHeight.contains('overweight') ||
-          weightForHeight.contains('obese') ||
-          bmi.contains('overweight') ||
-          bmi.contains('obese')) {
+      // ── Overweight / Obese (includes "at risk of overweight") ─────
+      // Matches: "overweight", "obese", "at risk of overweight"
+      if (wfa.contains('overweight') || wfa.contains('obese') ||
+          wfh.contains('overweight') || wfh.contains('obese') ||
+          bmi.contains('overweight') || bmi.contains('obese')) {
         counts['Overweight'] = counts['Overweight']! + 1;
       }
 
-      // ── Stunted ───────────────────────────────────────────────────
-      if (heightForAge.contains('stunted')) {
+      // ── Stunted (includes severely stunted) ───────────────────────
+      if (hfa.contains('stunted')) {
         counts['Stunted'] = counts['Stunted']! + 1;
       }
 
-      // ── At Risk ───────────────────────────────────────────────────
-      if (weightForAge.contains('at risk') ||
-          weightForHeight.contains('at risk') ||
-          bmi.contains('at risk')) {
+      // ── At Risk (wasted / severe wasting / at risk of overweight) ─
+      if (wfh.contains('wasted') ||
+          wfa.contains('at risk') ||
+          bmi.contains('at risk') ||
+          wfh.contains('at risk')) {
         counts['At Risk'] = counts['At Risk']! + 1;
       }
     }

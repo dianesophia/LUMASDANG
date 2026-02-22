@@ -149,7 +149,7 @@ class PrivacyPolicy extends StatelessWidget {
                                               ),
                                             ),
                                             Text(
-                                              "Last updated: 2024",
+                                              "Last updated: 2026",
                                               style: TextStyle(
                                                 fontSize: 12,
                                                 color: Colors.grey,

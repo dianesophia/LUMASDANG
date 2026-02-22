@@ -2,12 +2,6 @@ import 'package:flutter/material.dart';
 import '../../patient_list.dart';
 import 'profile_info_card.dart';
 
-/// Parent / Guardian Contact Information tab.
-/// Displays the parent/guardian details for a given patient,
-/// matching the rounded-card design shown in the mockup.
-///
-/// Preferred contact method state is owned by the parent widget
-/// so it survives tab switches and is persisted to Firestore.
 class ParentContactTab extends StatelessWidget {
   final Patient patient;
   final bool preferPhoneCall;
@@ -24,410 +18,258 @@ class ParentContactTab extends StatelessWidget {
     required this.onSMSChanged,
   });
 
-  /// Determine the primary guardian name and relationship.
-  /// Prefers mother data if available, falls back to father.
-  String get _guardianName {
-    if (patient.motherName.isNotEmpty) return patient.motherName;
-    if (patient.fatherName.isNotEmpty) return patient.fatherName;
-    return 'N/A';
-  }
+  // ── Derived fields ────────────────────────────────────────────────────────
+  String get _guardianName =>
+      patient.motherName.isNotEmpty ? patient.motherName :
+      patient.fatherName.isNotEmpty ? patient.fatherName : 'N/A';
 
-  String get _relationship {
-    if (patient.motherName.isNotEmpty) return 'Mother';
-    if (patient.fatherName.isNotEmpty) return 'Father';
-    return 'N/A';
-  }
+  String get _relationship =>
+      patient.motherName.isNotEmpty ? 'Mother' :
+      patient.fatherName.isNotEmpty ? 'Father' : 'N/A';
 
-  String get _primaryPhone {
-    if (patient.motherContact.isNotEmpty) return patient.motherContact;
-    if (patient.fatherContact.isNotEmpty) return patient.fatherContact;
-    return 'N/A';
-  }
+  String get _primaryPhone =>
+      patient.motherContact.isNotEmpty ? patient.motherContact :
+      patient.fatherContact.isNotEmpty ? patient.fatherContact : 'N/A';
 
-  String get _secondaryPhone {
-    if (patient.motherContact.isNotEmpty &&
-        patient.fatherContact.isNotEmpty) {
-      return patient.fatherContact;
-    }
-    return 'N/A';
-  }
+  String get _secondaryPhone =>
+      (patient.motherContact.isNotEmpty && patient.fatherContact.isNotEmpty)
+          ? patient.fatherContact : 'N/A';
 
-  String get _guardianAddress {
-    return patient.address.isNotEmpty ? patient.address : 'N/A';
-  }
+  String get _guardianAddress =>
+      patient.address.isNotEmpty ? patient.address : 'N/A';
 
-  /// Emergency contact: the *other* parent (father if mother is primary, etc.)
-  String get _emergencyName {
-    if (patient.fatherName.isNotEmpty) {
-      return '${patient.fatherName} - Father';
-    }
-    if (patient.motherName.isNotEmpty) {
-      return '${patient.motherName} - Mother';
-    }
-    return 'N/A';
-  }
+  String get _emergencyName =>
+      patient.fatherName.isNotEmpty ? '${patient.fatherName} (Father)' :
+      patient.motherName.isNotEmpty ? '${patient.motherName} (Mother)' : 'N/A';
 
-  String get _emergencyPhone {
-    if (patient.fatherContact.isNotEmpty) return patient.fatherContact;
-    if (patient.motherContact.isNotEmpty) return patient.motherContact;
-    return 'N/A';
-  }
+  String get _emergencyPhone =>
+      patient.fatherContact.isNotEmpty ? patient.fatherContact :
+      patient.motherContact.isNotEmpty ? patient.motherContact : 'N/A';
 
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 16),
-
-          // ===== AVATAR + INFO CARD (same as profile) =====
           ProfileInfoCard(patient: patient),
-          const SizedBox(height: 24),
-
-          // ===== CONTACT INFO CARDS =====
-          _ContactInfoCard(
-            label: 'Parent / Guardian Name',
-            value: _guardianName,
-          ),
-          const SizedBox(height: 14),
-
-          _ContactInfoCard(
-            label: 'Relationship to Child:',
-            value: _relationship,
-          ),
-          const SizedBox(height: 14),
-
-          _ContactInfoCard(
-            label: 'Primary Phone Number',
-            value: _primaryPhone,
-          ),
-          const SizedBox(height: 14),
-
-          _ContactInfoCard(
-            label: 'Secondary Phone Number',
-            value: _secondaryPhone,
-          ),
-          const SizedBox(height: 14),
-
-          _ContactInfoCard(
-            label: 'Address',
-            value: _guardianAddress,
-          ),
           const SizedBox(height: 20),
 
-          // ===== EMERGENCY CONTACT =====
-          _EmergencyContactCard(
-            name: _emergencyName,
-            phone: _emergencyPhone,
+          // ── Section label ─────────────────────────────────────────────
+          _sectionLabel('GUARDIAN INFORMATION'),
+          const SizedBox(height: 10),
+
+          // ── Guardian details card ─────────────────────────────────────
+          _frostedCard(
+            children: [
+              _infoRow(Icons.person_outline_rounded, 'Name', _guardianName),
+              _divider(),
+              _infoRow(Icons.family_restroom_outlined, 'Relationship', _relationship),
+              _divider(),
+              _infoRow(Icons.phone_outlined, 'Primary Phone', _primaryPhone),
+              _divider(),
+              _infoRow(Icons.phone_in_talk_outlined, 'Secondary Phone', _secondaryPhone),
+              _divider(),
+              _infoRow(Icons.location_on_outlined, 'Address', _guardianAddress),
+            ],
           ),
+
           const SizedBox(height: 20),
 
-          // ===== PREFERRED CONTACT METHOD =====
-          _PreferredContactMethodCard(
-            phoneCall: preferPhoneCall,
-            sms: preferSMS,
-            onPhoneCallChanged: onPhoneCallChanged,
-            onSMSChanged: onSMSChanged,
+          // ── Section label ─────────────────────────────────────────────
+          _sectionLabel('EMERGENCY CONTACT'),
+          const SizedBox(height: 10),
+
+          _frostedCard(
+            children: [
+              _infoRow(Icons.emergency_outlined, 'Name', _emergencyName),
+              _divider(),
+              _infoRow(Icons.phone_outlined, 'Phone', _emergencyPhone),
+            ],
           ),
-          const SizedBox(height: 24),
+
+          const SizedBox(height: 20),
+
+          // ── Section label ─────────────────────────────────────────────
+          _sectionLabel('PREFERRED CONTACT METHOD'),
+          const SizedBox(height: 10),
+
+          // ── Preferred contact toggle ──────────────────────────────────
+          _frostedCard(
+            children: [
+              _contactToggle(
+                icon: Icons.phone_outlined,
+                label: 'Phone Call',
+                value: preferPhoneCall,
+                onChanged: onPhoneCallChanged,
+              ),
+              _divider(),
+              _contactToggle(
+                icon: Icons.sms_outlined,
+                label: 'SMS / Text Message',
+                value: preferSMS,
+                onChanged: onSMSChanged,
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
-}
 
-/// A rounded card with a header pill and bullet-point value,
-/// using the same light-teal style as Emergency Contact / Preferred Contact.
-class _ContactInfoCard extends StatelessWidget {
-  final String label;
-  final String value;
+  // ── Helpers ───────────────────────────────────────────────────────────────
 
-  const _ContactInfoCard({
-    required this.label,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: const Color(0xFFB5DDD4),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 6,
-            offset: const Offset(0, 3),
+  Widget _sectionLabel(String text) => Padding(
+        padding: const EdgeInsets.only(left: 4),
+        child: Text(
+          text,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: Colors.white.withOpacity(0.65),
+            letterSpacing: 1.4,
           ),
-        ],
-      ),
-      child: Column(
-        children: [
-          // ── Header pill ──
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            decoration: BoxDecoration(
-              color: const Color(0xFF7FBFB3),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              label,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                fontStyle: FontStyle.italic,
-                color: Color(0xFF1A3C34),
+        ),
+      );
+
+  Widget _frostedCard({required List<Widget> children}) => Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.18),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withOpacity(0.28), width: 1),
+        ),
+        clipBehavior: Clip.hardEdge,
+        child: Column(children: children),
+      );
+
+  Widget _divider() => Container(
+        height: 1,
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        color: Colors.white.withOpacity(0.15),
+      );
+
+  Widget _infoRow(IconData icon, String label, String value) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Icon badge
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
               ),
+              child: Icon(icon, color: Colors.white, size: 17),
             ),
-          ),
-
-          // ── Bullet value ──
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Padding(
-                  padding: EdgeInsets.only(top: 3),
-                  child: Icon(Icons.circle, size: 8, color: Color(0xFF1A3C34)),
-                ),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white.withOpacity(0.55),
+                      letterSpacing: 0.4,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
                     value,
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF1A3C34),
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Chevron hint
+            Icon(Icons.chevron_right_rounded,
+                color: Colors.white.withOpacity(0.25), size: 20),
+          ],
+        ),
+      );
+
+  Widget _contactToggle({
+    required IconData icon,
+    required String label,
+    required bool value,
+    required ValueChanged<bool?> onChanged,
+  }) =>
+      GestureDetector(
+        onTap: () => onChanged(!value),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          color: value ? Colors.white.withOpacity(0.1) : Colors.transparent,
+          child: Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: value
+                      ? Colors.white.withOpacity(0.3)
+                      : Colors.white.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon,
+                    color: value ? Colors.white : Colors.white.withOpacity(0.5),
+                    size: 17),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: value ? FontWeight.w700 : FontWeight.w400,
+                    color: value ? Colors.white : Colors.white.withOpacity(0.6),
+                  ),
+                ),
+              ),
+              // Toggle pill
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                width: 44,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: value ? Colors.white : Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: value
+                        ? Colors.white
+                        : Colors.white.withOpacity(0.35),
+                    width: 1,
+                  ),
+                ),
+                child: AnimatedAlign(
+                  duration: const Duration(milliseconds: 180),
+                  alignment:
+                      value ? Alignment.centerRight : Alignment.centerLeft,
+                  child: Container(
+                    width: 18,
+                    height: 18,
+                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                    decoration: BoxDecoration(
+                      color: value
+                          ? const Color(0xFF2E8B7B)
+                          : Colors.white.withOpacity(0.5),
+                      shape: BoxShape.circle,
                     ),
                   ),
                 ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Emergency Contact card with a light teal background,
-/// showing the emergency contact name + relationship and phone number.
-class _EmergencyContactCard extends StatelessWidget {
-  final String name;
-  final String phone;
-
-  const _EmergencyContactCard({
-    required this.name,
-    required this.phone,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: const Color(0xFFB5DDD4),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 6,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          // ── Header pill ──
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            decoration: BoxDecoration(
-              color: const Color(0xFF7FBFB3),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Text(
-              'Emergency Contact',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                fontStyle: FontStyle.italic,
-                color: Color(0xFF1A3C34),
               ),
-            ),
+            ],
           ),
-
-          // ── Content ──
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Name + relationship
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Padding(
-                      padding: EdgeInsets.only(top: 3),
-                      child: Icon(Icons.circle, size: 8, color: Color(0xFF1A3C34)),
-                    ),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        name,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF1A3C34),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                // Phone
-                Padding(
-                  padding: const EdgeInsets.only(left: 16),
-                  child: Text(
-                    'Phone: $phone',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: Color(0xFF2A4F47),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Preferred Contact Method card with checkboxes for Phone call and SMS.
-class _PreferredContactMethodCard extends StatelessWidget {
-  final bool phoneCall;
-  final bool sms;
-  final ValueChanged<bool?> onPhoneCallChanged;
-  final ValueChanged<bool?> onSMSChanged;
-
-  const _PreferredContactMethodCard({
-    required this.phoneCall,
-    required this.sms,
-    required this.onPhoneCallChanged,
-    required this.onSMSChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: const Color(0xFFB5DDD4),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 6,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          // ── Header pill ──
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            decoration: BoxDecoration(
-              color: const Color(0xFF7FBFB3),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Text(
-              'Preferred Contact Method',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                fontStyle: FontStyle.italic,
-                color: Color(0xFF1A3C34),
-              ),
-            ),
-          ),
-
-          // ── Checkboxes ──
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Phone call
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Checkbox(
-                      value: phoneCall,
-                      onChanged: onPhoneCallChanged,
-                      activeColor: const Color(0xFF2E8B7B),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      side: const BorderSide(
-                        color: Color(0xFF2A4F47),
-                        width: 2,
-                      ),
-                    ),
-                    const Text(
-                      'Phone call',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF1A3C34),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(width: 16),
-                // SMS
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Checkbox(
-                      value: sms,
-                      onChanged: onSMSChanged,
-                      activeColor: const Color(0xFF2E8B7B),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      side: const BorderSide(
-                        color: Color(0xFF2A4F47),
-                        width: 2,
-                      ),
-                    ),
-                    const Text(
-                      'SMS',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF1A3C34),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+        ),
+      );
 }

@@ -346,7 +346,7 @@ class _LoadingScreenState extends State<LoadingScreen>
           children: [
             // App name
             Text(
-              'LUMASDANG',
+              'Lµmasdαng',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 30,

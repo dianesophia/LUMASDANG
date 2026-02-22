@@ -134,7 +134,7 @@ class MainAboutLumasdang extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 const Text(
-                                  "Lumasdang",
+                                  "Lµmasdαng",
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontSize: 18,
@@ -177,7 +177,7 @@ class MainAboutLumasdang extends StatelessWidget {
                             children: [
                               _menuItem(
                                 context: context,
-                                title: "About Lumasdang",
+                                title: "About Lµmasdαng",
                                 subtitle: "Learn more about this app",
                                 icon: Icons.info_outline_rounded,
                                 showDivider: true,

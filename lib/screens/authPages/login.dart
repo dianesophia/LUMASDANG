@@ -463,7 +463,7 @@ class _LoginPageState extends State<LoginPage>
                                 ),
                                 const SizedBox(height: 20),
                                 const Text(
-                                  'Lumasdang',
+                                  'Lµmasdαng',
                                   style: TextStyle(
                                     fontSize: 40,
                                     fontWeight: FontWeight.w800,

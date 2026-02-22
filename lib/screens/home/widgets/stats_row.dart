@@ -6,7 +6,7 @@ import 'status_row.dart';
 
 class StatsRow extends StatefulWidget {
   final VoidCallback? onTap;
-
+  // Add a key to allow parent to force rebuild: Key(DateTime.now().toString())
   const StatsRow({super.key, this.onTap});
 
   @override
@@ -14,6 +14,22 @@ class StatsRow extends StatefulWidget {
 }
 
 class _StatsRowState extends State<StatsRow> {
+  late Future<int> _todayCountFuture;
+  late Future<Map<String, int>> _statusCountsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _refresh();
+  }
+
+  void _refresh() {
+    setState(() {
+      _todayCountFuture = _loadTodayCount();
+      _statusCountsFuture = _loadStatusCounts();
+    });
+  }
+
   Future<int> _loadTodayCount() async {
     await LocalDbService.instance.init();
     final online = await ConnectivityService.instance.checkOnline();
@@ -46,7 +62,7 @@ class _StatsRowState extends State<StatsRow> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // ── Left card: today's screened count ────────────────────────
+          // ── Left card ──────────────────────────────────────────────
           Expanded(
             flex: 2,
             child: GestureDetector(
@@ -73,10 +89,9 @@ class _StatsRowState extends State<StatsRow> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: FutureBuilder<int>(
-                        future: _loadTodayCount(),
+                        future: _todayCountFuture,
                         builder: (context, snapshot) {
-                          final count =
-                              snapshot.hasData ? snapshot.data! : null;
+                          final count = snapshot.hasData ? snapshot.data! : null;
                           return Text(
                             count != null ? '$count' : '—',
                             style: const TextStyle(
@@ -128,12 +143,11 @@ class _StatsRowState extends State<StatsRow> {
 
           const SizedBox(width: 12),
 
-          // ── Right card: status counts ─────────────────────────────────
+          // ── Right card ─────────────────────────────────────────────
           Expanded(
             flex: 2,
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
@@ -146,7 +160,7 @@ class _StatsRowState extends State<StatsRow> {
                 ],
               ),
               child: FutureBuilder<Map<String, int>>(
-                future: _loadStatusCounts(),
+                future: _statusCountsFuture,
                 builder: (context, snapshot) {
                   final counts = snapshot.data ?? {};
                   final uw = counts['Underweight'] ?? 0;
@@ -161,10 +175,7 @@ class _StatsRowState extends State<StatsRow> {
                     children: [
                       StatusRow(count: '$uw', label: 'Underweight'),
                       const SizedBox(height: 2),
-                      StatusRow(
-                          count: '$ow',
-                          label: 'Overweight/',
-                          subtitle: 'Obese'),
+                      StatusRow(count: '$ow', label: 'Overweight/', subtitle: 'Obese'),
                       const SizedBox(height: 2),
                       StatusRow(count: '$st', label: 'Stunted'),
                       const SizedBox(height: 2),

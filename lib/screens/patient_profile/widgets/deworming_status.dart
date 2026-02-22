@@ -10,7 +10,72 @@ class DewormingStatusSection extends StatelessWidget {
     required this.assessments,
   });
 
-  /// Get the most recent assessment with deworming data
+  // ─── Design tokens ──────────────────────────────────────────────────────────
+  static const Color _cardBg        = Color(0xFFB8E6D5);
+  static const Color _headerBg      = Color(0xFFD4F1E3);
+  static const Color _accentTeal    = Color(0xFF2E8B7B);
+  static const Color _positiveGreen = Color(0xFF27AE60);
+  static const Color _warningOrange = Color(0xFFE65100);
+  static const Color _dividerColor  = Color(0xFFA0D8C5);
+
+  static const double _cardRadius  = 20;
+  static const double _innerRadius = 12;
+  static const double _pillRadius  = 30;
+  static const double _iconRadius  = 10;
+  static const double _bodyPadH    = 16;
+  static const double _bodyPadV    = 20;
+  static const double _sectionGap  = 16;
+
+  static List<BoxShadow> get _cardShadow => [
+    BoxShadow(
+      color: _accentTeal.withOpacity(0.18),
+      blurRadius: 16,
+      spreadRadius: 1,
+      offset: const Offset(0, 4),
+    ),
+    BoxShadow(
+      color: Colors.white.withOpacity(0.6),
+      blurRadius: 1,
+      offset: const Offset(0, -1),
+    ),
+  ];
+
+  static const TextStyle _headerTitleStyle = TextStyle(
+    fontSize: 17,
+    fontWeight: FontWeight.w800,
+    color: Colors.black87,
+    letterSpacing: 0.3,
+  );
+
+  static const TextStyle _sectionLabelStyle = TextStyle(
+    fontSize: 10,
+    fontWeight: FontWeight.w800,
+    color: _accentTeal,
+    letterSpacing: 1.4,
+  );
+
+  static const TextStyle _pillTextStyle = TextStyle(
+    fontSize: 12.5,
+    fontWeight: FontWeight.w600,
+    color: _accentTeal,
+    letterSpacing: 0.2,
+  );
+
+  static const TextStyle _detailLabelStyle = TextStyle(
+    fontSize: 11,
+    fontWeight: FontWeight.w600,
+    color: Colors.black45,
+    letterSpacing: 0.3,
+  );
+
+  static const TextStyle _detailValueStyle = TextStyle(
+    fontSize: 14,
+    fontWeight: FontWeight.w700,
+    color: Colors.black87,
+  );
+
+  // ─── Data helpers ───────────────────────────────────────────────────────────
+
   Map<String, dynamic>? _getLatestDeworming() {
     if (assessments.isEmpty) return null;
     for (var i = assessments.length - 1; i >= 0; i--) {
@@ -21,28 +86,24 @@ class DewormingStatusSection extends StatelessWidget {
     return null;
   }
 
-  /// Parse a date string (MM-DD-YYYY, MM/DD/YYYY or YYYY-MM-DD) into a DateTime
   DateTime? _parseDate(String? dateStr) {
     if (dateStr == null || dateStr.trim().isEmpty) return null;
     try {
-      // Try MM-DD-YYYY or MM/DD/YYYY
       final parts = dateStr.split(RegExp(r'[-/]'));
       if (parts.length == 3) {
         final month = int.tryParse(parts[0]);
-        final day = int.tryParse(parts[1]);
-        final year = int.tryParse(parts[2]);
+        final day   = int.tryParse(parts[1]);
+        final year  = int.tryParse(parts[2]);
         if (month != null && day != null && year != null) {
           return DateTime(year, month, day);
         }
       }
-      // Fallback: ISO-like formats (e.g. YYYY-MM-DD)
       return DateTime.tryParse(dateStr);
     } catch (_) {
       return null;
     }
   }
 
-  /// Format a DateTime for display (e.g. "December 15, 2025")
   String _formatDate(DateTime? date) {
     if (date == null) return 'N/A';
     const months = [
@@ -52,47 +113,92 @@ class DewormingStatusSection extends StatelessWidget {
     return '${months[date.month - 1]} ${date.day.toString().padLeft(2, '0')}, ${date.year}';
   }
 
-  /// Check if last deworming was within the last 6 months
   bool _isDewormingRecent(DateTime? dewormDate) {
     if (dewormDate == null) return false;
     final sixMonthsAgo = DateTime.now().subtract(const Duration(days: 183));
     return dewormDate.isAfter(sixMonthsAgo);
   }
 
-  /// Determine dosage description based on drug given
   String _getDosageDescription(String? drugGiven) {
     if (drugGiven == null || drugGiven.isEmpty) return '';
-    // Standard DOH/WHO dosage for children:
-    // Albendazole 400mg single dose (≥2 yrs), 200mg (<2 yrs)
-    // Mebendazole 500mg single dose
     return 'Age-appropriate single dose';
   }
+
+  String _getWeightOutcome() {
+    if (assessments.length < 2) return 'Good appetite and weight maintenance';
+    final latestWeight = double.tryParse(
+        assessments.last['weight']?.toString().trim() ?? '');
+    final prevWeight = double.tryParse(
+        assessments[assessments.length - 2]['weight']?.toString().trim() ?? '');
+    if (latestWeight != null && prevWeight != null) {
+      return latestWeight >= prevWeight
+          ? 'Good appetite and weight maintenance'
+          : 'Slight weight decrease – monitor appetite';
+    }
+    return 'Good appetite and weight maintenance';
+  }
+
+  // ─── Build ──────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     final latest = _getLatestDeworming();
 
-    if (latest == null) {
-      return Container(
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: _cardBg,
+        borderRadius: BorderRadius.circular(_cardRadius),
+        boxShadow: _cardShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildHeader(),
+          if (latest == null) _buildEmptyState() else _buildContent(latest),
+        ],
+      ),
+    );
+  }
+
+  // ─── Structural widgets ─────────────────────────────────────────────────────
+
+  Widget _buildHeader() => Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: const Color(0xFFB8E6D5),
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        decoration: const BoxDecoration(
+          color: _headerBg,
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(_cardRadius)),
+        ),
+        child: Row(
+          children: [
+            _buildIconBox(Icons.medication_liquid_rounded),
+            const SizedBox(width: 12),
+            const Text('Deworming Status', style: _headerTitleStyle),
           ],
         ),
+      );
+
+  Widget _buildIconBox(IconData icon) => Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: _accentTeal.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(_iconRadius),
+        ),
+        child: Icon(icon, color: _accentTeal, size: 22),
+      );
+
+  Widget _buildEmptyState() => Padding(
+        padding: const EdgeInsets.all(28),
         child: Column(
           children: [
-            _buildTitleBar(),
-            const SizedBox(height: 16),
+            Icon(Icons.info_outline_rounded,
+                size: 40, color: _accentTeal.withOpacity(0.5)),
+            const SizedBox(height: 12),
             const Text(
               'No deworming data available yet.',
+              textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.black54,
@@ -102,243 +208,217 @@ class DewormingStatusSection extends StatelessWidget {
           ],
         ),
       );
-    }
 
-    final deworming = latest['deworming'] as Map<String, dynamic>;
-    final isNA = deworming['isNA'] == true;
-    final drugGiven = deworming['drugGiven']?.toString() ?? '';
-    final dateOfLastDeworming = deworming['dateOfLastDeworming']?.toString() ?? '';
-    final adverseReactions = deworming['adverseReactions']?.toString() ?? '';
-    final dewormDate = _parseDate(dateOfLastDeworming);
-    final isRecent = _isDewormingRecent(dewormDate);
-    final dosage = _getDosageDescription(drugGiven);
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFFB8E6D5),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+  Widget _buildDatePill(String label) => Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+          decoration: BoxDecoration(
+            color: _accentTeal.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(_pillRadius),
+            border: Border.all(color: _accentTeal.withOpacity(0.25), width: 1),
           ),
-        ],
-      ),
-      child: Column(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.calendar_today_rounded,
+                  size: 13, color: _accentTeal),
+              const SizedBox(width: 6),
+              Text(label, style: _pillTextStyle),
+            ],
+          ),
+        ),
+      );
+
+  Widget _buildDetailCard({
+    required IconData icon,
+    required String label,
+    required String value,
+    Color? valueColor,
+  }) =>
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.45),
+          borderRadius: BorderRadius.circular(_innerRadius),
+          border: Border.all(color: Colors.white.withOpacity(0.7), width: 1),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: _accentTeal.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, size: 18, color: _accentTeal),
+            ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: _detailLabelStyle),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: _detailValueStyle.copyWith(
+                      color: valueColor ?? Colors.black87),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+
+  Widget _buildOutcomeRow({
+    required IconData icon,
+    required String text,
+    required bool isPositive,
+  }) =>
+      Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Title bar ──
-          _buildTitleBar(),
-          const SizedBox(height: 6),
-
-          // ── Last Deworming Date ──
-          Center(
+          Icon(icon,
+              size: 18,
+              color: isPositive ? _positiveGreen : _warningOrange),
+          const SizedBox(width: 10),
+          Expanded(
             child: Text(
-              'Last Deworming Date: ${_formatDate(dewormDate)}',
-              style: const TextStyle(
-                fontSize: 13,
+              text,
+              style: TextStyle(
+                fontSize: 13.5,
                 fontWeight: FontWeight.w500,
-                color: Color(0xFF2E8B7B),
-                fontStyle: FontStyle.italic,
+                height: 1.4,
+                color: isPositive
+                    ? Colors.black.withOpacity(0.75)
+                    : _warningOrange,
               ),
             ),
           ),
-          const SizedBox(height: 18),
+        ],
+      );
 
-          // ── Medication Given ──
-          if (!isNA && drugGiven.isNotEmpty) ...[
-            _buildCheckItem(
-              text: 'Medication Given:\n$drugGiven',
-              severity: _Severity.normal,
+  Widget _buildActionButton({
+    required String label,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) =>
+      Center(
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 28, vertical: 11),
+            decoration: BoxDecoration(
+              color: _accentTeal,
+              borderRadius: BorderRadius.circular(_pillRadius),
+              boxShadow: [
+                BoxShadow(
+                  color: _accentTeal.withOpacity(0.35),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
-          ],
-
-          // ── Dosage ──
-          if (!isNA && dosage.isNotEmpty) ...[
-            _buildCheckItem(
-              text: 'Dosage: $dosage',
-              severity: _Severity.normal,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 16, color: Colors.white),
+                const SizedBox(width: 8),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 10),
-          ],
+          ),
+        ),
+      );
 
-          // ── N/A indicator ──
-          if (isNA) ...[
-            _buildCheckItem(
-              text: 'Deworming: Not Applicable',
-              severity: _Severity.info,
-            ),
-            const SizedBox(height: 10),
-          ],
+  // ─── Content ────────────────────────────────────────────────────────────────
 
-          // ── Health outcome bullets ──
+  Widget _buildContent(Map<String, dynamic> latest) {
+    final deworming        = latest['deworming'] as Map<String, dynamic>;
+    final isNA             = deworming['isNA'] == true;
+    final drugGiven        = deworming['drugGiven']?.toString() ?? '';
+    final dateStr          = deworming['dateOfLastDeworming']?.toString() ?? '';
+    final adverseReactions = deworming['adverseReactions']?.toString() ?? '';
+    final dewormDate       = _parseDate(dateStr);
+    final isRecent         = _isDewormingRecent(dewormDate);
+    final dosage           = _getDosageDescription(drugGiven);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(_bodyPadH, 4, _bodyPadH, _bodyPadV),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildDatePill('Last Deworming: ${_formatDate(dewormDate)}'),
+          const SizedBox(height: _sectionGap),
+
           if (!isNA) ...[
-            // Deworming recency
-            _buildBulletItem(
+            if (drugGiven.isNotEmpty) ...[
+              _buildDetailCard(
+                icon: Icons.vaccines_rounded,
+                label: 'Medication Given',
+                value: drugGiven,
+              ),
+              const SizedBox(height: 10),
+            ],
+            if (dosage.isNotEmpty) ...[
+              _buildDetailCard(
+                icon: Icons.colorize_rounded,
+                label: 'Dosage',
+                value: dosage,
+              ),
+              const SizedBox(height: _sectionGap),
+            ],
+          ],
+
+          if (isNA) ...[
+            _buildDetailCard(
+              icon: Icons.block_rounded,
+              label: 'Status',
+              value: 'Not Applicable',
+              valueColor: _accentTeal,
+            ),
+            const SizedBox(height: _sectionGap),
+          ],
+
+          if (!isNA) ...[
+            const Divider(color: _dividerColor, thickness: 1.2),
+            const SizedBox(height: 12),
+            const Text('HEALTH OUTCOMES', style: _sectionLabelStyle),
+            const SizedBox(height: 10),
+            _buildOutcomeRow(
+              icon: Icons.schedule_rounded,
               text: isRecent
                   ? 'Dewormed within last 6 months'
                   : 'Last deworming was more than 6 months ago',
               isPositive: isRecent,
             ),
-            const SizedBox(height: 6),
-
-            // Adverse reactions / symptoms
-            _buildBulletItem(
+            const SizedBox(height: 8),
+            _buildOutcomeRow(
+              icon: adverseReactions.isEmpty
+                  ? Icons.check_circle_rounded
+                  : Icons.warning_amber_rounded,
               text: adverseReactions.isEmpty
                   ? 'No symptoms of intestinal worms'
                   : 'Adverse reactions: $adverseReactions',
               isPositive: adverseReactions.isEmpty,
             ),
-            const SizedBox(height: 6),
-
-            // Appetite / weight outcome
-            _buildBulletItem(
+            const SizedBox(height: 8),
+            _buildOutcomeRow(
+              icon: Icons.monitor_weight_rounded,
               text: _getWeightOutcome(),
-              isPositive: true,
+              isPositive: !_getWeightOutcome().contains('decrease'),
             ),
           ],
-
-          const SizedBox(height: 20),
         ],
       ),
     );
-  }
-
-  /// Derive a weight / appetite outcome from weight trend in assessments
-  String _getWeightOutcome() {
-    if (assessments.length < 2) return 'Good appetite and weight maintenance';
-    // Compare latest two weights
-    final latestWeight = double.tryParse(
-        assessments.last['weight']?.toString().trim() ?? '');
-    final prevWeight = double.tryParse(
-        assessments[assessments.length - 2]['weight']?.toString().trim() ?? '');
-    if (latestWeight != null && prevWeight != null) {
-      if (latestWeight >= prevWeight) {
-        return 'Good appetite and weight maintenance';
-      } else {
-        return 'Slight weight decrease – monitor appetite';
-      }
-    }
-    return 'Good appetite and weight maintenance';
-  }
-
-  Widget _buildTitleBar() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFD4F1E3),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: const Center(
-        child: Text(
-          'Deworming Status',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
-            letterSpacing: 0.5,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCheckItem({
-    required String text,
-    required _Severity severity,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            Icons.check,
-            size: 20,
-            color: _getSeverityColor(severity),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text.rich(
-              _buildBoldFirstLine(text),
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Colors.black.withOpacity(0.8),
-                height: 1.4,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Makes the first segment before '\n' bold and the rest regular weight
-  TextSpan _buildBoldFirstLine(String text) {
-    final parts = text.split('\n');
-    if (parts.length <= 1) {
-      return TextSpan(text: text);
-    }
-    return TextSpan(
-      children: [
-        TextSpan(
-          text: '${parts[0]}\n',
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        TextSpan(
-          text: parts.sublist(1).join('\n'),
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildBulletItem({required String text, required bool isPositive}) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 34),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '•  ',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.black.withOpacity(0.7),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              text,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: isPositive
-                    ? Colors.black.withOpacity(0.75)
-                    : const Color(0xFFE65100),
-                height: 1.4,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Color _getSeverityColor(_Severity severity) {
-    switch (severity) {
-      case _Severity.normal:
-        return const Color(0xFF4CAF50);
-      case _Severity.warning:
-        return const Color(0xFFFF9800);
-      case _Severity.info:
-        return const Color(0xFF2E8B7B);
-    }
   }
 }
-
-enum _Severity { normal, warning, info }
