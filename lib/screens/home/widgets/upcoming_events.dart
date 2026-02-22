@@ -85,146 +85,176 @@ class _UpcomingEventsState extends State<UpcomingEvents> {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () => _navigateToCalendar(context),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
+      child: IntrinsicHeight(
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Calendar icon
+            // ── Left card: icon + title ──────────────────────────────
             Container(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFF5A962), Color(0xFFF08030)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(10),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFFF5A962).withValues(alpha: 0.35),
-                    blurRadius: 8,
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: 10,
                     offset: const Offset(0, 3),
                   ),
                 ],
               ),
-              child: const Icon(Icons.calendar_month_rounded,
-                  color: Colors.white, size: 22),
-            ),
-
-            const SizedBox(width: 14),
-
-            // Events content
-            Expanded(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  const Text(
-                    'UPCOMING EVENTS',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFFF5A962),
-                      letterSpacing: 1.1,
+                  // Orange gradient icon
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFF5A962), Color(0xFFF08030)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFF5A962).withValues(alpha: 0.35),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.calendar_month_rounded,
+                      color: Colors.white,
+                      size: 22,
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  StreamBuilder<List<Map<String, dynamic>>>(
-                    stream: _upcomingEventsStream(),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const SizedBox(
-                          height: 40,
-                          child: Center(
-                            child: SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Color(0xFFF5A962),
-                              ),
+                  const SizedBox(height: 8),
+                  // View All button
+                  GestureDetector(
+                    onTap: () => _navigateToCalendar(context),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFF5A962), Color(0xFFF08030)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color:
+                                const Color(0xFFF5A962).withValues(alpha: 0.4),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'View All',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.3,
                             ),
                           ),
-                        );
-                      }
-
-                      final events = snapshot.data ?? [];
-
-                      if (events.isEmpty) {
-                        return const Text(
-                          'No upcoming events',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.black38,
-                            fontStyle: FontStyle.italic,
-                          ),
-                        );
-                      }
-
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: events
-                            .map((e) => _eventItem(
-                                  e['title'] ?? 'Untitled',
-                                  _formatDate(e['date']),
-                                  Color(e['colorValue'] ?? 0xFFF5A962),
-                                ))
-                            .toList(),
-                      );
-                    },
+                          SizedBox(width: 3),
+                          Icon(Icons.arrow_forward_ios_rounded,
+                              color: Colors.white, size: 9),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(width: 8),
+            const SizedBox(width: 10),
 
-            // View All button
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFF5A962), Color(0xFFF08030)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFFF5A962).withValues(alpha: 0.4),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'View All',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.4,
+            // ── Right card: events list ──────────────────────────────
+            Expanded(
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
                     ),
-                  ),
-                  SizedBox(width: 4),
-                  Icon(Icons.arrow_forward_ios_rounded,
-                      color: Colors.white, size: 10),
-                ],
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'UPCOMING EVENTS',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFFF5A962),
+                        letterSpacing: 1.1,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    StreamBuilder<List<Map<String, dynamic>>>(
+                      stream: _upcomingEventsStream(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const SizedBox(
+                            height: 40,
+                            child: Center(
+                              child: SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Color(0xFFF5A962),
+                                ),
+                              ),
+                            ),
+                          );
+                        }
+
+                        final events = snapshot.data ?? [];
+
+                        if (events.isEmpty) {
+                          return const Text(
+                            'No upcoming events',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.black38,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          );
+                        }
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: events
+                              .map((e) => _eventItem(
+                                    e['title'] ?? 'Untitled',
+                                    _formatDate(e['date']),
+                                    Color(e['colorValue'] ?? 0xFFF5A962),
+                                  ))
+                              .toList(),
+                        );
+                      },
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -233,6 +263,7 @@ class _UpcomingEventsState extends State<UpcomingEvents> {
     );
   }
 
+  // Matches _statusItem style from StatsRow exactly
   Widget _eventItem(String title, String dateLabel, Color color) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
@@ -259,9 +290,9 @@ class _UpcomingEventsState extends State<UpcomingEvents> {
           Text(
             dateLabel,
             style: const TextStyle(
-              fontSize: 10,
-              color: Colors.black38,
-              fontWeight: FontWeight.w400,
+              fontSize: 11,
+              color: Color(0xFFF5A962),
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],

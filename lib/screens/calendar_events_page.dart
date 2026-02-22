@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:lumasdang/services/firestore_service.dart';
+import 'package:lumasdang/screens/shared/app_buttom_navbar.dart'; // ← adjust path if needed
 
 // ─── Model ────────────────────────────────────────────────────────────────────
 class CalEvent {
@@ -124,15 +125,20 @@ class CalendarEventsPage extends StatefulWidget {
   State<CalendarEventsPage> createState() => _CalendarEventsPageState();
 }
 
+// ↓ Changed SingleTickerProviderStateMixin → TickerProviderStateMixin
+//   so we can create two AnimationControllers (fade + tab).
 class _CalendarEventsPageState extends State<CalendarEventsPage>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   final CalendarService _service = CalendarService();
 
   DateTime _focusedDay = DateTime.now();
   DateTime _selectedDay = DateTime.now();
 
-  late AnimationController _animController;
-  late Animation<double> _fadeAnim;
+  late final AnimationController _animController;
+  late final Animation<double> _fadeAnim;
+
+  // ── Bottom nav tab controller ───────────────────────────────────────────────
+  late final TabController _tabController;
 
   static const _colorOptions = [
     Color(0xFFF5A962),
@@ -157,15 +163,25 @@ class _CalendarEventsPageState extends State<CalendarEventsPage>
   @override
   void initState() {
     super.initState();
+
     _animController = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 350));
-    _fadeAnim = CurvedAnimation(parent: _animController, curve: Curves.easeOut);
+    _fadeAnim =
+        CurvedAnimation(parent: _animController, curve: Curves.easeOut);
     _animController.forward();
+
+    _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) {
+        Navigator.pop(context);
+      }
+    });
   }
 
   @override
   void dispose() {
     _animController.dispose();
+    _tabController.dispose();
     super.dispose();
   }
 
@@ -175,10 +191,12 @@ class _CalendarEventsPageState extends State<CalendarEventsPage>
   }
 
   void _prevMonth() =>
-      setState(() => _focusedDay = DateTime(_focusedDay.year, _focusedDay.month - 1));
+      setState(() => _focusedDay =
+          DateTime(_focusedDay.year, _focusedDay.month - 1));
 
   void _nextMonth() =>
-      setState(() => _focusedDay = DateTime(_focusedDay.year, _focusedDay.month + 1));
+      setState(() => _focusedDay =
+          DateTime(_focusedDay.year, _focusedDay.month + 1));
 
   void _showSnackBar(String message, {Color? color}) {
     if (!mounted) return;
@@ -201,15 +219,33 @@ class _CalendarEventsPageState extends State<CalendarEventsPage>
       builder: (context, snapshot) {
         final allEvents = snapshot.data ?? <CalEvent>[];
         final grouped = _groupByDay(allEvents);
-        final selectedEvents = grouped[_fmtKey(_selectedDay)] ?? <CalEvent>[];
+        final selectedEvents =
+            grouped[_fmtKey(_selectedDay)] ?? <CalEvent>[];
 
         return Scaffold(
+          // ── BOTTOM NAV BAR ────────────────────────────────────────────────
+          bottomNavigationBar: AppBottomNavBar(controller: _tabController),
+
+          floatingActionButton: FloatingActionButton(
+            onPressed: () => _showEventDialog(context),
+            backgroundColor: Colors.white,
+            foregroundColor: const Color(0xFF2E8B7B),
+            elevation: 4,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: const Icon(Icons.add_rounded, size: 28),
+          ),
+
           body: Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [Color(0xFF2E8B7B), Color(0xFF5CAA7F), Color(0xFF8BC88A)],
+                colors: [
+                  Color(0xFF2E8B7B),
+                  Color(0xFF5CAA7F),
+                  Color(0xFF8BC88A)
+                ],
                 stops: [0.0, 0.35, 1.0],
               ),
             ),
@@ -218,18 +254,12 @@ class _CalendarEventsPageState extends State<CalendarEventsPage>
                 children: [
                   _buildHeader(context),
                   _buildCalendarCard(grouped),
-                  Expanded(child: _buildEventsList(selectedEvents, snapshot.hasError)),
+                  Expanded(
+                      child: _buildEventsList(
+                          selectedEvents, snapshot.hasError)),
                 ],
               ),
             ),
-          ),
-          floatingActionButton: FloatingActionButton(
-            onPressed: () => _showEventDialog(context),
-            backgroundColor: Colors.white,
-            foregroundColor: const Color(0xFF2E8B7B),
-            elevation: 4,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            child: const Icon(Icons.add_rounded, size: 28),
           ),
         );
       },
@@ -254,9 +284,11 @@ class _CalendarEventsPageState extends State<CalendarEventsPage>
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.2),
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white.withOpacity(0.35), width: 1.2),
+                      border: Border.all(
+                          color: Colors.white.withOpacity(0.35), width: 1.2),
                     ),
-                    child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+                    child: const Icon(Icons.arrow_back_ios_new_rounded,
+                        color: Colors.white, size: 18),
                   ),
                 ),
               ),
@@ -273,7 +305,6 @@ class _CalendarEventsPageState extends State<CalendarEventsPage>
                   ),
                 ),
               ),
-              // Today button
               Material(
                 color: Colors.transparent,
                 child: InkWell(
@@ -287,9 +318,11 @@ class _CalendarEventsPageState extends State<CalendarEventsPage>
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.2),
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white.withOpacity(0.35), width: 1.2),
+                      border: Border.all(
+                          color: Colors.white.withOpacity(0.35), width: 1.2),
                     ),
-                    child: const Icon(Icons.today_rounded, color: Colors.white, size: 18),
+                    child: const Icon(Icons.today_rounded,
+                        color: Colors.white, size: 18),
                   ),
                 ),
               ),
@@ -397,7 +430,9 @@ class _CalendarEventsPageState extends State<CalendarEventsPage>
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
-                        color: d == 'Sun' ? const Color(0xFFF08030) : Colors.black38,
+                        color: d == 'Sun'
+                            ? const Color(0xFFF08030)
+                            : Colors.black38,
                       ),
                     ),
                   ),
@@ -409,7 +444,8 @@ class _CalendarEventsPageState extends State<CalendarEventsPage>
 
   Widget _buildDaysGrid(Map<String, List<CalEvent>> grouped) {
     final firstDay = DateTime(_focusedDay.year, _focusedDay.month, 1);
-    final daysInMonth = DateTime(_focusedDay.year, _focusedDay.month + 1, 0).day;
+    final daysInMonth =
+        DateTime(_focusedDay.year, _focusedDay.month + 1, 0).day;
     final startWeekday = firstDay.weekday % 7;
     final today = DateTime.now();
     final cells = <Widget>[];
@@ -418,7 +454,9 @@ class _CalendarEventsPageState extends State<CalendarEventsPage>
 
     for (int day = 1; day <= daysInMonth; day++) {
       final date = DateTime(_focusedDay.year, _focusedDay.month, day);
-      final isToday = date.year == today.year && date.month == today.month && date.day == today.day;
+      final isToday = date.year == today.year &&
+          date.month == today.month &&
+          date.day == today.day;
       final isSelected = date.year == _selectedDay.year &&
           date.month == _selectedDay.month &&
           date.day == _selectedDay.day;
@@ -439,7 +477,11 @@ class _CalendarEventsPageState extends State<CalendarEventsPage>
   }
 
   Widget _buildDayCell(
-    DateTime date, int day, bool isToday, bool isSelected, List<CalEvent> dayEvents,
+    DateTime date,
+    int day,
+    bool isToday,
+    bool isSelected,
+    List<CalEvent> dayEvents,
   ) {
     Color? bgColor;
     Color textColor = Colors.black87;
@@ -462,11 +504,16 @@ class _CalendarEventsPageState extends State<CalendarEventsPage>
       onTap: () => _onDayTap(date),
       child: Container(
         margin: const EdgeInsets.all(2),
-        decoration: BoxDecoration(color: bgColor, shape: BoxShape.circle),
+        decoration:
+            BoxDecoration(color: bgColor, shape: BoxShape.circle),
         child: Stack(
           alignment: Alignment.center,
           children: [
-            Text('$day', style: TextStyle(fontSize: 13, color: textColor, fontWeight: fontWeight)),
+            Text('$day',
+                style: TextStyle(
+                    fontSize: 13,
+                    color: textColor,
+                    fontWeight: fontWeight)),
             if (dayEvents.isNotEmpty)
               Positioned(
                 bottom: 3,
@@ -477,9 +524,12 @@ class _CalendarEventsPageState extends State<CalendarEventsPage>
                       .map((e) => Container(
                             width: 4,
                             height: 4,
-                            margin: const EdgeInsets.symmetric(horizontal: 1),
+                            margin:
+                                const EdgeInsets.symmetric(horizontal: 1),
                             decoration: BoxDecoration(
-                              color: isSelected ? Colors.white.withOpacity(0.8) : e.color,
+                              color: isSelected
+                                  ? Colors.white.withOpacity(0.8)
+                                  : e.color,
                               shape: BoxShape.circle,
                             ),
                           ))
@@ -511,16 +561,24 @@ class _CalendarEventsPageState extends State<CalendarEventsPage>
   Widget _legendDot(Color color, String label) {
     return Row(
       children: [
-        Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        Container(
+            width: 8,
+            height: 8,
+            decoration:
+                BoxDecoration(color: color, shape: BoxShape.circle)),
         const SizedBox(width: 4),
-        Text(label, style: const TextStyle(fontSize: 10, color: Colors.black45)),
+        Text(label,
+            style: const TextStyle(fontSize: 10, color: Colors.black45)),
       ],
     );
   }
 
   // ── Events list ────────────────────────────────────────────────────────────
   Widget _buildEventsList(List<CalEvent> events, bool hasError) {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
     const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     final dateLabel =
         '${weekdays[_selectedDay.weekday % 7]}, ${months[_selectedDay.month - 1]} ${_selectedDay.day}';
@@ -530,7 +588,8 @@ class _CalendarEventsPageState extends State<CalendarEventsPage>
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.15),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.25), width: 1),
+        border:
+            Border.all(color: Colors.white.withOpacity(0.25), width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -546,44 +605,54 @@ class _CalendarEventsPageState extends State<CalendarEventsPage>
                     color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.event_note_rounded, color: Colors.white, size: 17),
+                  child: const Icon(Icons.event_note_rounded,
+                      color: Colors.white, size: 17),
                 ),
                 const SizedBox(width: 10),
                 Text(
                   dateLabel,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14),
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14),
                 ),
                 const Spacer(),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
+                    border: Border.all(
+                        color: Colors.white.withOpacity(0.3), width: 1),
                   ),
                   child: Text(
                     '${events.length} event${events.length != 1 ? 's' : ''}',
-                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600),
                   ),
                 ),
               ],
             ),
           ),
-
-          // Divider
           Divider(height: 1, color: Colors.white.withOpacity(0.2)),
-
           Expanded(
             child: hasError
-                ? _emptyState(Icons.wifi_off_rounded, 'Could not load events')
+                ? _emptyState(
+                    Icons.wifi_off_rounded, 'Could not load events')
                 : events.isEmpty
-                    ? _emptyState(Icons.event_available_rounded, 'No events on this day')
+                    ? _emptyState(Icons.event_available_rounded,
+                        'No events on this day')
                     : FadeTransition(
                         opacity: _fadeAnim,
                         child: ListView.builder(
-                          padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                          padding:
+                              const EdgeInsets.fromLTRB(12, 10, 12, 12),
                           itemCount: events.length,
-                          itemBuilder: (context, i) => _buildEventCard(events[i]),
+                          itemBuilder: (context, i) =>
+                              _buildEventCard(events[i]),
                         ),
                       ),
           ),
@@ -604,13 +673,13 @@ class _CalendarEventsPageState extends State<CalendarEventsPage>
               color: Colors.white.withOpacity(0.15),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, color: Colors.white.withOpacity(0.6), size: 28),
+            child:
+                Icon(icon, color: Colors.white.withOpacity(0.6), size: 28),
           ),
           const SizedBox(height: 12),
-          Text(
-            label,
-            style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 14),
-          ),
+          Text(label,
+              style: TextStyle(
+                  color: Colors.white.withOpacity(0.7), fontSize: 14)),
         ],
       ),
     );
@@ -623,12 +692,14 @@ class _CalendarEventsPageState extends State<CalendarEventsPage>
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.07), blurRadius: 8, offset: const Offset(0, 2)),
+          BoxShadow(
+              color: Colors.black.withOpacity(0.07),
+              blurRadius: 8,
+              offset: const Offset(0, 2)),
         ],
       ),
       child: Row(
         children: [
-          // Color accent bar
           Container(
             width: 5,
             height: 72,
@@ -641,7 +712,6 @@ class _CalendarEventsPageState extends State<CalendarEventsPage>
             ),
           ),
           const SizedBox(width: 12),
-          // Icon
           Container(
             width: 38,
             height: 38,
@@ -649,10 +719,10 @@ class _CalendarEventsPageState extends State<CalendarEventsPage>
               color: event.color.withOpacity(0.12),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(Icons.event_rounded, color: event.color, size: 20),
+            child:
+                Icon(Icons.event_rounded, color: event.color, size: 20),
           ),
           const SizedBox(width: 12),
-          // Text
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -660,15 +730,21 @@ class _CalendarEventsPageState extends State<CalendarEventsPage>
               children: [
                 Text(
                   event.title,
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.black87),
+                  style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black87),
                 ),
                 const SizedBox(height: 3),
                 if (event.time.isNotEmpty)
                   Row(
                     children: [
-                      const Icon(Icons.access_time_rounded, size: 11, color: Colors.black38),
+                      const Icon(Icons.access_time_rounded,
+                          size: 11, color: Colors.black38),
                       const SizedBox(width: 3),
-                      Text(event.time, style: const TextStyle(fontSize: 11, color: Colors.black45)),
+                      Text(event.time,
+                          style: const TextStyle(
+                              fontSize: 11, color: Colors.black45)),
                     ],
                   ),
                 if (event.description.isNotEmpty) ...[
@@ -677,13 +753,13 @@ class _CalendarEventsPageState extends State<CalendarEventsPage>
                     event.description,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 10, color: Colors.black38),
+                    style: const TextStyle(
+                        fontSize: 10, color: Colors.black38),
                   ),
                 ],
               ],
             ),
           ),
-          // Action buttons
           Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -723,9 +799,12 @@ class _CalendarEventsPageState extends State<CalendarEventsPage>
 
   // ── Add/Edit dialog ────────────────────────────────────────────────────────
   void _showEventDialog(BuildContext context, {CalEvent? existingEvent}) {
-    final titleCtrl = TextEditingController(text: existingEvent?.title ?? '');
-    final timeCtrl = TextEditingController(text: existingEvent?.time ?? '');
-    final descCtrl = TextEditingController(text: existingEvent?.description ?? '');
+    final titleCtrl =
+        TextEditingController(text: existingEvent?.title ?? '');
+    final timeCtrl =
+        TextEditingController(text: existingEvent?.time ?? '');
+    final descCtrl =
+        TextEditingController(text: existingEvent?.description ?? '');
     Color selectedColor = existingEvent?.color ?? _colorOptions.first;
     DateTime selectedDate = existingEvent?.date ?? _selectedDay;
     bool isSaving = false;
@@ -736,11 +815,13 @@ class _CalendarEventsPageState extends State<CalendarEventsPage>
       backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setModalState) => Padding(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).viewInsets.bottom),
           child: Container(
             decoration: const BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              borderRadius:
+                  BorderRadius.vertical(top: Radius.circular(24)),
             ),
             padding: const EdgeInsets.all(24),
             child: SingleChildScrollView(
@@ -748,32 +829,38 @@ class _CalendarEventsPageState extends State<CalendarEventsPage>
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Handle
                   Center(
                     child: Container(
-                      width: 40, height: 4,
-                      decoration: BoxDecoration(color: Colors.black12, borderRadius: BorderRadius.circular(2)),
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                          color: Colors.black12,
+                          borderRadius: BorderRadius.circular(2)),
                     ),
                   ),
                   const SizedBox(height: 20),
-
                   Row(
                     children: [
                       Container(
-                        width: 36, height: 36,
+                        width: 36,
+                        height: 36,
                         decoration: BoxDecoration(
                           color: const Color(0xFF2E8B7B).withOpacity(0.1),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Icon(
-                          existingEvent == null ? Icons.add_rounded : Icons.edit_rounded,
+                          existingEvent == null
+                              ? Icons.add_rounded
+                              : Icons.edit_rounded,
                           color: const Color(0xFF2E8B7B),
                           size: 20,
                         ),
                       ),
                       const SizedBox(width: 12),
                       Text(
-                        existingEvent == null ? 'Add New Event' : 'Edit Event',
+                        existingEvent == null
+                            ? 'Add New Event'
+                            : 'Edit Event',
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
@@ -783,33 +870,22 @@ class _CalendarEventsPageState extends State<CalendarEventsPage>
                     ],
                   ),
                   const SizedBox(height: 20),
-
-                  // Title
                   _dialogField(
-                    controller: titleCtrl,
-                    hint: 'Event title *',
-                    icon: Icons.title_rounded,
-                  ),
+                      controller: titleCtrl,
+                      hint: 'Event title *',
+                      icon: Icons.title_rounded),
                   const SizedBox(height: 12),
-
-                  // Time
                   _dialogField(
-                    controller: timeCtrl,
-                    hint: 'Time (e.g. 09:00 AM)',
-                    icon: Icons.access_time_rounded,
-                  ),
+                      controller: timeCtrl,
+                      hint: 'Time (e.g. 09:00 AM)',
+                      icon: Icons.access_time_rounded),
                   const SizedBox(height: 12),
-
-                  // Description
                   _dialogField(
-                    controller: descCtrl,
-                    hint: 'Description (optional)',
-                    icon: Icons.notes_rounded,
-                    maxLines: 2,
-                  ),
+                      controller: descCtrl,
+                      hint: 'Description (optional)',
+                      icon: Icons.notes_rounded,
+                      maxLines: 2),
                   const SizedBox(height: 12),
-
-                  // Date picker
                   GestureDetector(
                     onTap: () async {
                       final picked = await showDatePicker(
@@ -819,36 +895,41 @@ class _CalendarEventsPageState extends State<CalendarEventsPage>
                         lastDate: DateTime(2030),
                         builder: (c, child) => Theme(
                           data: ThemeData.light().copyWith(
-                            colorScheme: const ColorScheme.light(primary: Color(0xFF2E8B7B)),
+                            colorScheme: const ColorScheme.light(
+                                primary: Color(0xFF2E8B7B)),
                           ),
                           child: child!,
                         ),
                       );
-                      if (picked != null) setModalState(() => selectedDate = picked);
+                      if (picked != null) {
+                        setModalState(() => selectedDate = picked);
+                      }
                     },
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 14),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF0FAF7),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.calendar_today_rounded, color: Color(0xFF2E8B7B), size: 20),
+                          const Icon(Icons.calendar_today_rounded,
+                              color: Color(0xFF2E8B7B), size: 20),
                           const SizedBox(width: 12),
                           Text(
                             '${selectedDate.year}-${selectedDate.month.toString().padLeft(2, '0')}-${selectedDate.day.toString().padLeft(2, '0')}',
-                            style: const TextStyle(fontSize: 14, color: Colors.black87),
+                            style: const TextStyle(
+                                fontSize: 14, color: Colors.black87),
                           ),
                           const Spacer(),
-                          const Icon(Icons.arrow_drop_down, color: Colors.black38),
+                          const Icon(Icons.arrow_drop_down,
+                              color: Colors.black38),
                         ],
                       ),
                     ),
                   ),
                   const SizedBox(height: 16),
-
-                  // Color picker
                   Text(
                     'EVENT COLOR',
                     style: TextStyle(
@@ -863,7 +944,8 @@ class _CalendarEventsPageState extends State<CalendarEventsPage>
                     children: _colorOptions.map((c) {
                       final isSelected = selectedColor == c;
                       return GestureDetector(
-                        onTap: () => setModalState(() => selectedColor = c),
+                        onTap: () =>
+                            setModalState(() => selectedColor = c),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 150),
                           width: isSelected ? 36 : 32,
@@ -873,22 +955,29 @@ class _CalendarEventsPageState extends State<CalendarEventsPage>
                             color: c,
                             shape: BoxShape.circle,
                             border: isSelected
-                                ? Border.all(color: Colors.black38, width: 2.5)
-                                : Border.all(color: Colors.transparent, width: 2.5),
+                                ? Border.all(
+                                    color: Colors.black38, width: 2.5)
+                                : Border.all(
+                                    color: Colors.transparent,
+                                    width: 2.5),
                             boxShadow: isSelected
-                                ? [BoxShadow(color: c.withOpacity(0.5), blurRadius: 8, spreadRadius: 1)]
+                                ? [
+                                    BoxShadow(
+                                        color: c.withOpacity(0.5),
+                                        blurRadius: 8,
+                                        spreadRadius: 1)
+                                  ]
                                 : null,
                           ),
                           child: isSelected
-                              ? const Icon(Icons.check_rounded, color: Colors.white, size: 16)
+                              ? const Icon(Icons.check_rounded,
+                                  color: Colors.white, size: 16)
                               : null,
                         ),
                       );
                     }).toList(),
                   ),
                   const SizedBox(height: 24),
-
-                  // Save button
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
@@ -898,9 +987,12 @@ class _CalendarEventsPageState extends State<CalendarEventsPage>
                               if (titleCtrl.text.trim().isEmpty) {
                                 ScaffoldMessenger.of(ctx).showSnackBar(
                                   SnackBar(
-                                    content: const Text('Please enter an event title'),
+                                    content: const Text(
+                                        'Please enter an event title'),
                                     behavior: SnackBarBehavior.floating,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(12)),
                                     margin: const EdgeInsets.all(16),
                                   ),
                                 );
@@ -922,7 +1014,10 @@ class _CalendarEventsPageState extends State<CalendarEventsPage>
                                   await _service.updateEvent(event);
                                 }
                                 if (ctx.mounted) Navigator.pop(ctx);
-                                if (mounted) setState(() => _selectedDay = selectedDate);
+                                if (mounted) {
+                                  setState(
+                                      () => _selectedDay = selectedDate);
+                                }
                               } catch (e) {
                                 setModalState(() => isSaving = false);
                                 if (ctx.mounted) {
@@ -931,7 +1026,9 @@ class _CalendarEventsPageState extends State<CalendarEventsPage>
                                       content: Text('Error: $e'),
                                       backgroundColor: Colors.redAccent,
                                       behavior: SnackBarBehavior.floating,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                      shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12)),
                                       margin: const EdgeInsets.all(16),
                                     ),
                                   );
@@ -941,24 +1038,37 @@ class _CalendarEventsPageState extends State<CalendarEventsPage>
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF2E8B7B),
                         foregroundColor: Colors.white,
-                        disabledBackgroundColor: const Color(0xFF2E8B7B).withOpacity(0.5),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        disabledBackgroundColor:
+                            const Color(0xFF2E8B7B).withOpacity(0.5),
+                        padding:
+                            const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14)),
                         elevation: 0,
                       ),
                       child: isSaving
                           ? const SizedBox(
-                              width: 20, height: 20,
-                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                  color: Colors.white, strokeWidth: 2.5),
                             )
                           : Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(existingEvent == null ? Icons.add_rounded : Icons.check_rounded, size: 20),
+                                Icon(
+                                    existingEvent == null
+                                        ? Icons.add_rounded
+                                        : Icons.check_rounded,
+                                    size: 20),
                                 const SizedBox(width: 8),
                                 Text(
-                                  existingEvent == null ? 'Save Event' : 'Update Event',
-                                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                                  existingEvent == null
+                                      ? 'Save Event'
+                                      : 'Update Event',
+                                  style: const TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700),
                                 ),
                               ],
                             ),
@@ -986,17 +1096,25 @@ class _CalendarEventsPageState extends State<CalendarEventsPage>
       style: const TextStyle(fontSize: 14, color: Colors.black87),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
-        prefixIcon: Icon(icon, color: const Color(0xFF2E8B7B), size: 20),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+        hintStyle:
+            TextStyle(color: Colors.grey.shade400, fontSize: 14),
+        prefixIcon:
+            Icon(icon, color: const Color(0xFF2E8B7B), size: 20),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFF2E8B7B), width: 1.5),
+          borderSide: const BorderSide(
+              color: Color(0xFF2E8B7B), width: 1.5),
         ),
         filled: true,
         fillColor: const Color(0xFFF0FAF7),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16, vertical: 14),
       ),
     );
   }
@@ -1006,8 +1124,10 @@ class _CalendarEventsPageState extends State<CalendarEventsPage>
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Delete Event', style: TextStyle(fontWeight: FontWeight.w700)),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Delete Event',
+            style: TextStyle(fontWeight: FontWeight.w700)),
         content: Text(
           'Are you sure you want to delete "${event.title}"?',
           style: const TextStyle(color: Colors.black54),
@@ -1015,7 +1135,8 @@ class _CalendarEventsPageState extends State<CalendarEventsPage>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: Colors.black45)),
+            child: const Text('Cancel',
+                style: TextStyle(color: Colors.black45)),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -1026,10 +1147,12 @@ class _CalendarEventsPageState extends State<CalendarEventsPage>
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFD45F5F),
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
               elevation: 0,
             ),
-            child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.w700)),
+            child: const Text('Delete',
+                style: TextStyle(fontWeight: FontWeight.w700)),
           ),
         ],
       ),

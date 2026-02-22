@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'form_card.dart';
-import 'form_field_row.dart';
 import 'checkbox_field_row.dart';
 
 class DietaryAssessmentForm extends StatefulWidget {
@@ -28,15 +26,6 @@ class DietaryAssessmentForm extends StatefulWidget {
 }
 
 class _DietaryAssessmentFormState extends State<DietaryAssessmentForm> {
-  // ── Theme constants (mirrors other forms) ─────────────────────────────────
-  static const Color _primary = Color(0xFFB5651D);
-  static const Color _primaryLight = Color(0xFFFFF3E0);
-  static const Color _surface = Colors.white;
-  static const Color _surfaceAlt = Color(0xFFFDF6EE);
-  static const Color _border = Color(0xFFE8C9A0);
-  static const Color _labelColor = Color(0xFF795548);
-  static const Color _textColor = Color(0xFF3E2723);
-
   bool? _purelyBreastfed;
 
   @override
@@ -45,127 +34,138 @@ class _DietaryAssessmentFormState extends State<DietaryAssessmentForm> {
     _purelyBreastfed = widget.purelyBreastfed;
   }
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
-
-  Widget _buildLabel(String text) => Padding(
-        padding: const EdgeInsets.only(bottom: 6),
-        child: Text(
-          text,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: _labelColor,
-            letterSpacing: 0.3,
-          ),
-        ),
-      );
-
   Widget _buildField({
     required String label,
     required TextEditingController controller,
     TextInputType keyboardType = TextInputType.text,
     String? hint,
     String? Function(String?)? validator,
-    Widget? prefixIcon,
+    IconData? icon,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildLabel(label),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFFF5A962),
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 5),
         TextFormField(
           controller: controller,
           keyboardType: keyboardType,
           validator: validator,
           style: const TextStyle(
-            fontSize: 14,
+            fontSize: 13,
             fontWeight: FontWeight.w500,
-            color: _textColor,
+            color: Color(0xFF1A1A1A),
           ),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: const TextStyle(fontSize: 13, color: Color(0xFFD4A97A)),
-            prefixIcon: prefixIcon,
-            prefixIconColor: _primary,
+            hintStyle: const TextStyle(fontSize: 12, color: Colors.black26),
+            prefixIcon: icon != null
+                ? Icon(icon, size: 16, color: Colors.black38)
+                : null,
             filled: true,
-            fillColor: _surfaceAlt,
+            fillColor: const Color(0xFFFAFAFA),
             contentPadding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: _border, width: 1.5),
+              borderSide:
+                  const BorderSide(color: Color(0xFFEEEEEE), width: 1.5),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFFE8985A), width: 2),
+              borderSide:
+                  const BorderSide(color: Color(0xFFF5A962), width: 2),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+              borderSide:
+                  const BorderSide(color: Color(0xFFEF4444), width: 1.5),
             ),
             focusedErrorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 2),
+              borderSide:
+                  const BorderSide(color: Color(0xFFEF4444), width: 2),
             ),
-            errorStyle: const TextStyle(fontSize: 11),
+            errorStyle: const TextStyle(fontSize: 10),
           ),
         ),
       ],
     );
   }
 
-  /// YES / NO pill toggle for boolean fields.
-  Widget _buildYesNoToggle({
-    required String label,
-    required bool? value,
-    required ValueChanged<bool?> onChanged,
-    String? errorText,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildLabel(label),
-        Row(
-          children: [
-            _buildTogglePill(
-              label: 'Yes',
-              selected: value == true,
-              onTap: () => onChanged(true),
-            ),
-            const SizedBox(width: 10),
-            _buildTogglePill(
-              label: 'No',
-              selected: value == false,
-              onTap: () => onChanged(false),
+  Widget _buildCard({required Widget child}) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
             ),
           ],
         ),
-        if (errorText != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 6, left: 2),
-            child: Text(
-              errorText,
-              style: const TextStyle(fontSize: 11, color: Color(0xFFEF4444)),
+        child: child,
+      );
+
+  Widget _buildSectionHeader(String title, IconData icon) => Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFF5A962), Color(0xFFF08030)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFF5A962).withValues(alpha: 0.35),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Icon(icon, color: Colors.white, size: 18),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFFF5A962),
+              letterSpacing: 1.1,
             ),
           ),
-      ],
-    );
-  }
+        ],
+      );
 
-  Widget _buildTogglePill({
-    required String label,
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
+  Widget _buildTogglePill(String label, bool selected, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
         decoration: BoxDecoration(
-          color: selected ? _primary : _surfaceAlt,
+          color: selected
+              ? const Color(0xFFF5A962)
+              : const Color(0xFFFAFAFA),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: selected ? _primary : _border,
+            color: selected
+                ? const Color(0xFFF5A962)
+                : const Color(0xFFEEEEEE),
             width: 1.5,
           ),
         ),
@@ -175,7 +175,7 @@ class _DietaryAssessmentFormState extends State<DietaryAssessmentForm> {
             Icon(
               selected ? Icons.check_circle : Icons.circle_outlined,
               size: 15,
-              color: selected ? Colors.white : _labelColor,
+              color: selected ? Colors.white : Colors.black38,
             ),
             const SizedBox(width: 6),
             Text(
@@ -183,7 +183,7 @@ class _DietaryAssessmentFormState extends State<DietaryAssessmentForm> {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: selected ? Colors.white : _textColor,
+                color: selected ? Colors.white : const Color(0xFF1A1A1A),
               ),
             ),
           ],
@@ -192,226 +192,172 @@ class _DietaryAssessmentFormState extends State<DietaryAssessmentForm> {
     );
   }
 
-  /// A sub-section card (same pattern as parent info / WHO results panels).
-  Widget _buildSubSection({
-    required String title,
-    required IconData icon,
-    required List<Widget> children,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: _primaryLight,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _border, width: 1.5),
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── Card 1: Breastfeeding ────────────────────────────────────
+        _buildCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: _primary,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Icon(icon, size: 14, color: Colors.white),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 13,
+              _buildSectionHeader(
+                  'DIETARY ASSESSMENT', Icons.restaurant_outlined),
+              const SizedBox(height: 14),
+
+              const Text(
+                'PURELY BREASTFED',
+                style: TextStyle(
+                  fontSize: 11,
                   fontWeight: FontWeight.w700,
-                  color: _primary,
-                  letterSpacing: 0.2,
+                  color: Color(0xFFF5A962),
+                  letterSpacing: 0.5,
                 ),
+              ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  _buildTogglePill('Yes', _purelyBreastfed == true, () {
+                    setState(() => _purelyBreastfed = true);
+                    widget.onPurelyBreastfedChanged?.call(true);
+                  }),
+                  const SizedBox(width: 10),
+                  _buildTogglePill('No', _purelyBreastfed == false, () {
+                    setState(() => _purelyBreastfed = false);
+                    widget.onPurelyBreastfedChanged?.call(false);
+                  }),
+                ],
+              ),
+              if (widget.purelyBreastfedError != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    widget.purelyBreastfedError!,
+                    style: const TextStyle(
+                        fontSize: 10, color: Color(0xFFEF4444)),
+                  ),
+                ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 10),
+
+        // ── Card 2: Complementary Feeding ────────────────────────────
+        _buildCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSectionHeader(
+                  'COMPLEMENTARY FEEDING', Icons.child_care_outlined),
+              const SizedBox(height: 14),
+
+              _buildField(
+                label: 'AGE WHEN CF STARTED',
+                controller: widget.ageWhenCfController,
+                keyboardType: TextInputType.number,
+                hint: 'Age in months',
+                icon: Icons.cake_outlined,
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'Required';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              _buildField(
+                label: 'FREQUENCY OF CF PER DAY',
+                controller: widget.freqCfController,
+                keyboardType: TextInputType.number,
+                hint: 'e.g. 3',
+                icon: Icons.repeat_outlined,
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'Required';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              _buildField(
+                label: 'FOODS GIVEN ON CF',
+                controller: widget.foodCfController,
+                hint: 'e.g. rice porridge, mashed vegetables',
+                icon: Icons.set_meal_outlined,
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'Required';
+                  return null;
+                },
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          ...children,
-        ],
-      ),
+        ),
+
+        const SizedBox(height: 10),
+
+        // ── Card 3: Dietary Diversity ────────────────────────────────
+        _buildCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSectionHeader(
+                  'DIETARY DIVERSITY', Icons.pie_chart_outline),
+              const SizedBox(height: 6),
+              const Text(
+                'Select all food groups consumed and specify:',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontStyle: FontStyle.italic,
+                  color: Colors.black38,
+                ),
+              ),
+              const SizedBox(height: 12),
+              const CheckboxFieldRow(
+                  label: 'Grains / Roots / Tubers', hint: 'Specify'),
+              const SizedBox(height: 8),
+              const CheckboxFieldRow(label: 'Legumes / Nuts', hint: 'Specify'),
+              const SizedBox(height: 8),
+              const CheckboxFieldRow(
+                  label: 'Dairy Products', hint: 'Specify'),
+              const SizedBox(height: 8),
+              const CheckboxFieldRow(
+                  label: 'Meat / Fish / Poultry', hint: 'Specify'),
+              const SizedBox(height: 8),
+              const CheckboxFieldRow(label: 'Eggs', hint: 'Specify'),
+              const SizedBox(height: 8),
+              const CheckboxFieldRow(
+                  label: 'Vit-A Rich Fruits & Vegetables', hint: 'Specify'),
+              const SizedBox(height: 8),
+              const CheckboxFieldRow(
+                  label: 'Other Fruits & Vegetables', hint: 'Specify'),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 10),
+
+        // ── Card 4: Meal Frequency ────────────────────────────────────
+        _buildCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSectionHeader(
+                  'MEAL FREQUENCY', Icons.dining_outlined),
+              const SizedBox(height: 14),
+              _buildField(
+                label: 'MEALS PER DAY',
+                controller: widget.mealFrequencyController,
+                keyboardType: TextInputType.number,
+                hint: 'e.g. 3',
+                icon: Icons.dining_outlined,
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty)
+                    return 'Meal frequency is required';
+                  return null;
+                },
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: _surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _border, width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ── Section Header ───────────────────────────────────────────────
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            decoration: const BoxDecoration(
-              color: _primaryLight,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: _primary,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.restaurant_outlined,
-                      size: 18, color: Colors.white),
-                ),
-                const SizedBox(width: 12),
-                const Text(
-                  'Dietary Assessment',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: _textColor,
-                    letterSpacing: 0.2,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // ── Form Body ────────────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // ── Purely Breastfed ─────────────────────────────────────
-                _buildYesNoToggle(
-                  label: 'Purely Breastfed',
-                  value: _purelyBreastfed,
-                  errorText: widget.purelyBreastfedError,
-                  onChanged: (v) {
-                    setState(() => _purelyBreastfed = v);
-                    widget.onPurelyBreastfedChanged?.call(v);
-                  },
-                ),
-
-                const SizedBox(height: 20),
-
-                // ── Complementary Feeding sub-section ────────────────────
-                _buildSubSection(
-                  title: 'Complementary Feeding (CF)',
-                  icon: Icons.child_care_outlined,
-                  children: [
-                    _buildField(
-                      label: 'Age When CF Started',
-                      controller: widget.ageWhenCfController,
-                      keyboardType: TextInputType.number,
-                      hint: 'Age in months',
-                      prefixIcon: const Icon(Icons.cake_outlined, size: 18),
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) return 'Required';
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    _buildField(
-                      label: 'Frequency of CF per Day',
-                      controller: widget.freqCfController,
-                      keyboardType: TextInputType.number,
-                      hint: 'e.g. 3',
-                      prefixIcon: const Icon(Icons.repeat_outlined, size: 18),
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) return 'Required';
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    _buildField(
-                      label: 'Foods Given on CF',
-                      controller: widget.foodCfController,
-                      hint: 'e.g. rice porridge, mashed vegetables',
-                      prefixIcon:
-                          const Icon(Icons.set_meal_outlined, size: 18),
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) return 'Required';
-                        return null;
-                      },
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 20),
-
-                // ── Dietary Diversity sub-section ────────────────────────
-                _buildSubSection(
-                  title: 'Dietary Diversity',
-                  icon: Icons.pie_chart_outline,
-                  children: [
-                    const Text(
-                      'Select all food groups consumed and specify:',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontStyle: FontStyle.italic,
-                        color: Color(0xFF8D4E15),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    const CheckboxFieldRow(
-                        label: 'Grains / Roots / Tubers',
-                        hint: 'Specify'),
-                    const SizedBox(height: 8),
-                    const CheckboxFieldRow(
-                        label: 'Legumes / Nuts', hint: 'Specify'),
-                    const SizedBox(height: 8),
-                    const CheckboxFieldRow(
-                        label: 'Dairy Products', hint: 'Specify'),
-                    const SizedBox(height: 8),
-                    const CheckboxFieldRow(
-                        label: 'Meat / Fish / Poultry', hint: 'Specify'),
-                    const SizedBox(height: 8),
-                    const CheckboxFieldRow(label: 'Eggs', hint: 'Specify'),
-                    const SizedBox(height: 8),
-                    const CheckboxFieldRow(
-                        label: 'Vit-A Rich Fruits & Vegetables',
-                        hint: 'Specify'),
-                    const SizedBox(height: 8),
-                    const CheckboxFieldRow(
-                        label: 'Other Fruits & Vegetables',
-                        hint: 'Specify'),
-                  ],
-                ),
-
-                const SizedBox(height: 20),
-
-                // ── Meal Frequency ───────────────────────────────────────
-                _buildField(
-                  label: 'Meal Frequency per Day',
-                  controller: widget.mealFrequencyController,
-                  keyboardType: TextInputType.number,
-                  hint: 'e.g. 3',
-                  prefixIcon:
-                      const Icon(Icons.dining_outlined, size: 18),
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) {
-                      return 'Meal frequency is required';
-                    }
-                    return null;
-                  },
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+} 

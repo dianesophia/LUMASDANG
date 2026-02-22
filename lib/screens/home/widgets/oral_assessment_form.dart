@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'form_card.dart';
 import 'yes_no_row.dart';
 
 class OralAssessmentForm extends StatefulWidget {
@@ -14,16 +13,6 @@ class OralAssessmentForm extends StatefulWidget {
 }
 
 class _OralAssessmentFormState extends State<OralAssessmentForm> {
-  // ── Theme constants ───────────────────────────────────────────────────────
-  static const Color _primary = Color(0xFFB5651D);
-  static const Color _primaryLight = Color(0xFFFFF3E0);
-  static const Color _surface = Colors.white;
-  static const Color _surfaceAlt = Color(0xFFFDF6EE);
-  static const Color _border = Color(0xFFE8C9A0);
-  static const Color _labelColor = Color(0xFF795548);
-  static const Color _textColor = Color(0xFF3E2723);
-
-  // ── Risk palette ──────────────────────────────────────────────────────────
   static const Color _highRisk = Color(0xFFDC2626);
   static const Color _highRiskLight = Color(0xFFFEF2F2);
   static const Color _modRisk = Color(0xFFD97706);
@@ -39,80 +28,106 @@ class _OralAssessmentFormState extends State<OralAssessmentForm> {
     }
   }
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
+  Widget _buildCard({required Widget child}) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: child,
+      );
 
-  Widget _buildLabel(String text) => Padding(
-        padding: const EdgeInsets.only(bottom: 6),
+  Widget _buildSectionHeader(String title, IconData icon) => Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFF5A962), Color(0xFFF08030)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFF5A962).withValues(alpha: 0.35),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Icon(icon, color: Colors.white, size: 18),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFFF5A962),
+              letterSpacing: 1.1,
+            ),
+          ),
+        ],
+      );
+
+  Widget _buildRiskBadge(String label, Color color, Color bgColor) =>
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(20),
+          border:
+              Border.all(color: color.withValues(alpha: 0.4), width: 1.2),
+        ),
         child: Text(
-          text,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: _labelColor,
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: color,
             letterSpacing: 0.3,
           ),
         ),
       );
 
-  Widget _buildRiskBadge(String label, Color color, Color bgColor) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.4), width: 1.2),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          color: color,
-          letterSpacing: 0.3,
+  Widget _buildYesNoHeader() => Padding(
+        padding: const EdgeInsets.only(bottom: 4),
+        child: Row(
+          children: [
+            const Expanded(child: SizedBox()),
+            SizedBox(
+              width: 36,
+              child: Text('YES',
+                  style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.black45,
+                      letterSpacing: 0.5),
+                  textAlign: TextAlign.center),
+            ),
+            const SizedBox(width: 6),
+            SizedBox(
+              width: 36,
+              child: Text('NO',
+                  style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.black45,
+                      letterSpacing: 0.5),
+                  textAlign: TextAlign.center),
+            ),
+          ],
         ),
-      ),
-    );
-  }
+      );
 
-  Widget _buildYesNoHeader() {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Row(
-        children: [
-          const Expanded(child: SizedBox()),
-          SizedBox(
-            width: 36,
-            child: Text(
-              'YES',
-              style: TextStyle(
-                fontSize: 9,
-                fontWeight: FontWeight.w800,
-                color: _labelColor,
-                letterSpacing: 0.5,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ),
-          const SizedBox(width: 6),
-          SizedBox(
-            width: 36,
-            child: Text(
-              'NO',
-              style: TextStyle(
-                fontSize: 9,
-                fontWeight: FontWeight.w800,
-                color: _labelColor,
-                letterSpacing: 0.5,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Risk card with coloured left accent bar.
   Widget _buildRiskCard({
     required String title,
     required String badgeLabel,
@@ -123,9 +138,9 @@ class _OralAssessmentFormState extends State<OralAssessmentForm> {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: _surface,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _border, width: 1.5),
+        border: Border.all(color: const Color(0xFFEEEEEE), width: 1.5),
       ),
       clipBehavior: Clip.hardEdge,
       child: IntrinsicHeight(
@@ -143,14 +158,11 @@ class _OralAssessmentFormState extends State<OralAssessmentForm> {
                       Row(
                         children: [
                           Expanded(
-                            child: Text(
-                              title,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: _textColor,
-                              ),
-                            ),
+                            child: Text(title,
+                                style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF1A1A1A))),
                           ),
                           const SizedBox(width: 8),
                           _buildRiskBadge(badgeLabel, riskColor, riskBgColor),
@@ -179,36 +191,6 @@ class _OralAssessmentFormState extends State<OralAssessmentForm> {
     );
   }
 
-  Widget _buildOverallRisk() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildLabel('Overall Risk Assessment'),
-        Row(
-          children: [
-            Expanded(
-                child: _buildRiskPill('High', _highRisk, _highRiskLight)),
-            const SizedBox(width: 8),
-            Expanded(
-                child: _buildRiskPill('Moderate', _modRisk, _modRiskLight)),
-            const SizedBox(width: 8),
-            Expanded(
-                child: _buildRiskPill('Low', _lowRisk, _lowRiskLight)),
-          ],
-        ),
-        if (widget.overallRiskError != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 6, left: 2),
-            child: Text(
-              widget.overallRiskError!,
-              style: const TextStyle(
-                  fontSize: 11, color: Color(0xFFEF4444)),
-            ),
-          ),
-      ],
-    );
-  }
-
   Widget _buildRiskPill(String label, Color color, Color bgColor) {
     final isSelected = _selectedOverallRisk == label;
     return GestureDetector(
@@ -224,7 +206,7 @@ class _OralAssessmentFormState extends State<OralAssessmentForm> {
           color: isSelected ? color : bgColor,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isSelected ? color : color.withOpacity(0.4),
+            color: isSelected ? color : color.withValues(alpha: 0.4),
             width: 1.5,
           ),
         ),
@@ -253,145 +235,153 @@ class _OralAssessmentFormState extends State<OralAssessmentForm> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: _surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _border, width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── Card 1: Risk Factors ──────────────────────────────────────
+        _buildCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSectionHeader(
+                  'ORAL ASSESSMENT', Icons.medical_services_outlined),
+              const SizedBox(height: 14),
+
+              const Text(
+                'RISK FACTORS',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFFF5A962),
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              _buildRiskCard(
+                title: 'Social / Behavioral / Medical',
+                badgeLabel: 'High Risk',
+                riskColor: _highRisk,
+                riskBgColor: _highRiskLight,
+                items: [
+                  'Mother/primary caregiver has active dental caries',
+                  'Parent/caregiver has life-time of poverty, low health literacy',
+                  'Child has frequent exposure (>3×/day) to sugar-containing snacks or beverages between meals',
+                  'Child uses bottle or nonspill cup with natural/added sugar frequently between meals or at bedtime',
+                ],
+              ),
+
+              const SizedBox(height: 8),
+
+              _buildRiskCard(
+                title: '',
+                badgeLabel: 'Moderate Risk',
+                riskColor: _modRisk,
+                riskBgColor: _modRiskLight,
+                showTitle: false,
+                items: [
+                  'Child is a recent immigrant',
+                  'Child has special health care needs',
+                ],
+              ),
+
+              const SizedBox(height: 8),
+
+              _buildRiskCard(
+                title: 'Clinical',
+                badgeLabel: 'High Risk',
+                riskColor: _highRisk,
+                riskBgColor: _highRiskLight,
+                items: [
+                  'Child has visible plaque on teeth',
+                  'Child presents with dental enamel defects',
+                ],
+              ),
+
+              const SizedBox(height: 8),
+
+              _buildRiskCard(
+                title: 'Protective Factors',
+                badgeLabel: 'Low Risk',
+                riskColor: _lowRisk,
+                riskBgColor: _lowRiskLight,
+                items: [
+                  'Child receives optimally-fluoridated drinking water or fluoride supplements',
+                  'Child has teeth brushed daily with fluoridated toothpaste',
+                  'Child receives topical fluoride from health professional',
+                  'Child has dental home / regular dental care',
+                ],
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ── Section Header ─────────────────────────────────────────────
-          Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            decoration: const BoxDecoration(
-              color: _primaryLight,
-              borderRadius:
-                  BorderRadius.vertical(top: Radius.circular(14)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: _primary,
-                    borderRadius: BorderRadius.circular(8),
+        ),
+
+        const SizedBox(height: 10),
+
+        // ── Card 2: Disease Indicators ────────────────────────────────
+        _buildCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSectionHeader(
+                  'DISEASE INDICATORS', Icons.biotech_outlined),
+              const SizedBox(height: 14),
+
+              _buildRiskCard(
+                title: 'Caries Findings',
+                badgeLabel: 'High Risk',
+                riskColor: _highRisk,
+                riskBgColor: _highRiskLight,
+                items: [
+                  'Child has noncavitated (incipient / white spot) caries lesions',
+                  'Child has visible caries lesions',
+                  'Child has recent restorations or missing teeth due to caries',
+                ],
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 10),
+
+        // ── Card 3: Overall Risk ──────────────────────────────────────
+        _buildCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSectionHeader(
+                  'OVERALL RISK ASSESSMENT', Icons.assessment_outlined),
+              const SizedBox(height: 14),
+
+              Row(
+                children: [
+                  Expanded(
+                      child: _buildRiskPill(
+                          'High', _highRisk, _highRiskLight)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                      child: _buildRiskPill(
+                          'Moderate', _modRisk, _modRiskLight)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                      child:
+                          _buildRiskPill('Low', _lowRisk, _lowRiskLight)),
+                ],
+              ),
+
+              if (widget.overallRiskError != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    widget.overallRiskError!,
+                    style: const TextStyle(
+                        fontSize: 10, color: Color(0xFFEF4444)),
                   ),
-                  child: const Icon(Icons.medical_services_outlined,
-                      size: 18, color: Colors.white),
                 ),
-                const SizedBox(width: 12),
-                const Text(
-                  'Oral Assessment',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: _textColor,
-                    letterSpacing: 0.2,
-                  ),
-                ),
-              ],
-            ),
+            ],
           ),
-
-          // ── Form Body ──────────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // ── Risk Factors ───────────────────────────────────────
-                _buildLabel('Risk Factors'),
-
-                _buildRiskCard(
-                  title: 'Social / Behavioral / Medical',
-                  badgeLabel: 'High Risk',
-                  riskColor: _highRisk,
-                  riskBgColor: _highRiskLight,
-                  items: [
-                    'Mother/primary caregiver has active dental caries',
-                    'Parent/caregiver has life-time of poverty, low health literacy',
-                    'Child has frequent exposure (>3×/day) to sugar-containing snacks or beverages between meals',
-                    'Child uses bottle or nonspill cup with natural/added sugar frequently between meals or at bedtime',
-                  ],
-                ),
-
-                const SizedBox(height: 8),
-
-                _buildRiskCard(
-                  title: '',
-                  badgeLabel: 'Moderate Risk',
-                  riskColor: _modRisk,
-                  riskBgColor: _modRiskLight,
-                  showTitle: false,
-                  items: [
-                    'Child is a recent immigrant',
-                    'Child has special health care needs',
-                  ],
-                ),
-
-                const SizedBox(height: 12),
-
-                _buildRiskCard(
-                  title: 'Clinical',
-                  badgeLabel: 'High Risk',
-                  riskColor: _highRisk,
-                  riskBgColor: _highRiskLight,
-                  items: [
-                    'Child has visible plaque on teeth',
-                    'Child presents with dental enamel defects',
-                  ],
-                ),
-
-                const SizedBox(height: 12),
-
-                _buildRiskCard(
-                  title: 'Protective Factors',
-                  badgeLabel: 'Low Risk',
-                  riskColor: _lowRisk,
-                  riskBgColor: _lowRiskLight,
-                  items: [
-                    'Child receives optimally-fluoridated drinking water or fluoride supplements',
-                    'Child has teeth brushed daily with fluoridated toothpaste',
-                    'Child receives topical fluoride from health professional',
-                    'Child has dental home / regular dental care',
-                  ],
-                ),
-
-                const SizedBox(height: 20),
-
-                // ── Disease Indicators ─────────────────────────────────
-                _buildLabel('Disease Indicators'),
-                _buildRiskCard(
-                  title: 'Caries Findings',
-                  badgeLabel: 'High Risk',
-                  riskColor: _highRisk,
-                  riskBgColor: _highRiskLight,
-                  items: [
-                    'Child has noncavitated (incipient / white spot) caries lesions',
-                    'Child has visible caries lesions',
-                    'Child has recent restorations or missing teeth due to caries',
-                  ],
-                ),
-
-                const SizedBox(height: 20),
-
-                // ── Overall Risk ───────────────────────────────────────
-                _buildOverallRisk(),
-              ],
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

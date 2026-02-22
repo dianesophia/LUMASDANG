@@ -49,7 +49,8 @@ class _NotificationsTabState extends State<NotificationsTab> {
         'patientAge': data['demographic']?['age'] ?? '',
         'patientSex': data['demographic']?['sex'] ?? '',
         'createdAt': record['timestamp'],
-        'read': record['synced'] ?? false,
+        'read': false,
+        'synced': record['synced'] ?? false,
       };
     }).toList();
 
@@ -83,8 +84,7 @@ class _NotificationsTabState extends State<NotificationsTab> {
         .limit(50)
         .snapshots()
         .map((snap) => snap.docs.map((d) {
-              final data = d.data();
-              data['id'] = d.id;
+              final data = {...(d.data() as Map<String, dynamic>), 'id': d.id, '_collection': 'notifications'};
               return data;
             }).toList());
   }
@@ -103,8 +103,7 @@ class _NotificationsTabState extends State<NotificationsTab> {
         .limit(50)
         .snapshots()
         .map((snap) => snap.docs.map((d) {
-              final data = d.data();
-              data['id'] = d.id;
+              final data = {...(d.data() as Map<String, dynamic>), 'id': d.id, '_collection': 'calendarNotifications'};
               return data;
             }).toList());
   }
@@ -115,13 +114,19 @@ class _NotificationsTabState extends State<NotificationsTab> {
     List<Map<String, dynamic>> events,
   ) {
     final all = [...patients, ...events];
-    all.sort((a, b) {
+    final seen = <String>{};
+    final deduped = <Map<String, dynamic>>[];
+    for (final n in all) {
+      final key = '${n['_collection']}_${n['id']}';
+      if (seen.add(key)) deduped.add(n);
+    }
+    deduped.sort((a, b) {
       final aTs = a['createdAt'];
       final bTs = b['createdAt'];
       if (aTs is Timestamp && bTs is Timestamp) return bTs.compareTo(aTs);
       return 0;
     });
-    return all;
+    return deduped;
   }
 
   List<Map<String, dynamic>> _filtered(List<Map<String, dynamic>> all) {
@@ -166,6 +171,141 @@ class _NotificationsTabState extends State<NotificationsTab> {
     if (s == 'male' || s == 'm') return Icons.boy;
     if (s == 'female' || s == 'f') return Icons.girl;
     return Icons.person;
+  }
+
+  // ── Delete single notification ─────────────────────────────────────────────
+  Future<void> _deleteNotification(Map<String, dynamic> n) async {
+    final id = n['id'] as String?;
+    final collection = n['_collection'] as String?;
+    if (id == null || collection == null) return;
+
+    try {
+      final barangayId = await FirestoreService().getCurrentUserBarangayId();
+      if (barangayId == null || barangayId.isEmpty) return;
+
+      await FirebaseFirestore.instance
+          .collection('barangays')
+          .doc(barangayId)
+          .collection(collection)
+          .doc(id)
+          .delete();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: const [
+                Icon(Icons.error_outline, color: Colors.white, size: 18),
+                SizedBox(width: 8),
+                Text('Failed to delete notification'),
+              ],
+            ),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      }
+    }
+  }
+
+  // ── Clear All ──────────────────────────────────────────────────────────────
+  Future<void> _clearAllNotifications(List<Map<String, dynamic>> all) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: const [
+            Icon(Icons.delete_sweep_rounded, color: Color(0xFF2E8B7B)),
+            SizedBox(width: 8),
+            Text('Clear All', style: TextStyle(fontSize: 18)),
+          ],
+        ),
+        content: const Text(
+          'This will permanently delete all notifications for your barangay team. This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2E8B7B),
+              foregroundColor: Colors.white,
+              shape:
+                  RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Clear All'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      final barangayId = await FirestoreService().getCurrentUserBarangayId();
+      if (barangayId == null || barangayId.isEmpty) return;
+
+      final db = FirebaseFirestore.instance;
+      final batch = db.batch();
+
+      for (final n in all) {
+        final id = n['id'] as String?;
+        final collection = n['_collection'] as String?;
+        if (id == null || collection == null) continue;
+        batch.delete(db
+            .collection('barangays')
+            .doc(barangayId)
+            .collection(collection)
+            .doc(id));
+      }
+
+      await batch.commit();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: const [
+                Icon(Icons.check_circle_outline, color: Colors.white, size: 18),
+                SizedBox(width: 8),
+                Text('All notifications cleared'),
+              ],
+            ),
+            backgroundColor: const Color(0xFF2E8B7B),
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: const [
+                Icon(Icons.error_outline, color: Colors.white, size: 18),
+                SizedBox(width: 8),
+                Text('Failed to clear notifications'),
+              ],
+            ),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      }
+    }
   }
 
   // ── Navigation ─────────────────────────────────────────────────────────────
@@ -221,7 +361,7 @@ class _NotificationsTabState extends State<NotificationsTab> {
                       ],
                     ),
                   ),
-                  const Expanded(child: PatientListTab()),
+                  Expanded(child: PatientListTab()),
                 ],
               ),
             ),
@@ -267,7 +407,7 @@ class _NotificationsTabState extends State<NotificationsTab> {
               ),
               child: Column(
                 children: [
-                  _buildHeader(unread),
+                  _buildHeader(unread, all),
                   _buildFilterChips(all),
                   if (isLoading)
                     const LinearProgressIndicator(
@@ -285,7 +425,7 @@ class _NotificationsTabState extends State<NotificationsTab> {
   }
 
   // ── Header ─────────────────────────────────────────────────────────────────
-  Widget _buildHeader(int unread) {
+  Widget _buildHeader(int unread, List<Map<String, dynamic>> all) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Row(
@@ -293,7 +433,7 @@ class _NotificationsTabState extends State<NotificationsTab> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
+              color: Colors.white.withOpacity(0.2),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Stack(
@@ -306,49 +446,59 @@ class _NotificationsTabState extends State<NotificationsTab> {
                     right: -5,
                     child: Container(
                       padding: const EdgeInsets.all(3),
-                      decoration: const BoxDecoration(
-                          color: Color(0xFFF08030), shape: BoxShape.circle),
-                      child: Text('$unread',
-                          style: const TextStyle(
-                              color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700)),
+                      decoration: const BoxDecoration(color: Color(0xFFF08030), shape: BoxShape.circle),
+                      child: Text('$unread', style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700)),
                     ),
                   ),
               ],
             ),
           ),
           const SizedBox(width: 12),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Notifications',
-                    style: TextStyle(
-                        fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
-                Text('Shared with your barangay team',
-                    style: TextStyle(fontSize: 13, color: Colors.white70)),
+              children: const [
+                Text('Notifications', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
+                Text('Shared with your barangay team', style: TextStyle(fontSize: 13, color: Colors.white70)),
               ],
             ),
           ),
+          // Clear All — only shown when there are notifications
+          if (all.isNotEmpty) ...[
+            GestureDetector(
+              onTap: () => _clearAllNotifications(all),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(Icons.delete_sweep_rounded, color: Colors.white70, size: 14),
+                    SizedBox(width: 4),
+                    Text('Clear', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
           // Live indicator
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
+              color: Colors.white.withOpacity(0.2),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 6,
-                  height: 6,
-                  decoration: const BoxDecoration(
-                      color: Color(0xFF8BC88A), shape: BoxShape.circle),
-                ),
-                const SizedBox(width: 4),
-                const Text('Live',
-                    style: TextStyle(
-                        color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
+              children: const [
+                SizedBox(width: 6, height: 6, child: DecoratedBox(decoration: BoxDecoration(color: Color(0xFF8BC88A), shape: BoxShape.circle))),
+                SizedBox(width: 4),
+                Text('Live', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
               ],
             ),
           ),
@@ -384,30 +534,22 @@ class _NotificationsTabState extends State<NotificationsTab> {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
-          color: isActive ? Colors.white : Colors.white.withValues(alpha: 0.2),
+          color: isActive ? Colors.white : Colors.white.withOpacity(0.2),
           borderRadius: BorderRadius.circular(20),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(label,
-                style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: isActive ? const Color(0xFF2E8B7B) : Colors.white)),
+            Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isActive ? const Color(0xFF2E8B7B) : Colors.white)),
             if (count > 0) ...[
               const SizedBox(width: 5),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                 decoration: BoxDecoration(
-                  color: isActive
-                      ? const Color(0xFF2E8B7B)
-                      : Colors.white.withValues(alpha: 0.3),
+                  color: isActive ? const Color(0xFF2E8B7B) : Colors.white.withOpacity(0.3),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Text('$count',
-                    style: const TextStyle(
-                        color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
+                child: Text('$count', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
               ),
             ],
           ],
@@ -423,14 +565,9 @@ class _NotificationsTabState extends State<NotificationsTab> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.notifications_none,
-                size: 72, color: Colors.white.withValues(alpha: 0.4)),
+            Icon(Icons.notifications_none, size: 72, color: Colors.white.withOpacity(0.4)),
             const SizedBox(height: 12),
-            Text('No notifications yet',
-                style: TextStyle(
-                    fontSize: 17,
-                    color: Colors.white.withValues(alpha: 0.7),
-                    fontWeight: FontWeight.w500)),
+            Text('No notifications yet', style: TextStyle(fontSize: 17, color: Colors.white.withOpacity(0.7), fontWeight: FontWeight.w500)),
             const SizedBox(height: 6),
             Text(
               _activeFilter == 'new_patient'
@@ -439,8 +576,7 @@ class _NotificationsTabState extends State<NotificationsTab> {
                       ? 'Calendar events will appear here'
                       : 'New activity from your barangay\nteam will appear here in real-time',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                  fontSize: 13, color: Colors.white.withValues(alpha: 0.5)),
+              style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.5)),
             ),
           ],
         ),
@@ -452,9 +588,7 @@ class _NotificationsTabState extends State<NotificationsTab> {
       itemCount: items.length,
       itemBuilder: (context, i) {
         final n = items[i];
-        return n['type'] == 'new_event'
-            ? _buildEventCard(n)
-            : _buildPatientCard(n);
+        return n['type'] == 'new_event' ? _buildEventCard(n) : _buildPatientCard(n);
       },
     );
   }
@@ -477,10 +611,7 @@ class _NotificationsTabState extends State<NotificationsTab> {
           width: 2,
         ),
         boxShadow: [
-          BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 8,
-              offset: const Offset(0, 2)),
+          BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 8, offset: const Offset(0, 2)),
         ],
       ),
       child: Material(
@@ -488,11 +619,11 @@ class _NotificationsTabState extends State<NotificationsTab> {
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
           onTap: () async {
-            // Mark as read
             if (!isRead && n['id'] != null) {
-              await FirestoreService().markNotificationAsRead(n['id']);
+              try {
+                await FirestoreService().markNotificationAsRead(n['id']);
+              } catch (_) {}
             }
-            // Navigate to Patient List
             if (mounted) _navigateToPatientList();
           },
           child: Padding(
@@ -502,8 +633,7 @@ class _NotificationsTabState extends State<NotificationsTab> {
                 Container(
                   width: 50,
                   height: 50,
-                  decoration: BoxDecoration(
-                      color: _avatarColor(patientSex), shape: BoxShape.circle),
+                  decoration: BoxDecoration(color: _avatarColor(patientSex), shape: BoxShape.circle),
                   child: Icon(_avatarIcon(patientSex), color: Colors.white, size: 28),
                 ),
                 const SizedBox(width: 12),
@@ -514,61 +644,29 @@ class _NotificationsTabState extends State<NotificationsTab> {
                       Row(
                         children: [
                           Expanded(
-                            child: Text('New Assessment',
-                                style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: isRead
-                                        ? Colors.grey
-                                        : const Color(0xFF2E8B7B))),
-                          ),
+                            child: Text('New Assessment', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: isRead ? Colors.grey : const Color(0xFF2E8B7B)))),
                           if (!isRead)
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: const BoxDecoration(
-                                  color: Color(0xFF2E8B7B), shape: BoxShape.circle),
-                            ),
+                            Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFF2E8B7B), shape: BoxShape.circle)),
                         ],
                       ),
                       const SizedBox(height: 3),
-                      Text(patientName,
-                          style: TextStyle(
-                              fontSize: 15,
-                              fontWeight:
-                                  isRead ? FontWeight.normal : FontWeight.bold,
-                              color: Colors.black87)),
+                      Text(patientName, style: TextStyle(fontSize: 15, fontWeight: isRead ? FontWeight.normal : FontWeight.bold, color: Colors.black87)),
                       const SizedBox(height: 2),
-                      Text('Added by $createdBy',
-                          style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.grey.shade600,
-                              fontStyle: FontStyle.italic)),
+                      Text('Added by $createdBy', style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontStyle: FontStyle.italic)),
                       const SizedBox(height: 4),
                       Row(
                         children: [
                           Icon(Icons.cake, size: 11, color: Colors.grey.shade500),
                           const SizedBox(width: 3),
-                          Text(
-                              patientAge.isNotEmpty ? '$patientAge months' : 'Age N/A',
-                              style: TextStyle(
-                                  fontSize: 11, color: Colors.grey.shade600)),
+                          Text(patientAge.isNotEmpty ? '$patientAge months' : 'Age N/A', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
                           const SizedBox(width: 10),
-                          Icon(_avatarIcon(patientSex),
-                              size: 11, color: Colors.grey.shade500),
+                          Icon(_avatarIcon(patientSex), size: 11, color: Colors.grey.shade500),
                           const SizedBox(width: 3),
-                          Text(patientSex.isNotEmpty ? patientSex : 'N/A',
-                              style: TextStyle(
-                                  fontSize: 11, color: Colors.grey.shade600)),
+                          Text(patientSex.isNotEmpty ? patientSex : 'N/A', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
                           const Spacer(),
-                          Icon(Icons.access_time,
-                              size: 11, color: Colors.grey.shade400),
+                          Icon(Icons.access_time, size: 11, color: Colors.grey.shade400),
                           const SizedBox(width: 3),
-                          Text(_formatTimestamp(n['createdAt']),
-                              style: TextStyle(
-                                  fontSize: 10,
-                                  color: Colors.grey.shade500,
-                                  fontStyle: FontStyle.italic)),
+                          Text(_formatTimestamp(n['createdAt']), style: TextStyle(fontSize: 10, color: Colors.grey.shade500, fontStyle: FontStyle.italic)),
                         ],
                       ),
                     ],
@@ -577,12 +675,9 @@ class _NotificationsTabState extends State<NotificationsTab> {
                 // Destination hint
                 Column(
                   children: [
-                    Icon(Icons.people_rounded,
-                        color: const Color(0xFF2E8B7B).withValues(alpha: 0.4),
-                        size: 16),
+                    Icon(Icons.people_rounded, color: const Color(0xFF2E8B7B).withOpacity(0.4), size: 16),
                     const SizedBox(height: 2),
-                    Icon(Icons.chevron_right,
-                        color: Colors.grey.shade300, size: 20),
+                    Icon(Icons.chevron_right, color: Colors.grey.shade300, size: 20),
                   ],
                 ),
               ],
@@ -605,8 +700,7 @@ class _NotificationsTabState extends State<NotificationsTab> {
     String dateLabel = '';
     if (eventDate is Timestamp) {
       final d = eventDate.toDate();
-      const months = ['Jan','Feb','Mar','Apr','May','Jun',
-                      'Jul','Aug','Sep','Oct','Nov','Dec'];
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
       dateLabel = '${months[d.month - 1]} ${d.day}, ${d.year}';
     }
 
@@ -615,15 +709,9 @@ class _NotificationsTabState extends State<NotificationsTab> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isRead ? Colors.transparent : eventColor,
-          width: 2,
-        ),
+        border: Border.all(color: isRead ? Colors.transparent : eventColor, width: 2),
         boxShadow: [
-          BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 8,
-              offset: const Offset(0, 2)),
+          BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 8, offset: const Offset(0, 2)),
         ],
       ),
       child: Material(
@@ -631,11 +719,11 @@ class _NotificationsTabState extends State<NotificationsTab> {
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
           onTap: () async {
-            // Mark as read
             if (!isRead && n['id'] != null) {
-              await FirestoreService().markCalendarNotificationAsRead(n['id']);
+              try {
+                await FirestoreService().markCalendarNotificationAsRead(n['id']);
+              } catch (_) {}
             }
-            // Navigate to Calendar
             if (mounted) _navigateToCalendar();
           },
           child: Padding(
@@ -645,11 +733,7 @@ class _NotificationsTabState extends State<NotificationsTab> {
                 Container(
                   width: 50,
                   height: 50,
-                  decoration: BoxDecoration(
-                    color: eventColor.withValues(alpha: 0.12),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: eventColor, width: 2),
-                  ),
+                  decoration: BoxDecoration(color: eventColor.withOpacity(0.12), shape: BoxShape.circle, border: Border.all(color: eventColor, width: 2)),
                   child: Icon(Icons.event_rounded, color: eventColor, size: 24),
                 ),
                 const SizedBox(width: 12),
@@ -659,75 +743,41 @@ class _NotificationsTabState extends State<NotificationsTab> {
                     children: [
                       Row(
                         children: [
-                          Expanded(
-                            child: Text('New Event Added',
-                                style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: isRead ? Colors.grey : eventColor)),
-                          ),
+                          Expanded(child: Text('New Event Added', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: isRead ? Colors.grey : eventColor))),
                           if (!isRead)
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                  color: eventColor, shape: BoxShape.circle),
-                            ),
+                            Container(width: 8, height: 8, decoration: BoxDecoration(color: eventColor, shape: BoxShape.circle)),
                         ],
                       ),
                       const SizedBox(height: 3),
-                      Text(eventTitle,
-                          style: TextStyle(
-                              fontSize: 15,
-                              fontWeight:
-                                  isRead ? FontWeight.normal : FontWeight.bold,
-                              color: Colors.black87)),
+                      Text(eventTitle, style: TextStyle(fontSize: 15, fontWeight: isRead ? FontWeight.normal : FontWeight.bold, color: Colors.black87)),
                       const SizedBox(height: 2),
-                      Text('Added by $createdBy',
-                          style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.grey.shade600,
-                              fontStyle: FontStyle.italic)),
+                      Text('Added by $createdBy', style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontStyle: FontStyle.italic)),
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          Icon(Icons.calendar_today_rounded,
-                              size: 11, color: Colors.grey.shade500),
+                          Icon(Icons.calendar_today_rounded, size: 11, color: Colors.grey.shade500),
                           const SizedBox(width: 3),
-                          Text(dateLabel,
-                              style: TextStyle(
-                                  fontSize: 11, color: Colors.grey.shade600)),
+                          Text(dateLabel, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
                           if (eventTime.isNotEmpty) ...[
                             const SizedBox(width: 8),
-                            Icon(Icons.access_time_rounded,
-                                size: 11, color: Colors.grey.shade500),
+                            Icon(Icons.access_time_rounded, size: 11, color: Colors.grey.shade500),
                             const SizedBox(width: 3),
-                            Text(eventTime,
-                                style: TextStyle(
-                                    fontSize: 11, color: Colors.grey.shade600)),
+                            Text(eventTime, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
                           ],
                           const Spacer(),
-                          Icon(Icons.access_time,
-                              size: 11, color: Colors.grey.shade400),
+                          Icon(Icons.access_time, size: 11, color: Colors.grey.shade400),
                           const SizedBox(width: 3),
-                          Text(_formatTimestamp(n['createdAt']),
-                              style: TextStyle(
-                                  fontSize: 10,
-                                  color: Colors.grey.shade500,
-                                  fontStyle: FontStyle.italic)),
+                          Text(_formatTimestamp(n['createdAt']), style: TextStyle(fontSize: 10, color: Colors.grey.shade500, fontStyle: FontStyle.italic)),
                         ],
                       ),
                     ],
                   ),
                 ),
-                // Destination hint
                 Column(
                   children: [
-                    Icon(Icons.calendar_month_rounded,
-                        color: eventColor.withValues(alpha: 0.4), size: 16),
+                    Icon(Icons.calendar_month_rounded, color: eventColor.withOpacity(0.4), size: 16),
                     const SizedBox(height: 2),
-                    Icon(Icons.chevron_right,
-                        color: Colors.grey.shade300, size: 20),
+                    Icon(Icons.chevron_right, color: Colors.grey.shade300, size: 20),
                   ],
                 ),
               ],
@@ -756,44 +806,28 @@ class _NotificationsTabState extends State<NotificationsTab> {
               children: [
                 Container(
                   padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(Icons.notifications_active,
-                      color: Colors.white, size: 28),
+                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(12)),
+                  child: const Icon(Icons.notifications_active, color: Colors.white, size: 28),
                 ),
                 const SizedBox(width: 12),
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Notifications',
-                          style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white)),
-                      Text('Offline mode — local records only',
-                          style: TextStyle(fontSize: 13, color: Colors.white70)),
+                    children: const [
+                      Text('Notifications', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
+                      Text('Offline mode — local records only', style: TextStyle(fontSize: 13, color: Colors.white70)),
                     ],
                   ),
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Row(
+                  decoration: BoxDecoration(color: Colors.orange.withOpacity(0.3), borderRadius: BorderRadius.circular(12)),
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
-                    children: [
+                    children: const [
                       Icon(Icons.wifi_off, color: Colors.white, size: 12),
                       SizedBox(width: 4),
-                      Text('Offline',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600)),
+                      Text('Offline', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
                     ],
                   ),
                 ),
@@ -802,30 +836,20 @@ class _NotificationsTabState extends State<NotificationsTab> {
           ),
           Expanded(
             child: _offlineLoading
-                ? const Center(
-                    child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white)))
+                ? Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.white)))
                 : _offlineNotifications.isEmpty
                     ? Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.wifi_off,
-                                size: 64,
-                                color: Colors.white.withValues(alpha: 0.4)),
+                            Icon(Icons.wifi_off, size: 64, color: Colors.white.withOpacity(0.4)),
                             const SizedBox(height: 12),
-                            Text('You are offline',
-                                style: TextStyle(
-                                    fontSize: 17,
-                                    color: Colors.white.withValues(alpha: 0.7),
-                                    fontWeight: FontWeight.w500)),
+                            Text('You are offline', style: TextStyle(fontSize: 17, color: Colors.white.withOpacity(0.7), fontWeight: FontWeight.w500)),
                             const SizedBox(height: 6),
                             Text(
                               'Connect to the internet to see\nshared barangay notifications',
                               textAlign: TextAlign.center,
-                              style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.white.withValues(alpha: 0.5)),
+                              style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.5)),
                             ),
                           ],
                         ),
@@ -833,8 +857,7 @@ class _NotificationsTabState extends State<NotificationsTab> {
                     : ListView.builder(
                         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                         itemCount: _offlineNotifications.length,
-                        itemBuilder: (context, i) =>
-                            _buildPatientCard(_offlineNotifications[i]),
+                        itemBuilder: (context, i) => _buildPatientCard(_offlineNotifications[i]),
                       ),
           ),
         ],
