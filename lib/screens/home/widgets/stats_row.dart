@@ -2,11 +2,10 @@ import 'package:flutter/material.dart';
 import '../../../services/firestore_service.dart';
 import '../../../services/local_db_service.dart';
 import '../../../services/connectivity_service.dart';
-import 'status_row.dart';
+import '../../shared/status_color.dart';
 
 class StatsRow extends StatefulWidget {
   final VoidCallback? onTap;
-
   const StatsRow({super.key, this.onTap});
 
   @override
@@ -27,25 +26,27 @@ class _StatsRowState extends State<StatsRow> {
   Future<int> _loadTodayCount() async {
     await LocalDbService.instance.init();
     final online = await ConnectivityService.instance.checkOnline();
-    if (online) {
-      return FirestoreService().getTodayScreenedCountFromBarangay();
-    }
+    if (online) return FirestoreService().getTodayScreenedCountFromBarangay();
     return LocalDbService.instance.getTodayScreenedCount();
   }
 
   Future<Map<String, int>> _loadStatusCounts() async {
     await LocalDbService.instance.init();
     final online = await ConnectivityService.instance.checkOnline();
-    if (online) {
-      return FirestoreService().getTodayStatusCounts();
-    }
-    return {'Underweight': 0, 'Overweight': 0, 'Stunted': 0, 'At Risk': 0};
+    if (online) return FirestoreService().getStatusCounts();
+    return {
+      'Underweight': 0,
+      'Overweight/Obese': 0,
+      'Stunted': 0,
+      'At Risk': 0,
+      'Normal': 0,
+    };
   }
 
   String _formatDate(DateTime d) {
     const months = [
       'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
     ];
     return '${months[d.month - 1]} ${d.day}, ${d.year}';
   }
@@ -56,7 +57,7 @@ class _StatsRowState extends State<StatsRow> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // ── Left card: today's screened count ────────────────────────
+          // ── Left card: today's screened count ──────────────────────
           Expanded(
             flex: 5,
             child: GestureDetector(
@@ -82,7 +83,6 @@ class _StatsRowState extends State<StatsRow> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // Icon + label row
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -92,11 +92,8 @@ class _StatsRowState extends State<StatsRow> {
                             color: Colors.white.withValues(alpha: 0.25),
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: const Icon(
-                            Icons.people_alt_rounded,
-                            color: Colors.white,
-                            size: 16,
-                          ),
+                          child: const Icon(Icons.people_alt_rounded,
+                              color: Colors.white, size: 16),
                         ),
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -128,7 +125,6 @@ class _StatsRowState extends State<StatsRow> {
 
                     const SizedBox(height: 8),
 
-                    // Count
                     FutureBuilder<int>(
                       future: _todayCountFuture,
                       builder: (context, snapshot) {
@@ -138,16 +134,13 @@ class _StatsRowState extends State<StatsRow> {
                             width: 20,
                             height: 20,
                             child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
+                                strokeWidth: 2, color: Colors.white),
                           );
                         }
-                        final count = snapshot.data ?? 0;
                         return Text(
-                          '$count',
+                          '${snapshot.data ?? 0}',
                           style: const TextStyle(
-                            fontSize: 36,
+                            fontSize: 50,
                             fontWeight: FontWeight.w800,
                             color: Colors.white,
                             height: 1.0,
@@ -158,7 +151,6 @@ class _StatsRowState extends State<StatsRow> {
 
                     const SizedBox(height: 2),
 
-                    // Label
                     Text(
                       'Patients screened\ntoday',
                       style: TextStyle(
@@ -176,11 +168,12 @@ class _StatsRowState extends State<StatsRow> {
 
           const SizedBox(width: 10),
 
-          // ── Right card: status counts ─────────────────────────────────
+          // ── Right card: overall status counts ──────────────────────
           Expanded(
             flex: 6,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
@@ -195,7 +188,8 @@ class _StatsRowState extends State<StatsRow> {
               child: FutureBuilder<Map<String, int>>(
                 future: _statusCountsFuture,
                 builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
+                  if (snapshot.connectionState ==
+                      ConnectionState.waiting) {
                     return const Center(
                       child: SizedBox(
                         width: 20,
@@ -209,10 +203,6 @@ class _StatsRowState extends State<StatsRow> {
                   }
 
                   final counts = snapshot.data ?? {};
-                  final uw = counts['Underweight'] ?? 0;
-                  final ow = counts['Overweight'] ?? 0;
-                  final st = counts['Stunted'] ?? 0;
-                  final ar = counts['At Risk'] ?? 0;
 
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -231,7 +221,7 @@ class _StatsRowState extends State<StatsRow> {
                           ),
                           const SizedBox(width: 6),
                           const Text(
-                            "Today's Status",
+                            'Overall Status',
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
@@ -244,33 +234,39 @@ class _StatsRowState extends State<StatsRow> {
 
                       const SizedBox(height: 8),
 
-                      // Status items
                       _StatusItem(
-                        count: uw,
+                        count: counts['Underweight'] ?? 0,
                         label: 'Underweight',
-                        color: const Color(0xFF5B8DEF),
+                        color: kStatusColors['Underweight']!,
                         icon: Icons.arrow_downward_rounded,
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 5),
                       _StatusItem(
-                        count: ow,
+                        count: counts['Overweight/Obese'] ?? 0,
                         label: 'Overweight/Obese',
-                        color: const Color(0xFFF5A962),
+                        color: kStatusColors['Overweight/Obese']!,
                         icon: Icons.arrow_upward_rounded,
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 5),
                       _StatusItem(
-                        count: st,
+                        count: counts['Stunted'] ?? 0,
                         label: 'Stunted',
-                        color: const Color(0xFFE57373),
+                        color: kStatusColors['Stunted']!,
                         icon: Icons.height_rounded,
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 5),
                       _StatusItem(
-                        count: ar,
+                        count: counts['At Risk'] ?? 0,
                         label: 'At Risk',
-                        color: const Color(0xFFFFB74D),
+                        color: kStatusColors['At Risk']!,
                         icon: Icons.warning_amber_rounded,
+                      ),
+                      const SizedBox(height: 5),
+                      _StatusItem(
+                        count: counts['Normal'] ?? 0,
+                        label: 'Normal',
+                        color: kStatusColors['Normal']!,
+                        icon: Icons.check_circle_outline_rounded,
                       ),
                     ],
                   );
@@ -284,7 +280,7 @@ class _StatsRowState extends State<StatsRow> {
   }
 }
 
-// ── Inline status item widget (replaces StatusRow for this card) ─────────────
+// ── Status item widget ────────────────────────────────────────────────────────
 class _StatusItem extends StatelessWidget {
   final int count;
   final String label;
@@ -302,18 +298,13 @@ class _StatusItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        // Color dot
         Container(
           width: 6,
           height: 6,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
+          decoration:
+              BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 6),
-
-        // Label
         Expanded(
           child: Text(
             label,
@@ -325,17 +316,14 @@ class _StatusItem extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
         ),
-
-        // Count badge
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
           decoration: BoxDecoration(
             color: color.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: color.withValues(alpha: 0.25),
-              width: 0.8,
-            ),
+                color: color.withValues(alpha: 0.25), width: 0.8),
           ),
           child: Text(
             '$count',

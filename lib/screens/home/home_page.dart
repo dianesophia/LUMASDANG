@@ -157,7 +157,7 @@ class _HomePageState extends State<HomePage>
     super.dispose();
   }
 
-  // ── Save ───────────────────────────────────────────────────────────────────
+
   Future<void> _saveAllData() async {
     final isFormValid = _formKey.currentState?.validate() ?? false;
     bool hasNonTextErrors = false;
@@ -259,7 +259,286 @@ class _HomePageState extends State<HomePage>
       try {
         final docId = await firestore.saveHomePageData(data);
         try {
-          barangayPatientId = await firestore.savePatientToBarangay(data);
+          barangayPatientId = await firestore.savePatientToBarangay(data); // ← only call here
+        } catch (eBarangay) {
+          debugPrint('Barangay patient save: $eBarangay');
+          if (mounted) {
+            _showSnackBar(
+              'Saved to server but could not add to Patient List.',
+              color: Colors.orange,
+            );
+          }
+        }
+        await LocalDbService.instance
+            .saveLocalRecord(data, synced: true, firestoreId: docId);
+        if (!mounted) return;
+        _patientListRefreshTrigger.value++;
+        _showSnackBar('Assessment saved to server and locally.');
+      } catch (e) {
+        await LocalDbService.instance.saveLocalRecord(data, synced: false);
+        if (!mounted) return;
+        _showSnackBar('Saved locally (will sync later). Error: ${e.toString()}',
+            color: Colors.orange);
+      }
+    } else {
+      await LocalDbService.instance.saveLocalRecord(data, synced: false);
+      if (!mounted) return;
+      _showSnackBar('No internet: saved locally, will sync when online.',
+          color: Colors.orange);
+    }
+
+    // Sync vaccination status
+    if (_vaccinationData != null && online) {
+      try {
+        int highestDoseNumber(String vaccine) {
+          final doses =
+              _vaccinationData![vaccine] as Map<String, dynamic>?;
+          if (doses == null) return 0;
+          const birth = 'BIRTH';
+          const m1_5 = '1½';
+          const m2_5 = '2½';
+          const m3_5 = '3½';
+          const m9 = '9';
+          const y1 = '1 YR';
+          List<String> relevantHeaders;
+          switch (vaccine) {
+            case 'BCG':
+              relevantHeaders = [birth];
+              break;
+            case 'HEP B':
+              relevantHeaders = [birth, m1_5, m2_5];
+              break;
+            case 'PENTAVALENT':
+              relevantHeaders = [m1_5, m2_5, m3_5, y1];
+              break;
+            case 'OPV':
+              relevantHeaders = [birth, m2_5, m9];
+              break;
+            case 'IPV':
+              relevantHeaders = [m1_5, m2_5, m3_5, y1];
+              break;
+            case 'PCV':
+              relevantHeaders = [m1_5, m2_5, m3_5, y1];
+              break;
+            case 'MMR':
+              relevantHeaders = [m9, y1];
+              break;
+            default:
+              relevantHeaders = [birth, m1_5, m2_5, m3_5, m9, y1];
+          }
+          for (int i = relevantHeaders.length - 1; i >= 0; i--) {
+            if (doses[relevantHeaders[i]] == true) return i + 1;
+          }
+          return 0;
+        }
+
+        String doseLabelForNumber(int number) {
+          if (number <= 0) return 'Pending';
+          switch (number) {
+            case 1: return '1st dose';
+            case 2: return '2nd dose';
+            case 3: return '3rd dose';
+            case 4: return '4th dose';
+            case 5: return '5th dose';
+            default: return 'Booster';
+          }
+        }
+
+        String vaccineStatus(String name) =>
+            doseLabelForNumber(highestDoseNumber(name));
+        final opvNumber = highestDoseNumber('OPV');
+        final ipvNumber = highestDoseNumber('IPV');
+
+        final statuses = <String, String>{
+          'bcg': vaccineStatus('BCG'),
+          'hepatitisB': vaccineStatus('HEP B'),
+          'dptPentavalent': vaccineStatus('PENTAVALENT'),
+          'opv': vaccineStatus('OPV'),
+          'ipv': vaccineStatus('IPV'),
+          'opvIpv': doseLabelForNumber(
+              opvNumber > ipvNumber ? opvNumber : ipvNumber),
+          'measlesMmr': vaccineStatus('MMR'),
+          'pcv': vaccineStatus('PCV'),
+        };
+
+        await FirestoreService().saveVaccinationStatus(
+          firstName: firstNameController.text.trim(),
+          lastName: lastNameController.text.trim(),
+          statuses: statuses,
+        );
+
+        // Reuse barangayPatientId from above — no second savePatientToBarangay call
+        if (barangayPatientId != null) {
+          try {
+            final barangayId = await firestore.getCurrentUserBarangayId();
+            if (barangayId != null && barangayId.isNotEmpty) {
+              await firestore.createPatientNotification(
+                barangayId: barangayId,
+                patientId: barangayPatientId,
+                patientData: data,
+              );
+            }
+          } catch (eBarangay) {
+            debugPrint('Notification error: $eBarangay');
+            if (mounted) {
+              _showSnackBar(
+                'Saved to server but could not create notification.',
+                color: Colors.orange,
+              );
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Error syncing vaccination status: $e');
+      }
+    }
+
+    if (mounted) {
+      for (final c in [
+        firstNameController, lastNameController, ageController,
+        sexController, addressController, placeOfBirthController,
+        dobController, motherController, motherContactController,
+        fatherController, fatherContactController,
+        measurementDateController, weightController, heightController,
+        muacController, weightForAgeController, weightForHeightController,
+        heightForAgeController, bmiController,
+        cfAgeController, cfFreqController, cfFoodController, mealFreqController,
+      ]) {
+        c.clear();
+      }
+
+      setState(() {
+        _statsRefreshKey++;
+        _demographicFormKey++;
+        _anthropometricFormKey++;
+        _dietaryFormKey++;
+        _dewormingFormKey++;
+        _oralFormKey++;
+        _vaccinationFormKey++;
+        _diarrhea = false;
+        _fever = false;
+        _cough = false;
+        _other = false;
+        _medications = false;
+        _purelyBreastfed = null;
+        _purelyBreastfedError = null;
+        _oralData = null;
+        _oralRiskError = null;
+        _vaccinationData = null;
+        _dewormingData = null;
+        _dewormingError = null;
+      });
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _formKey.currentState?.reset();
+      });
+
+      setState(() => _statsRefreshKey++);
+    }
+  }
+  // ── Save ───────────────────────────────────────────────────────────────────
+  /*Future<void> _saveAllData() async {
+    final isFormValid = _formKey.currentState?.validate() ?? false;
+    bool hasNonTextErrors = false;
+
+    if (_purelyBreastfed == null) {
+      setState(() => _purelyBreastfedError = 'Please select Yes or No');
+      hasNonTextErrors = true;
+    } else {
+      setState(() => _purelyBreastfedError = null);
+    }
+
+    if (_oralData == null || _oralData!['overallRisk'] == null) {
+      setState(
+          () => _oralRiskError = 'Please select an overall risk level');
+      hasNonTextErrors = true;
+    } else {
+      setState(() => _oralRiskError = null);
+    }
+
+    if (_dewormingData == null) {
+      setState(
+          () => _dewormingError = 'Please fill in deworming information');
+      hasNonTextErrors = true;
+    } else {
+      final isNA = _dewormingData!['isNA'] == true;
+      if (!isNA) {
+        if ((_dewormingData!['dateOfLastDeworming'] ?? '')
+            .toString()
+            .trim()
+            .isEmpty) {
+          setState(
+              () => _dewormingError = 'Please enter a date or select N/A');
+          hasNonTextErrors = true;
+        } else if (_dewormingData!['drugGiven'] == null) {
+          setState(() => _dewormingError = 'Please select a drug given');
+          hasNonTextErrors = true;
+        } else {
+          setState(() => _dewormingError = null);
+        }
+      } else {
+        setState(() => _dewormingError = null);
+      }
+    }
+
+    if (!isFormValid || hasNonTextErrors) {
+      _showSnackBar('Please fill in all required fields.',
+          color: const Color(0xFFEF4444));
+      return;
+    }
+
+    final data = {
+      'demographic': {
+        'firstName': firstNameController.text.trim(),
+        'lastName': lastNameController.text.trim(),
+        'age': ageController.text.trim(),
+        'sex': sexController.text.trim(),
+        'address': addressController.text.trim(),
+        'placeOfBirth': placeOfBirthController.text.trim(),
+        'dateOfBirth': dobController.text.trim(),
+        'mother': motherController.text.trim(),
+        'motherContact': motherContactController.text.trim(),
+        'father': fatherController.text.trim(),
+        'fatherContact': fatherContactController.text.trim(),
+      },
+      'anthropometric': {
+        'dateOfMeasurement': measurementDateController.text.trim(),
+        'weight': weightController.text.trim(),
+        'height': heightController.text.trim(),
+        'muac': muacController.text.trim(),
+        'weightForAge': weightForAgeController.text.trim(),
+        'weightForHeight': weightForHeightController.text.trim(),
+        'heightForAge': heightForAgeController.text.trim(),
+        'bmi': bmiController.text.trim(),
+      },
+      'healthStatus': {
+        'diarrhea': _diarrhea,
+        'fever': _fever,
+        'cough': _cough,
+        'other': _other,
+        'medications': _medications,
+      },
+      'dietary': {
+        'purelyBreastfed': _purelyBreastfed,
+        'cfAge': cfAgeController.text.trim(),
+        'cfFrequency': cfFreqController.text.trim(),
+        'cfFoods': cfFoodController.text.trim(),
+        'mealFrequency': mealFreqController.text.trim(),
+      },
+      'deworming': _dewormingData,
+      'oral': _oralData,
+      'vaccination': _vaccinationData,
+    };
+
+    final firestore = FirestoreService();
+    final online = await ConnectivityService.instance.checkOnline();
+    String? barangayPatientId;
+
+    if (online) {
+      try {
+        final docId = await firestore.saveHomePageData(data);
+        try {
+          //barangayPatientId = await firestore.savePatientToBarangay(data);
         } catch (eBarangay) {
           debugPrint('Barangay patient save: $eBarangay');
           if (mounted) {
@@ -438,7 +717,7 @@ class _HomePageState extends State<HomePage>
 
       setState(() => _statsRefreshKey++);
     }
-  }
+  }*/
 
   // ── Build ──────────────────────────────────────────────────────────────────
   @override
