@@ -1061,7 +1061,7 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
                               ],
                             ),
                     ),
-                  ),*/
+                  ),
                 ],
               ),
             ),
