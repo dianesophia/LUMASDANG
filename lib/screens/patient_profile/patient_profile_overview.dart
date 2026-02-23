@@ -1011,15 +1011,30 @@ Future<void> _saveNewAssessment({
 }) async {
   final patient = widget.patient;
 
-  // Calculate anthropometric classifications
+  // Calculate anthropometric classifications. Use empty ageStr when DOB + measurement date exist
+  // so the calculator uses exact age in months from dates (avoids age-in-years vs months confusion).
   final result = AnthropometricCalculator.calculate(
     weightStr: weight,
     heightStr: height,
-    ageStr: patient.age.toString(),
+    ageStr: patient.dateOfBirth.trim().isNotEmpty && date.trim().isNotEmpty
+        ? ''
+        : patient.age.toString(),
     sexStr: patient.sex,
     dobStr: patient.dateOfBirth,
     measurementDateStr: date,
   );
+
+  // Track whether Weight for Length/Height (Lt/Ht) was saved and why not if missing
+  final bool wflSaved = result != null &&
+      result.weightForHeight != null &&
+      result.weightForHeight!.trim().isNotEmpty;
+  if (!wflSaved) {
+    debugPrint(
+      '[Lumasdang] Assessment save: Weight for Length/Height (Lt/Ht) will NOT be saved. '
+      'weight=$weight, height=$height, DOB=${patient.dateOfBirth}, date=$date, sex=${patient.sex}. '
+      'Reason: ${result == null ? "calculator returned null (see AnthropometricCalculator log above)" : "calculator did not return weightForHeight (often age/height outside WHO range)"}',
+    );
+  }
 
   // ✅ NOW INCLUDES ALL DATA - just like home page
   final data = {
@@ -1089,10 +1104,14 @@ Future<void> _saveNewAssessment({
         .saveLocalRecord(data, synced: true, firestoreId: patient.docId);
     
     if (mounted) {
+      final String saveMessage = wflSaved
+          ? '✅ Complete assessment saved to shared patient record!'
+          : '✅ Assessment saved. Weight for Length/Height was not calculated (age/height may be outside WHO range: 0–2y length 45–110 cm, 2–5y height 65–120 cm). See console for details.';
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('✅ Complete assessment saved to shared patient record!'),
-          backgroundColor: Color(0xFF2E8B7B),
+        SnackBar(
+          content: Text(saveMessage),
+          backgroundColor: const Color(0xFF2E8B7B),
+          duration: wflSaved ? const Duration(seconds: 2) : const Duration(seconds: 5),
         ),
       );
     }

@@ -3,7 +3,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'patient_profile/patient_profile_overview.dart';
-import 'opt_plus/opt_plus_screen.dart';
+// import 'opt_plus/opt_plus_screen.dart';
+import 'lumasdang_records/lumasdang_records_screen.dart';
+import 'archived_patients_screen.dart';
+import '../services/age_utils.dart';
+import '../services/auto_archive_preferences.dart';
 
 // ==================== PATIENT LIST TAB ====================
 class PatientListTab extends StatefulWidget {
@@ -206,8 +210,39 @@ class _PatientListTabState extends State<PatientListTab> {
           .orderBy('createdAt', descending: true)
           .get();
 
+      // Auto-archive: mark patients aged 60+ months (5 years) as archived (if enabled in settings)
+      final archivedDocIds = <String>{};
+      final archiveBatch = FirebaseFirestore.instance.batch();
+      var hasArchiveUpdates = false;
+      final autoArchiveEnabled = await AutoArchivePreferences.isAutoArchiveEnabled();
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        if (data['isArchived'] == true) {
+          archivedDocIds.add(doc.id);
+          continue;
+        }
+        if (!autoArchiveEnabled) continue;
+        final demographic = (data['demographic'] ?? {}) as Map<String, dynamic>;
+        final ageMonths = ageInMonthsFromDemographic(demographic);
+        if (ageMonths != null && ageMonths >= 60) {
+          archivedDocIds.add(doc.id);
+          hasArchiveUpdates = true;
+          final ref = FirebaseFirestore.instance
+              .collection('barangays')
+              .doc(barangayId)
+              .collection('patients')
+              .doc(doc.id);
+          archiveBatch.update(ref, {
+            'isArchived': true,
+            'archivedAt': FieldValue.serverTimestamp(),
+          });
+        }
+      }
+      if (hasArchiveUpdates) await archiveBatch.commit();
+
       final Map<String, List<QueryDocumentSnapshot>> patientGroups = {};
       for (var doc in snapshot.docs) {
+        if (archivedDocIds.contains(doc.id)) continue;
         final data = doc.data();
         final demographic = data['demographic'] ?? {};
         final key =
@@ -431,12 +466,15 @@ class _PatientListTabState extends State<PatientListTab> {
 
   // ── TOP ROW ────────────────────────────────────────────────────────────────
   Widget _buildTopRow() {
-    return Row(
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      alignment: WrapAlignment.spaceBetween,
       children: [
-        // OPT Plus button
+        // Lumasdang Records button
         ElevatedButton.icon(
           onPressed: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const OptPlusScreen()),
+            MaterialPageRoute(builder: (_) => const LumasdangRecordsScreen()),
           ),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.white,
@@ -445,13 +483,30 @@ class _PatientListTabState extends State<PatientListTab> {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             elevation: 2,
           ),
-          icon: const Icon(Icons.post_add_rounded, size: 16),
+          icon: const Icon(Icons.list_alt_rounded, size: 16),
           label: const Text(
-            'OPT Plus',
+            'Lumasdang Records',
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
           ),
         ),
-        const Spacer(),
+        // Archived (5+ yrs) button
+        ElevatedButton.icon(
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const ArchivedPatientsScreen()),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.white,
+            foregroundColor: const Color(0xFF2E8B7B),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            elevation: 2,
+          ),
+          icon: const Icon(Icons.archive_outlined, size: 16),
+          label: const Text(
+            'Archived (5+ yrs)',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+          ),
+        ),
         // Total count chip
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
@@ -461,6 +516,7 @@ class _PatientListTabState extends State<PatientListTab> {
             border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
           ),
           child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
               const Icon(Icons.people_outline_rounded, color: Colors.white, size: 14),
               const SizedBox(width: 6),
@@ -1044,6 +1100,7 @@ class Patient {
   final String fatherContact;
   final String createdBy;
   final String barangayId;
+  final bool isArchived;
 
   Patient({
     required this.lastName,
@@ -1063,5 +1120,6 @@ class Patient {
     this.fatherContact = '',
     this.createdBy = 'Unknown',
     this.barangayId = '',
+    this.isArchived = false,
   });
 }
