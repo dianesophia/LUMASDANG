@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lumasdang/screens/authPages/login.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:lumasdang/screens/home/home_page.dart';
 
 class LoadingScreen extends StatefulWidget {
   const LoadingScreen({super.key});
@@ -105,8 +107,23 @@ class _LoadingScreenState extends State<LoadingScreen>
 
     _startSequence();
 
-    Future.delayed(const Duration(seconds: 5), () {
-      if (mounted) {
+    // After initial animation, decide where to navigate based on auth state.
+    Future.delayed(const Duration(seconds: 2), () async {
+      if (!mounted) return;
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        // Already signed in — go to HomePage (works offline if auth token persisted).
+        Navigator.pushReplacement(
+          context,
+          PageRouteBuilder(
+            pageBuilder: (_, __, ___) => const HomePage(),
+            transitionsBuilder: (_, animation, __, child) {
+              return FadeTransition(opacity: animation, child: child);
+            },
+            transitionDuration: const Duration(milliseconds: 600),
+          ),
+        );
+      } else {
         Navigator.pushReplacement(
           context,
           PageRouteBuilder(

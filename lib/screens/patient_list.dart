@@ -33,7 +33,7 @@ class _PatientListTabState extends State<PatientListTab> {
     return double.tryParse(match.group(0)!);
   }
 
-  /*String _buildAssessmentRemarks(Map<String, dynamic> data, int assessmentCount) {
+  String _buildAssessmentRemarks(Map<String, dynamic> data, int assessmentCount) {
     if (assessmentCount == 0) return 'No assessments';
 
     final anthropometric = (data['anthropometric'] ?? {}) as Map<String, dynamic>;
@@ -48,71 +48,26 @@ class _PatientListTabState extends State<PatientListTab> {
       return 'Assessment done';
     }
 
-    final tags = <String>{};
+    // Priority 1: Underweight (Weight-for-Age < -2 SD)
+    if (weightForAge != null && weightForAge < -2) return 'Underweight';
 
-    // Weight-for-Age: Underweight < -2 SD | At Risk -2 to -1 SD
-    if (weightForAge != null) {
-      if (weightForAge < -2) tags.add('Underweight');
-      else if (weightForAge >= -2 && weightForAge < -1) tags.add('At Risk');
-    }
+    // Priority 2: Stunted (Height-for-Age < -2 SD)
+    if (heightForAge != null && heightForAge < -2) return 'Stunted';
 
-    // Height-for-Age: Stunted < -2 SD | At Risk -2 to -1 SD
-    if (heightForAge != null) {
-      if (heightForAge < -2) tags.add('Stunted');
-      else if (heightForAge >= -2 && heightForAge < -1) tags.add('At Risk');
-    }
+    // Priority 3: Overweight/Obese (Weight-for-Height > +1 SD or BMI > +2 SD)
+    if ((weightForHeight != null && weightForHeight > 1) ||
+        (bmi != null && bmi > 2)) return 'Overweight/Obese';
 
-    // Weight-for-Height: Overweight/Obese > +1 SD | At Risk -2 to -1 SD
-    if (weightForHeight != null) {
-      if (weightForHeight > 1) tags.add('Overweight/Obese');
-      else if (weightForHeight >= -2 && weightForHeight < -1) tags.add('At Risk');
-    }
+    // Priority 4: At Risk (any indicator -2 to -1 SD)
+    final atRisk = (weightForAge != null && weightForAge >= -2 && weightForAge < -1) ||
+        (heightForAge != null && heightForAge >= -2 && heightForAge < -1) ||
+        (weightForHeight != null && weightForHeight >= -2 && weightForHeight < -1) ||
+        (bmi != null && bmi >= -2 && bmi < -1);
+    if (atRisk) return 'At Risk';
 
-    // BMI: Overweight/Obese > +2 SD | At Risk -2 to -1 SD
-    if (bmi != null) {
-      if (bmi > 2) tags.add('Overweight/Obese');
-      else if (bmi >= -2 && bmi < -1) tags.add('At Risk');
-    }
-
-    if (tags.isNotEmpty) return tags.join(', ');
+    // Priority 5: Normal
     return 'Normal';
-  }*/
-
-  String _buildAssessmentRemarks(Map<String, dynamic> data, int assessmentCount) {
-  if (assessmentCount == 0) return 'No assessments';
-
-  final anthropometric = (data['anthropometric'] ?? {}) as Map<String, dynamic>;
-
-  final double? weightForAge    = _extractZScore(anthropometric['weightForAge']?.toString());
-  final double? heightForAge    = _extractZScore(anthropometric['heightForAge']?.toString());
-  final double? weightForHeight = _extractZScore(anthropometric['weightForHeight']?.toString());
-  final double? bmi             = _extractZScore(anthropometric['bmi']?.toString());
-
-  if (weightForAge == null && heightForAge == null &&
-      weightForHeight == null && bmi == null) {
-    return 'Assessment done';
   }
-
-  // Priority 1: Underweight (Weight-for-Age < -2 SD)
-  if (weightForAge != null && weightForAge < -2) return 'Underweight';
-
-  // Priority 2: Stunted (Height-for-Age < -2 SD)
-  if (heightForAge != null && heightForAge < -2) return 'Stunted';
-
-  // Priority 3: Overweight/Obese (Weight-for-Height > +1 SD or BMI > +2 SD)
-  if ((weightForHeight != null && weightForHeight > 1) ||
-      (bmi != null && bmi > 2)) return 'Overweight/Obese';
-
-  // Priority 4: At Risk (any indicator -2 to -1 SD)
-  final atRisk = (weightForAge != null && weightForAge >= -2 && weightForAge < -1) ||
-      (heightForAge != null && heightForAge >= -2 && heightForAge < -1) ||
-      (weightForHeight != null && weightForHeight >= -2 && weightForHeight < -1) ||
-      (bmi != null && bmi >= -2 && bmi < -1);
-  if (atRisk) return 'At Risk';
-
-  // Priority 5: Normal
-  return 'Normal';
-}
 
   @override
   void initState() {
@@ -138,6 +93,19 @@ class _PatientListTabState extends State<PatientListTab> {
         _selectedDocIds.remove(patient.docId);
       } else {
         _selectedDocIds.add(patient.docId);
+      }
+    });
+  }
+
+  // ── SELECT ALL / DESELECT ALL ──────────────────────────────────────────────
+  void _toggleSelectAll() {
+    setState(() {
+      final allVisibleIds = _filteredPatients.map((p) => p.docId).toSet();
+      final allSelected = allVisibleIds.every((id) => _selectedDocIds.contains(id));
+      if (allSelected) {
+        _selectedDocIds.removeAll(allVisibleIds);
+      } else {
+        _selectedDocIds.addAll(allVisibleIds);
       }
     });
   }
@@ -180,7 +148,10 @@ class _PatientListTabState extends State<PatientListTab> {
       final user = FirebaseAuth.instance.currentUser;
       final deletedBy = user?.email ?? user?.uid ?? 'unknown';
       final batch = FirebaseFirestore.instance.batch();
-      for (final patient in _filteredPatients) {
+
+      // ✅ FIX: iterate _patients (not _filteredPatients) so selected records
+      // that are currently filtered out are still soft-deleted.
+      for (final patient in _patients) {
         if (!_selectedDocIds.contains(patient.docId)) continue;
         final ref = FirebaseFirestore.instance
             .collection('barangays')
@@ -500,6 +471,44 @@ class _PatientListTabState extends State<PatientListTab> {
           ),
         ),
         const Spacer(),
+        // ── Select All button (only in selection mode) ──────────────────────
+        if (_selectionMode) ...[
+          GestureDetector(
+            onTap: _toggleSelectAll,
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                    color: Colors.white.withOpacity(0.3), width: 1),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _filteredPatients.every(
+                            (p) => _selectedDocIds.contains(p.docId))
+                        ? Icons.check_box_rounded
+                        : Icons.check_box_outline_blank_rounded,
+                    color: Colors.white,
+                    size: 14,
+                  ),
+                  const SizedBox(width: 6),
+                  const Text(
+                    'Select All',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
         Container(
           padding:
               const EdgeInsets.symmetric(horizontal: 12, vertical: 7),

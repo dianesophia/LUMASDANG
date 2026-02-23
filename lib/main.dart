@@ -4,6 +4,7 @@ import 'package:lumasdang/loading.dart';
 import 'package:lumasdang/screens/authPages/login.dart';
 import 'firebase_options.dart';
 import 'services/local_db_service.dart';
+import 'services/connectivity_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -11,7 +12,9 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-   await LocalDbService.instance.init();
+  await LocalDbService.instance.init();
+  // Start a global auto-sync so that pending records are pushed when connection restores
+  ConnectivityService.instance.startAutoSync();
   runApp(const MyApp());
 }
 

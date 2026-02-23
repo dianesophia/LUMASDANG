@@ -28,7 +28,7 @@ class FirestoreService {
   /// Saves a map containing data from HomePage under:
   /// users/{uid}/homepageData/{autoId}
   /// Returns the generated document id on success.
-  Future<String> saveHomePageData(Map<String, dynamic> data) async {
+  Future<String> saveHomePageData(Map<String, dynamic> data, {String? docId}) async {
     final user = _auth.currentUser;
     if (user == null) {
       throw FirebaseAuthException(
@@ -38,11 +38,12 @@ class FirestoreService {
     }
 
     final uid = user.uid;
+    print('FirestoreService.saveHomePageData: called by uid=$uid');
     final docRef = _firestore
-        .collection('users')
-        .doc(uid)
-        .collection('homepageData')
-        .doc(); // auto id
+      .collection('users')
+      .doc(uid)
+      .collection('homepageData')
+      .doc(docId); // use provided docId or auto-generate when null
 
     final payload = {
       ...data,
@@ -52,6 +53,34 @@ class FirestoreService {
 
     await docRef.set(payload);
     return docRef.id;
+  }
+
+  /// Update an existing homepageData document by document id.
+  /// Uses merge so it won't overwrite unrelated fields.
+  Future<void> updateHomePageData(String docId, Map<String, dynamic> data) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw FirebaseAuthException(
+        code: 'no-current-user',
+        message: 'No authenticated user found',
+      );
+    }
+
+    final uid = user.uid;
+    print('FirestoreService.updateHomePageData: called uid=$uid docId=$docId');
+    final docRef = _firestore
+        .collection('users')
+        .doc(uid)
+        .collection('homepageData')
+        .doc(docId);
+
+    final payload = {
+      ...data,
+      'lastModifiedAt': FieldValue.serverTimestamp(),
+      'ownerUid': uid,
+    };
+
+    await docRef.set(payload, SetOptions(merge: true));
   }
 
   /// Saves vaccination status for Profile Overview (keyed by child name).
