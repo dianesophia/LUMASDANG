@@ -832,6 +832,12 @@ Future<List<Map<String, dynamic>>> getPatientsFromBarangay() async {
   }
 }
 
+/// Get archived patients (5+ years) from user's barangay.
+/// Fetches non-deleted patients and filters for isArchived == true.
+Future<List<Map<String, dynamic>>> getArchivedPatientsFromBarangay() async {
+  final patients = await getPatientsFromBarangay();
+  return patients.where((p) => p['isArchived'] == true).toList();
+}
 
 /// Get today's screened count from barangay
 Future<int> getTodayScreenedCountFromBarangay() async {

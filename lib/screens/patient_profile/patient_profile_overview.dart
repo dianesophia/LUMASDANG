@@ -1503,6 +1503,152 @@ void _showAddAssessmentSheet() {
       }
     }
 
+    // Refresh the assessment table
+    setState(() => _loading = true);
+    await _fetchAssessments();
+  }
+*/
+
+// ============================================================================
+// SIMPLE FIX: Update _saveNewAssessment to save ALL data
+// Replace your existing _saveNewAssessment method with this
+// ============================================================================
+
+Future<void> _saveNewAssessment({
+  required String date,
+  required String weight,
+  required String height,
+  required String muac,
+  // Add optional parameters for complete data
+  bool? diarrhea,
+  bool? fever,
+  bool? cough,
+  bool? other,
+  bool? medications,
+  bool? purelyBreastfed,
+  String? cfAge,
+  String? cfFreq,
+  String? cfFood,
+  String? mealFreq,
+  String? dewormDate,
+  bool? dewormNA,
+  String? drugGiven,
+  String? adverseReactions,
+  String? nextDewormDate,
+  String? overallRisk,
+}) async {
+  final patient = widget.patient;
+
+  // Calculate anthropometric classifications. Use empty ageStr when DOB + measurement date exist
+  // so the calculator uses exact age in months from dates (avoids age-in-years vs months confusion).
+  final result = AnthropometricCalculator.calculate(
+    weightStr: weight,
+    heightStr: height,
+    ageStr: patient.dateOfBirth.trim().isNotEmpty && date.trim().isNotEmpty
+        ? ''
+        : patient.age.toString(),
+    sexStr: patient.sex,
+    dobStr: patient.dateOfBirth,
+    measurementDateStr: date,
+  );
+
+  // Track whether Weight for Length/Height (Lt/Ht) was saved and why not if missing
+  final bool wflSaved = result != null &&
+      result.weightForHeight != null &&
+      result.weightForHeight!.trim().isNotEmpty;
+  if (!wflSaved) {
+    debugPrint(
+      '[Lumasdang] Assessment save: Weight for Length/Height (Lt/Ht) will NOT be saved. '
+      'weight=$weight, height=$height, DOB=${patient.dateOfBirth}, date=$date, sex=${patient.sex}. '
+      'Reason: ${result == null ? "calculator returned null (see AnthropometricCalculator log above)" : "calculator did not return weightForHeight (often age/height outside WHO range)"}',
+    );
+  }
+
+  // ✅ NOW INCLUDES ALL DATA - just like home page
+  final data = {
+    'demographic': {
+      'firstName': patient.firstName,
+      'lastName': patient.lastName,
+      'age': patient.age.toString(),
+      'sex': patient.sex,
+      'address': patient.address,
+      'dateOfBirth': patient.dateOfBirth,
+      'mother': patient.motherName,
+      'motherContact': patient.motherContact,
+      'father': patient.fatherName,
+      'fatherContact': patient.fatherContact,
+    },
+    'anthropometric': {
+      'dateOfMeasurement': date,
+      'weight': weight,
+      'height': height,
+      'muac': muac,
+      'weightForAge': result?.weightForAge ?? '',
+      'weightForHeight': result?.weightForHeight ?? '',
+      'heightForAge': result?.heightForAge ?? '',
+      'bmi': result?.bmi ?? '',
+    },
+    // ✅ ADD HEALTH STATUS
+    'healthStatus': {
+      'diarrhea': diarrhea ?? false,
+      'fever': fever ?? false,
+      'cough': cough ?? false,
+      'other': other ?? false,
+      'medications': medications ?? false,
+    },
+    // ✅ ADD DIETARY
+    'dietary': {
+      'purelyBreastfed': purelyBreastfed,
+      'cfAge': cfAge ?? '',
+      'cfFrequency': cfFreq ?? '',
+      'cfFoods': cfFood ?? '',
+      'mealFrequency': mealFreq ?? '',
+    },
+    // ✅ ADD DEWORMING
+    'deworming': {
+      'dateOfLastDeworming': dewormDate ?? '',
+      'isNA': dewormNA ?? false,
+      'drugGiven': drugGiven,
+      'adverseReactions': adverseReactions ?? '',
+      'nextDewormingDate': nextDewormDate ?? '',
+    },
+    // ✅ ADD ORAL ASSESSMENT
+    'oral': {
+      'overallRisk': overallRisk,
+    },
+  };
+
+  final firestore = FirestoreService();
+  
+  try {
+    // ✅ ALWAYS save to barangay shared storage
+    await firestore.saveAssessmentToBarangayPatient(
+      patientId: patient.docId,  // Use patient.docId directly
+      assessmentData: data,
+    );
+    
+    // Also save locally
+    await LocalDbService.instance
+        .saveLocalRecord(data, synced: true, firestoreId: patient.docId);
+    
+    if (mounted) {
+      final String saveMessage = wflSaved
+          ? '✅ Complete assessment saved to shared patient record!'
+          : '✅ Assessment saved. Weight for Length/Height was not calculated (age/height may be outside WHO range: 0–2y length 45–110 cm, 2–5y height 65–120 cm). See console for details.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(saveMessage),
+          backgroundColor: const Color(0xFF2E8B7B),
+          duration: wflSaved ? const Duration(seconds: 2) : const Duration(seconds: 5),
+        ),
+      );
+    }
+  } catch (e) {
+    debugPrint('Error saving assessment: $e');
+    
+    // Fallback to local storage
+    await LocalDbService.instance.saveLocalRecord(data, synced: false);
+    
     if (mounted) {
       setState(() => _loading = true);
       await _fetchAssessments();

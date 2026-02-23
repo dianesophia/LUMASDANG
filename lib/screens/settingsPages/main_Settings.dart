@@ -17,6 +17,7 @@ import 'package:lumasdang/screens/settingsPages/securityPages/main_security.dart
 // Services
 import '../../services/local_db_service.dart';
 import '../../services/firestore_service.dart';
+import '../../services/auto_archive_preferences.dart';
 
 /// ✅ ENUM FOR SETTINGS ROUTES
 enum SettingsOption {
@@ -156,6 +157,9 @@ class MainSettings extends StatelessWidget {
                     _sectionLabel("Preferences"),
                     const SizedBox(height: 8),
 
+                    _autoArchiveSwitchTile(context),
+                    const SizedBox(height: 8),
+
                     _settingsGroup(
                       context: context,
                       tiles: [
@@ -227,6 +231,11 @@ class MainSettings extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  // ── AUTO ARCHIVE SWITCH TILE ─────────────────────────────────────────────────
+  Widget _autoArchiveSwitchTile(BuildContext context) {
+    return _AutoArchiveSwitchTile();
   }
 
   // ── SECTION LABEL ──────────────────────────────────────────────────────────
@@ -464,6 +473,102 @@ class _TileData {
     required this.text,
     required this.option,
   });
+}
+
+// ── AUTO ARCHIVE SWITCH TILE ───────────────────────────────────────────────
+class _AutoArchiveSwitchTile extends StatefulWidget {
+  @override
+  State<_AutoArchiveSwitchTile> createState() => _AutoArchiveSwitchTileState();
+}
+
+class _AutoArchiveSwitchTileState extends State<_AutoArchiveSwitchTile> {
+  bool _enabled = true;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final enabled = await AutoArchivePreferences.isAutoArchiveEnabled();
+    if (mounted) setState(() {
+      _enabled = enabled;
+      _loading = false;
+    });
+  }
+
+  Future<void> _onChanged(bool value) async {
+    await AutoArchivePreferences.setAutoArchiveEnabled(value);
+    if (mounted) setState(() => _enabled = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.18),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.28),
+          width: 1,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.archive_outlined, color: Colors.white, size: 20),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Auto-archive at 5 years",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    "Archive children when they reach 60 months",
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.7),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (_loading)
+              const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54),
+              )
+            else
+              Switch(
+                value: _enabled,
+                onChanged: _onChanged,
+                activeColor: const Color(0xFF2E8B7B),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 // ============================================================================

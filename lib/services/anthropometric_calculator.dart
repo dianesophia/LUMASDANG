@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:growth_standards/growth_standards.dart';
 
 /// WHO z-score interpretation (widely used in the Philippines and internationally).
@@ -138,6 +139,11 @@ class AnthropometricCalculator {
 
     if (weight == null || weight <= 0 || height == null || height <= 0 ||
         ageMonths == null || ageMonths < 0 || sex == null) {
+      debugPrint(
+        '[Lumasdang] AnthropometricCalculator returned null (inputs invalid or insufficient). '
+        'weight=$weightStr→$weight height=$heightStr→$height ageMonths=$ageMonths sex=$sexStr→$sex '
+        'dobStr=$dobStr measurementDateStr=$measurementDateStr',
+      );
       return null;
     }
 
@@ -198,7 +204,14 @@ class AnthropometricCalculator {
           );
           wfhZ = wfh.zScore(Precision.two).toDouble();
         }
-      } catch (_) {}
+      } catch (e, st) {
+        debugPrint(
+          '[Lumasdang] Weight for Length/Height (Lt/Ht) calculation failed. '
+          'ageMonths=$ageMonths height=${height}cm (${ageMonths < 24 ? "length" : "height"}). '
+          'WHO: 0–2y length 45–110cm, 2–5y height 65–120cm. Error: $e',
+        );
+        if (kDebugMode) debugPrint('$st');
+      }
 
       try {
         final bmiCalc = _gs.bodyMassIndexForAge(
@@ -221,7 +234,9 @@ class AnthropometricCalculator {
         heightForAge: hfaZ != null ? '${hfaZ.toStringAsFixed(2)} (${_interpretZScore(hfaZ, type: 'hfa')})' : null,
         bmi: bmiZ != null ? '${bmiValue.toStringAsFixed(1)} | ${bmiZ.toStringAsFixed(2)} (${_interpretZScore(bmiZ, type: 'bmi')})' : bmiValue.toStringAsFixed(1),
       );
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('[Lumasdang] AnthropometricCalculator failed (outer catch): $e');
+      if (kDebugMode) debugPrint('$st');
       return null;
     }
   }
