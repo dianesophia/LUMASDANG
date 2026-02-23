@@ -85,7 +85,7 @@ class _NotificationsTabState extends State<NotificationsTab> {
         .snapshots()
         .map((snap) => snap.docs.map((d) {
               final data = {
-                ...(d.data() as Map<String, dynamic>),
+                ...d.data(),
                 'id': d.id,
                 '_collection': 'notifications'
               };
@@ -108,7 +108,7 @@ class _NotificationsTabState extends State<NotificationsTab> {
         .snapshots()
         .map((snap) => snap.docs.map((d) {
               final data = {
-                ...(d.data() as Map<String, dynamic>),
+                ...d.data(),
                 'id': d.id,
                 '_collection': 'calendarNotifications'
               };

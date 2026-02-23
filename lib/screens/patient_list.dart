@@ -8,7 +8,6 @@ import 'lumasdang_records/lumasdang_records_screen.dart';
 import 'archived_patients_screen.dart';
 import '../services/age_utils.dart';
 import '../services/auto_archive_preferences.dart';
-import 'opt_plus/opt_plus_screen.dart';
 import 'shared/status_color.dart';
 
 // ==================== PATIENT LIST TAB ====================

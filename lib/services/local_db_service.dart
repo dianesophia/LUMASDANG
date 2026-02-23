@@ -11,6 +11,7 @@ class LocalDbService {
   late Box _box;
   bool _initialized = false;
   bool _isSyncing = false;
+  bool _offlineAuthenticated = false;
   final Uuid _uuid = const Uuid();
 
   /// Initialize Hive (idempotent)
@@ -31,6 +32,14 @@ class LocalDbService {
   Box get box {
     if (!_initialized) throw Exception("LocalDbService not initialized.");
     return _box;
+  }
+
+  /// Whether the current session is using cached offline authentication.
+  bool get offlineAuthenticated => _offlineAuthenticated;
+
+  /// Set offline authenticated state (used when user signs in with cached credentials).
+  void setOfflineAuthenticated(bool v) {
+    _offlineAuthenticated = v;
   }
 
   /// Save a local record with username included. Returns the local key (int).

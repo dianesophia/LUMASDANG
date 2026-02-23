@@ -14,7 +14,6 @@ import 'widgets/overall_nutritional_status.dart';
 import 'widgets/vaccination_status.dart';
 import 'widgets/deworming_status.dart';
 import 'widgets/parent_contact_tab.dart';
-import '../../services/assessment_service.dart';
 import 'package:lumasdang/screens/shared/app_buttom_navbar.dart'; // ← adjust path if needed
 
 class PatientProfileOverview extends StatefulWidget {
@@ -49,7 +48,6 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
   bool _preferPhoneCall = true;
   bool _preferSMS = false;
 
-  static const _tabTitles = ['PROFILE', 'PARENT CONTACT'];
 
   @override
   void initState() {
@@ -73,22 +71,32 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
     super.dispose();
   }
 
-  // ── Snackbar ───────────────────────────────────────────────────────────────
-  void _snack(String message, {Color? color}) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(message, style: const TextStyle(fontSize: 13)),
-      backgroundColor: color ?? const Color(0xFF2E8B7B),
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      margin: const EdgeInsets.all(16),
-    ));
-  }
+  
 
   // ── Contact preferences ────────────────────────────────────────────────────
   Future<void> _loadContactPreferences() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null || widget.patient.docId.isEmpty) return;
+
+      final online = await ConnectivityService.instance.checkOnline();
+      if (!online || LocalDbService.instance.offlineAuthenticated) {
+        // Try to load from local DB
+        await LocalDbService.instance.init();
+        final all = await LocalDbService.instance.getAllRecords(includeDeleted: true);
+        final match = all.firstWhere(
+            (r) => (r['id'] == widget.patient.docId) || (r['firestoreId'] == widget.patient.docId),
+            orElse: () => {});
+        if (match.isNotEmpty) {
+          final prefs = (match['data'] as Map<String, dynamic>?)?['contactPreferences'] as Map<String, dynamic>? ?? {};
+          if (mounted) setState(() {
+            _preferPhoneCall = prefs['phoneCall'] ?? true;
+            _preferSMS = prefs['sms'] ?? false;
+          });
+        }
+        return;
+      }
+
       final doc = await FirebaseFirestore.instance
           .collection('users').doc(user.uid)
           .collection('homepageData').doc(widget.patient.docId).get();
@@ -106,6 +114,37 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null || widget.patient.docId.isEmpty) return;
+
+      final online = await ConnectivityService.instance.checkOnline();
+      if (!online || LocalDbService.instance.offlineAuthenticated) {
+        await LocalDbService.instance.init();
+        // Update local record if exists, otherwise create a minimal record
+        final all = await LocalDbService.instance.getAllRecords(includeDeleted: true);
+        final matchIndex = all.indexWhere((r) => (r['id'] == widget.patient.docId) || (r['firestoreId'] == widget.patient.docId));
+        if (matchIndex >= 0) {
+          // fetch the underlying box key by scanning box
+          for (final key in LocalDbService.instance.box.keys) {
+            final value = LocalDbService.instance.box.get(key);
+            if (value is Map) {
+              if ((value['id'] == widget.patient.docId) || (value['firestoreId'] == widget.patient.docId)) {
+                final updated = Map<String, dynamic>.from(value);
+                final data = Map<String, dynamic>.from(updated['data'] ?? {});
+                data['contactPreferences'] = {'phoneCall': _preferPhoneCall, 'sms': _preferSMS};
+                updated['data'] = data;
+                updated['lastModified'] = DateTime.now().toIso8601String();
+                await LocalDbService.instance.box.put(key, updated);
+                break;
+              }
+            }
+          }
+        } else {
+          // Create a new minimal local record
+          final data = {'contactPreferences': {'phoneCall': _preferPhoneCall, 'sms': _preferSMS}};
+          await LocalDbService.instance.saveLocalRecord(data, synced: false, firestoreId: widget.patient.docId);
+        }
+        return;
+      }
+
       await FirebaseFirestore.instance
           .collection('users').doc(user.uid)
           .collection('homepageData').doc(widget.patient.docId)
@@ -1433,81 +1472,7 @@ void _showAddAssessmentSheet() {
     );
   }
 
-  // ── Save assessment ────────────────────────────────────────────────────────
-  Future<void> _saveNewAssessment({
-    required String date,
-    required String weight,
-    required String height,
-    required String muac,
-    bool? diarrhea, bool? fever, bool? cough, bool? other, bool? medications,
-    bool? purelyBreastfed, String? cfAge, String? cfFreq, String? cfFood,
-    String? mealFreq, String? dewormDate, bool? dewormNA, String? drugGiven,
-    String? adverseReactions, String? nextDewormDate, String? overallRisk,
-  }) async {
-    final patient = widget.patient;
-    final result = AnthropometricCalculator.calculate(
-      weightStr: weight,
-      heightStr: height,
-      ageStr: patient.age.toString(),
-      sexStr: patient.sex,
-      dobStr: patient.dateOfBirth,
-      measurementDateStr: date,
-    );
-
-    final data = {
-      'demographic': {
-        'firstName': patient.firstName, 'lastName': patient.lastName,
-        'age': patient.age.toString(), 'sex': patient.sex,
-        'address': patient.address, 'dateOfBirth': patient.dateOfBirth,
-        'mother': patient.motherName, 'motherContact': patient.motherContact,
-        'father': patient.fatherName, 'fatherContact': patient.fatherContact,
-      },
-      'anthropometric': {
-        'dateOfMeasurement': date, 'weight': weight, 'height': height,
-        'muac': muac,
-        'weightForAge': result?.weightForAge ?? '',
-        'weightForHeight': result?.weightForHeight ?? '',
-        'heightForAge': result?.heightForAge ?? '',
-        'bmi': result?.bmi ?? '',
-      },
-      'healthStatus': {
-        'diarrhea': diarrhea ?? false, 'fever': fever ?? false,
-        'cough': cough ?? false, 'other': other ?? false,
-        'medications': medications ?? false,
-      },
-      'dietary': {
-        'purelyBreastfed': purelyBreastfed, 'cfAge': cfAge ?? '',
-        'cfFrequency': cfFreq ?? '', 'cfFoods': cfFood ?? '',
-        'mealFrequency': mealFreq ?? '',
-      },
-      'deworming': {
-        'dateOfLastDeworming': dewormDate ?? '', 'isNA': dewormNA ?? false,
-        'drugGiven': drugGiven, 'adverseReactions': adverseReactions ?? '',
-        'nextDewormingDate': nextDewormDate ?? '',
-      },
-      'oral': {'overallRisk': overallRisk},
-    };
-
-    try {
-      await FirestoreService().saveAssessmentToBarangayPatient(
-        patientId: patient.docId, assessmentData: data,
-      );
-      await LocalDbService.instance.saveLocalRecord(data,
-          synced: true, firestoreId: patient.docId);
-      if (mounted) _snack('Assessment saved successfully.');
-    } catch (e) {
-      debugPrint('Error saving assessment: $e');
-      await LocalDbService.instance.saveLocalRecord(data, synced: false);
-      if (mounted) {
-        _snack('Saved locally, will sync later.', color: Colors.orange);
-      }
-    }
-
-    // Refresh the assessment table
-    setState(() => _loading = true);
-    await _fetchAssessments();
-  }
-*/
+  // (removed duplicate older implementation)
 
 // ============================================================================
 // SIMPLE FIX: Update _saveNewAssessment to save ALL data
@@ -1654,4 +1619,5 @@ Future<void> _saveNewAssessment({
       await _fetchAssessments();
     }
   }
+}
 }
