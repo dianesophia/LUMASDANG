@@ -398,7 +398,7 @@ class _RegisterPageState extends State<RegisterPage> with TickerProviderStateMix
                               ),
                             ),
                             Text(
-                              'Join the Lumasdang community',
+                              'Join the Lµmasdαng community',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.white60,

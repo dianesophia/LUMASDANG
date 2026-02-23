@@ -8,6 +8,8 @@ import 'lumasdang_records/lumasdang_records_screen.dart';
 import 'archived_patients_screen.dart';
 import '../services/age_utils.dart';
 import '../services/auto_archive_preferences.dart';
+import 'opt_plus/opt_plus_screen.dart';
+import 'shared/status_color.dart';
 
 // ==================== PATIENT LIST TAB ====================
 class PatientListTab extends StatefulWidget {
@@ -28,61 +30,48 @@ class _PatientListTabState extends State<PatientListTab> {
   final Set<String> _selectedDocIds = {};
   bool _deleting = false;
 
-  String _extractInterpretation(String? zScoreStr) {
-    if (zScoreStr == null || zScoreStr.isEmpty) return '';
-    final match = RegExp(r'\(([^)]+)\)').firstMatch(zScoreStr);
-    return match?.group(1) ?? '';
+  // Extracts leading z-score number from strings like "-2.5 (Stunted)" or "-2.5"
+  double? _extractZScore(String? raw) {
+    if (raw == null || raw.isEmpty) return null;
+    final match = RegExp(r'^-?\d+(\.\d+)?').firstMatch(raw.trim());
+    if (match == null) return null;
+    return double.tryParse(match.group(0)!);
   }
 
   String _buildAssessmentRemarks(Map<String, dynamic> data, int assessmentCount) {
-    final anthropometric = (data['anthropometric'] ?? {}) as Map<String, dynamic>;
-    final weightForAge = anthropometric['weightForAge']?.toString() ?? '';
-    final heightForAge = anthropometric['heightForAge']?.toString() ?? '';
-    final weightForHeight = anthropometric['weightForHeight']?.toString() ?? '';
-    final bmi = anthropometric['bmi']?.toString() ?? '';
-
-    final interpretations = <String>[];
-    for (final raw in [weightForAge, heightForAge, weightForHeight, bmi]) {
-      final interp = _extractInterpretation(raw);
-      if (interp.isNotEmpty) interpretations.add(interp.toLowerCase());
-    }
-
     if (assessmentCount == 0) return 'No assessments';
 
-    final tags = <String>{};
-    for (final interp in interpretations) {
-      if (interp.contains('underweight')) tags.add('Underweight');
-      if (interp.contains('stunted')) tags.add('Stunted');
-      if (interp.contains('overweight') || interp.contains('obese')) tags.add('Overweight/Obese');
-      if (interp.contains('at risk')) tags.add('At risk');
+    final anthropometric = (data['anthropometric'] ?? {}) as Map<String, dynamic>;
+
+    final double? weightForAge    = _extractZScore(anthropometric['weightForAge']?.toString());
+    final double? heightForAge    = _extractZScore(anthropometric['heightForAge']?.toString());
+    final double? weightForHeight = _extractZScore(anthropometric['weightForHeight']?.toString());
+    final double? bmi             = _extractZScore(anthropometric['bmi']?.toString());
+
+    if (weightForAge == null && heightForAge == null &&
+        weightForHeight == null && bmi == null) {
+      return 'Assessment done';
     }
 
-    if (tags.isNotEmpty) return tags.join(', ');
-    if (interpretations.isEmpty) return 'Assessment done';
+    // Priority 1: Underweight (Weight-for-Age < -2 SD)
+    if (weightForAge != null && weightForAge < -2) return 'Underweight';
 
-    final allNormal = interpretations.isNotEmpty &&
-        interpretations.every((i) => i == 'normal');
-    if (allNormal) return 'Normal';
+    // Priority 2: Stunted (Height-for-Age < -2 SD)
+    if (heightForAge != null && heightForAge < -2) return 'Stunted';
 
-    final first = interpretations.first;
-    return first.isEmpty ? 'Assessment done' : '${first[0].toUpperCase()}${first.substring(1)}';
-  }
+    // Priority 3: Overweight/Obese (Weight-for-Height > +1 SD or BMI > +2 SD)
+    if ((weightForHeight != null && weightForHeight > 1) ||
+        (bmi != null && bmi > 2)) return 'Overweight/Obese';
 
-  // ── Status color helper ──────────────────────────────────────────────────
-  Color _statusColor(String remarks) {
-    final r = remarks.toLowerCase();
-    if (r.contains('underweight') || r.contains('stunted') || r.contains('wasted')) {
-      return const Color(0xFFE57373); // red
-    }
-    if (r.contains('overweight') || r.contains('obese')) {
-      return const Color(0xFFFFB74D); // orange
-    }
-    if (r.contains('at risk')) {
-      return const Color(0xFFFFD54F); // amber
-    }
-    if (r == 'normal') return const Color(0xFF66BB6A); // green
-    if (r == 'no assessments') return Colors.grey;
-    return const Color(0xFF4DB6AC); // teal fallback
+    // Priority 4: At Risk (any indicator -2 to -1 SD)
+    final atRisk = (weightForAge != null && weightForAge >= -2 && weightForAge < -1) ||
+        (heightForAge != null && heightForAge >= -2 && heightForAge < -1) ||
+        (weightForHeight != null && weightForHeight >= -2 && weightForHeight < -1) ||
+        (bmi != null && bmi >= -2 && bmi < -1);
+    if (atRisk) return 'At Risk';
+
+    // Priority 5: Normal
+    return 'Normal';
   }
 
   @override
@@ -113,6 +102,19 @@ class _PatientListTabState extends State<PatientListTab> {
     });
   }
 
+  // ── SELECT ALL / DESELECT ALL ──────────────────────────────────────────────
+  void _toggleSelectAll() {
+    setState(() {
+      final allVisibleIds = _filteredPatients.map((p) => p.docId).toSet();
+      final allSelected = allVisibleIds.every((id) => _selectedDocIds.contains(id));
+      if (allSelected) {
+        _selectedDocIds.removeAll(allVisibleIds);
+      } else {
+        _selectedDocIds.addAll(allVisibleIds);
+      }
+    });
+  }
+
   Future<void> _confirmAndSoftDelete() async {
     if (_selectedDocIds.isEmpty) return;
     final count = _selectedDocIds.length;
@@ -120,20 +122,24 @@ class _PatientListTabState extends State<PatientListTab> {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Delete Selected?', style: TextStyle(fontWeight: FontWeight.w700)),
+        title: const Text('Delete Selected?',
+            style: TextStyle(fontWeight: FontWeight.w700)),
         content: Text(
-          'Soft-delete $count patient record(s)? They will be hidden from the list but can be restored later.',
+          'Soft-delete $count patient record(s)? '
+          'They will be hidden from the list but can be restored later.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel', style: TextStyle(color: Color(0xFF2E8B7B))),
+            child: const Text('Cancel',
+                style: TextStyle(color: Color(0xFF2E8B7B))),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.redAccent,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
               elevation: 0,
             ),
             child: const Text('Delete'),
@@ -147,7 +153,10 @@ class _PatientListTabState extends State<PatientListTab> {
       final user = FirebaseAuth.instance.currentUser;
       final deletedBy = user?.email ?? user?.uid ?? 'unknown';
       final batch = FirebaseFirestore.instance.batch();
-      for (final patient in _filteredPatients) {
+
+      // ✅ FIX: iterate _patients (not _filteredPatients) so selected records
+      // that are currently filtered out are still soft-deleted.
+      for (final patient in _patients) {
         if (!_selectedDocIds.contains(patient.docId)) continue;
         final ref = FirebaseFirestore.instance
             .collection('barangays')
@@ -169,7 +178,8 @@ class _PatientListTabState extends State<PatientListTab> {
             content: Text('$count record(s) deleted.'),
             backgroundColor: const Color(0xFF2E8B7B),
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12)),
             margin: const EdgeInsets.all(16),
           ),
         );
@@ -181,7 +191,8 @@ class _PatientListTabState extends State<PatientListTab> {
             content: Text('Delete failed: $e'),
             backgroundColor: Colors.redAccent,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12)),
             margin: const EdgeInsets.all(16),
           ),
         );
@@ -195,12 +206,20 @@ class _PatientListTabState extends State<PatientListTab> {
     setState(() => _loading = true);
     try {
       final user = FirebaseAuth.instance.currentUser;
-      if (user == null) { setState(() => _loading = false); return; }
+      if (user == null) {
+        setState(() => _loading = false);
+        return;
+      }
 
       final userDoc = await FirebaseFirestore.instance
-          .collection('users').doc(user.uid).get();
+          .collection('users')
+          .doc(user.uid)
+          .get();
       final barangayId = userDoc.data()?['barangayId'] as String?;
-      if (barangayId == null) { setState(() => _loading = false); return; }
+      if (barangayId == null) {
+        setState(() => _loading = false);
+        return;
+      }
 
       final snapshot = await FirebaseFirestore.instance
           .collection('barangays')
@@ -246,7 +265,8 @@ class _PatientListTabState extends State<PatientListTab> {
         final data = doc.data();
         final demographic = data['demographic'] ?? {};
         final key =
-            '${(demographic['firstName'] ?? '').toString().toLowerCase().trim()}_${(demographic['lastName'] ?? '').toString().toLowerCase().trim()}';
+            '${(demographic['firstName'] ?? '').toString().toLowerCase().trim()}_'
+            '${(demographic['lastName'] ?? '').toString().toLowerCase().trim()}';
         if (key.isNotEmpty && key != '_') {
           patientGroups.putIfAbsent(key, () => []);
           patientGroups[key]!.add(doc);
@@ -260,8 +280,10 @@ class _PatientListTabState extends State<PatientListTab> {
           docs.sort((a, b) {
             final dataA = a.data() as Map<String, dynamic>;
             final dataB = b.data() as Map<String, dynamic>;
-            final timeA = (dataA['createdAt'] as Timestamp?)?.toDate() ?? DateTime(1970);
-            final timeB = (dataB['createdAt'] as Timestamp?)?.toDate() ?? DateTime(1970);
+            final timeA = (dataA['createdAt'] as Timestamp?)?.toDate()
+                ?? DateTime(1970);
+            final timeB = (dataB['createdAt'] as Timestamp?)?.toDate()
+                ?? DateTime(1970);
             return timeB.compareTo(timeA);
           });
 
@@ -269,7 +291,8 @@ class _PatientListTabState extends State<PatientListTab> {
           final data = mostRecentDoc.data() as Map<String, dynamic>;
           final demographic = data['demographic'] ?? {};
           final createdAt = data['createdAt'] as Timestamp?;
-          final assessmentRemarks = _buildAssessmentRemarks(data, assessmentCount);
+          final assessmentRemarks =
+              _buildAssessmentRemarks(data, assessmentCount);
 
           return Patient(
             firstName: demographic['firstName'] ?? '',
@@ -277,7 +300,8 @@ class _PatientListTabState extends State<PatientListTab> {
             age: int.tryParse(demographic['age'] ?? '0') ?? 0,
             assessmentRemarks: assessmentRemarks,
             lastVisit: createdAt?.toDate() ?? DateTime.now(),
-            guardianContact: demographic['fatherContact'] ?? demographic['motherContact'] ?? '',
+            guardianContact: demographic['fatherContact'] ??
+                demographic['motherContact'] ?? '',
             avatarColor: const Color(0xFF2E8B7B),
             address: demographic['address'] ?? '',
             dateOfBirth: demographic['dateOfBirth'] ?? '',
@@ -302,7 +326,8 @@ class _PatientListTabState extends State<PatientListTab> {
             content: Text('Error loading patients: $e'),
             backgroundColor: Colors.redAccent,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12)),
             margin: const EdgeInsets.all(16),
           ),
         );
@@ -335,7 +360,8 @@ class _PatientListTabState extends State<PatientListTab> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator(color: Colors.white));
+      return const Center(
+          child: CircularProgressIndicator(color: Colors.white));
     }
 
     if (_patients.isEmpty) {
@@ -382,28 +408,21 @@ class _PatientListTabState extends State<PatientListTab> {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       child: Column(
         children: [
-          /// Search bar
           _buildSearchBar(),
           const SizedBox(height: 12),
-
-          /// OPT Plus + count row
           _buildTopRow(),
-
-          /// Selection bar
           if (_selectionMode) ...[
             const SizedBox(height: 8),
             _buildSelectionBar(),
           ],
-
           const SizedBox(height: 10),
-
-          /// Patient table
           Expanded(
             child: Container(
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: Colors.white.withOpacity(0.25), width: 1),
+                border: Border.all(
+                    color: Colors.white.withOpacity(0.25), width: 1),
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(18),
@@ -416,10 +435,7 @@ class _PatientListTabState extends State<PatientListTab> {
               ),
             ),
           ),
-
           const SizedBox(height: 10),
-
-          /// Sort button
           _buildSortButton(),
         ],
       ),
@@ -447,10 +463,12 @@ class _PatientListTabState extends State<PatientListTab> {
         decoration: InputDecoration(
           hintText: 'Search by name or status…',
           hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
-          prefixIcon: Icon(Icons.search_rounded, color: Colors.grey.shade400, size: 20),
+          prefixIcon: Icon(Icons.search_rounded,
+              color: Colors.grey.shade400, size: 20),
           suffixIcon: _searchQuery.isNotEmpty
               ? IconButton(
-                  icon: Icon(Icons.close_rounded, color: Colors.grey.shade400, size: 18),
+                  icon: Icon(Icons.close_rounded,
+                      color: Colors.grey.shade400, size: 18),
                   onPressed: () {
                     _searchController.clear();
                     setState(() => _searchQuery = '');
@@ -458,7 +476,8 @@ class _PatientListTabState extends State<PatientListTab> {
                 )
               : null,
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         ),
       ),
     );
@@ -497,8 +516,10 @@ class _PatientListTabState extends State<PatientListTab> {
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.white,
             foregroundColor: const Color(0xFF2E8B7B),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12)),
             elevation: 2,
           ),
           icon: const Icon(Icons.archive_outlined, size: 16),
@@ -508,17 +529,59 @@ class _PatientListTabState extends State<PatientListTab> {
           ),
         ),
         // Total count chip
+        const Spacer(),
+        // ── Select All button (only in selection mode) ──────────────────────
+        if (_selectionMode) ...[
+          GestureDetector(
+            onTap: _toggleSelectAll,
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                    color: Colors.white.withOpacity(0.3), width: 1),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _filteredPatients.every(
+                            (p) => _selectedDocIds.contains(p.docId))
+                        ? Icons.check_box_rounded
+                        : Icons.check_box_outline_blank_rounded,
+                    color: Colors.white,
+                    size: 14,
+                  ),
+                  const SizedBox(width: 6),
+                  const Text(
+                    'Select All',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
           decoration: BoxDecoration(
             color: Colors.white.withOpacity(0.2),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
+            border: Border.all(
+                color: Colors.white.withOpacity(0.3), width: 1),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.people_outline_rounded, color: Colors.white, size: 14),
+              const Icon(Icons.people_outline_rounded,
+                  color: Colors.white, size: 14),
               const SizedBox(width: 6),
               Text(
                 '${_filteredPatients.length} Patients',
@@ -539,18 +602,25 @@ class _PatientListTabState extends State<PatientListTab> {
   Widget _buildSelectionBar() {
     final count = _selectedDocIds.length;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding:
+          const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 6, offset: const Offset(0, 2)),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
       child: Row(
         children: [
           Icon(
-            count > 0 ? Icons.check_circle_rounded : Icons.radio_button_unchecked,
+            count > 0
+                ? Icons.check_circle_rounded
+                : Icons.radio_button_unchecked,
             size: 18,
             color: count > 0 ? const Color(0xFF2E8B7B) : Colors.grey,
           ),
@@ -569,16 +639,20 @@ class _PatientListTabState extends State<PatientListTab> {
               onPressed: _deleting ? null : _confirmAndSoftDelete,
               icon: _deleting
                   ? const SizedBox(
-                      width: 14, height: 14,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.red),
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.red),
                     )
                   : const Icon(Icons.delete_outline_rounded, size: 16),
               label: Text(_deleting ? 'Deleting…' : 'Delete'),
-              style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
+              style:
+                  TextButton.styleFrom(foregroundColor: Colors.redAccent),
             ),
           TextButton(
             onPressed: _deleting ? null : _exitSelectionMode,
-            child: const Text('Cancel', style: TextStyle(color: Color(0xFF2E8B7B))),
+            child: const Text('Cancel',
+                style: TextStyle(color: Color(0xFF2E8B7B))),
           ),
         ],
       ),
@@ -588,13 +662,14 @@ class _PatientListTabState extends State<PatientListTab> {
   // ── TABLE HEADER ───────────────────────────────────────────────────────────
   Widget _buildTableHeader() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding:
+          const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.12),
       ),
       child: Row(
         children: [
-          const SizedBox(width: 46), // avatar + checkbox space
+          const SizedBox(width: 46),
           _headerCell('Last Name', flex: 2),
           _headerCell('First Name', flex: 2),
           _headerCell('Age', flex: 1),
@@ -627,13 +702,14 @@ class _PatientListTabState extends State<PatientListTab> {
     return ListView.builder(
       padding: const EdgeInsets.symmetric(vertical: 6),
       itemCount: _filteredPatients.length,
-      itemBuilder: (context, index) => _buildPatientRow(_filteredPatients[index], index),
+      itemBuilder: (context, index) =>
+          _buildPatientRow(_filteredPatients[index], index),
     );
   }
 
   Widget _buildPatientRow(Patient patient, int index) {
     final isSelected = _selectedDocIds.contains(patient.docId);
-    final statusColor = _statusColor(patient.assessmentRemarks);
+    final statusColor = getStatusColor(patient.assessmentRemarks);
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -643,7 +719,9 @@ class _PatientListTabState extends State<PatientListTab> {
             : Colors.white.withOpacity(0.92),
         borderRadius: BorderRadius.circular(12),
         border: isSelected
-            ? Border.all(color: const Color(0xFF2E8B7B).withOpacity(0.4), width: 1.5)
+            ? Border.all(
+                color: const Color(0xFF2E8B7B).withOpacity(0.4),
+                width: 1.5)
             : null,
         boxShadow: [
           BoxShadow(
@@ -662,35 +740,43 @@ class _PatientListTabState extends State<PatientListTab> {
               _selectedDocIds.add(patient.docId);
             });
           },
-          onTap: () => _selectionMode ? _toggleSelection(patient) : _showPatientDetails(patient),
+          onTap: () => _selectionMode
+              ? _toggleSelection(patient)
+              : _showPatientDetails(patient),
           borderRadius: BorderRadius.circular(12),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
             child: Row(
               children: [
                 // Checkbox / avatar
                 if (_selectionMode)
                   SizedBox(
-                    width: 20, height: 20,
+                    width: 20,
+                    height: 20,
                     child: Checkbox(
                       value: isSelected,
                       onChanged: (_) => _toggleSelection(patient),
                       activeColor: const Color(0xFF2E8B7B),
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                      materialTapTargetSize:
+                          MaterialTapTargetSize.shrinkWrap,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(4)),
                     ),
                   )
                 else
-                  // Avatar
                   Container(
-                    width: 28, height: 28,
+                    width: 28,
+                    height: 28,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF2E8B7B).withOpacity(0.12),
+                      color:
+                          const Color(0xFF2E8B7B).withOpacity(0.12),
                       shape: BoxShape.circle,
                     ),
                     child: ClipOval(
                       child: Image.network(
-                        'https://ui-avatars.com/api/?name=${patient.firstName}+${patient.lastName}&background=8BC88A&color=fff&size=56',
+                        'https://ui-avatars.com/api/?name=${patient.firstName}+${patient.lastName}'
+                        '&background=8BC88A&color=fff&size=56',
                         fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) => Icon(
                           Icons.person_rounded,
@@ -721,7 +807,8 @@ class _PatientListTabState extends State<PatientListTab> {
                   flex: 2,
                   child: Text(
                     patient.firstName,
-                    style: const TextStyle(fontSize: 10, color: Color(0xFF444444)),
+                    style: const TextStyle(
+                        fontSize: 10, color: Color(0xFF444444)),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -731,7 +818,8 @@ class _PatientListTabState extends State<PatientListTab> {
                   flex: 1,
                   child: Text(
                     '${patient.age}m',
-                    style: const TextStyle(fontSize: 10, color: Color(0xFF444444)),
+                    style: const TextStyle(
+                        fontSize: 10, color: Color(0xFF444444)),
                     textAlign: TextAlign.center,
                   ),
                 ),
@@ -741,11 +829,14 @@ class _PatientListTabState extends State<PatientListTab> {
                   flex: 2,
                   child: Center(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 3),
                       decoration: BoxDecoration(
                         color: statusColor.withOpacity(0.12),
                         borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: statusColor.withOpacity(0.3), width: 0.8),
+                        border: Border.all(
+                            color: statusColor.withOpacity(0.3),
+                            width: 0.8),
                       ),
                       child: Text(
                         patient.assessmentRemarks,
@@ -766,8 +857,11 @@ class _PatientListTabState extends State<PatientListTab> {
                 Expanded(
                   flex: 2,
                   child: Text(
-                    '${patient.lastVisit.month.toString().padLeft(2, '0')}/${patient.lastVisit.day.toString().padLeft(2, '0')}/${patient.lastVisit.year}',
-                    style: const TextStyle(fontSize: 9, color: Color(0xFF666666)),
+                    '${patient.lastVisit.month.toString().padLeft(2, '0')}/'
+                    '${patient.lastVisit.day.toString().padLeft(2, '0')}/'
+                    '${patient.lastVisit.year}',
+                    style: const TextStyle(
+                        fontSize: 9, color: Color(0xFF666666)),
                     textAlign: TextAlign.center,
                   ),
                 ),
@@ -781,13 +875,17 @@ class _PatientListTabState extends State<PatientListTab> {
                       _contactIcon(
                         Icons.phone_rounded,
                         const Color(0xFF2E8B7B),
-                        _selectionMode ? () {} : () => _handleCall(patient),
+                        _selectionMode
+                            ? () {}
+                            : () => _handleCall(patient),
                       ),
                       const SizedBox(width: 4),
                       _contactIcon(
                         Icons.sms_rounded,
                         const Color(0xFFF5A962),
-                        _selectionMode ? () {} : () => _handleMessage(patient),
+                        _selectionMode
+                            ? () {}
+                            : () => _handleMessage(patient),
                       ),
                     ],
                   ),
@@ -800,11 +898,13 @@ class _PatientListTabState extends State<PatientListTab> {
     );
   }
 
-  Widget _contactIcon(IconData icon, Color color, VoidCallback onTap) {
+  Widget _contactIcon(
+      IconData icon, Color color, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 22, height: 22,
+        width: 22,
+        height: 22,
         decoration: BoxDecoration(
           color: color.withOpacity(0.12),
           borderRadius: BorderRadius.circular(6),
@@ -821,19 +921,26 @@ class _PatientListTabState extends State<PatientListTab> {
       child: GestureDetector(
         onTap: () => setState(() => _sortAscending = !_sortAscending),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
             color: Colors.white.withOpacity(0.9),
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 6, offset: const Offset(0, 2)),
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
             ],
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                _sortAscending ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+                _sortAscending
+                    ? Icons.arrow_downward_rounded
+                    : Icons.arrow_upward_rounded,
                 size: 14,
                 color: const Color(0xFF2E8B7B),
               ),
@@ -854,7 +961,8 @@ class _PatientListTabState extends State<PatientListTab> {
   }
 
   // ── CONTACT HANDLERS ───────────────────────────────────────────────────────
-  String _sanitizePhone(String raw) => raw.replaceAll(RegExp(r'[^\d+]'), '');
+  String _sanitizePhone(String raw) =>
+      raw.replaceAll(RegExp(r'[^\d+]'), '');
 
   Future<void> _handleCall(Patient patient) async {
     final number = _sanitizePhone(patient.guardianContact);
@@ -864,7 +972,8 @@ class _PatientListTabState extends State<PatientListTab> {
           content: const Text('No guardian contact number to call'),
           backgroundColor: Colors.orange.shade700,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12)),
           margin: const EdgeInsets.all(16),
         ),
       );
@@ -879,7 +988,8 @@ class _PatientListTabState extends State<PatientListTab> {
           content: Text('Cannot open dialer for $number'),
           backgroundColor: Colors.redAccent,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12)),
           margin: const EdgeInsets.all(16),
         ),
       );
@@ -891,10 +1001,12 @@ class _PatientListTabState extends State<PatientListTab> {
     if (number.isEmpty) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('No guardian contact number to message'),
+          content:
+              const Text('No guardian contact number to message'),
           backgroundColor: Colors.orange.shade700,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12)),
           margin: const EdgeInsets.all(16),
         ),
       );
@@ -909,7 +1021,8 @@ class _PatientListTabState extends State<PatientListTab> {
           content: Text('Cannot open messaging app for $number'),
           backgroundColor: Colors.redAccent,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12)),
           margin: const EdgeInsets.all(16),
         ),
       );
@@ -918,11 +1031,12 @@ class _PatientListTabState extends State<PatientListTab> {
 
   // ── PATIENT DETAIL DIALOG ──────────────────────────────────────────────────
   void _showPatientDetails(Patient patient) {
-    final statusColor = _statusColor(patient.assessmentRemarks);
+    final statusColor = getStatusColor(patient.assessmentRemarks);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         contentPadding: EdgeInsets.zero,
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -944,16 +1058,21 @@ class _PatientListTabState extends State<PatientListTab> {
               child: Row(
                 children: [
                   Container(
-                    width: 48, height: 48,
+                    width: 48,
+                    height: 48,
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.25),
                       shape: BoxShape.circle,
                     ),
                     child: ClipOval(
                       child: Image.network(
-                        'https://ui-avatars.com/api/?name=${patient.firstName}+${patient.lastName}&background=ffffff&color=2E8B7B&size=96',
+                        'https://ui-avatars.com/api/?name=${patient.firstName}+${patient.lastName}'
+                        '&background=ffffff&color=2E8B7B&size=96',
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const Icon(Icons.person_rounded, color: Colors.white, size: 28),
+                        errorBuilder: (_, __, ___) => const Icon(
+                            Icons.person_rounded,
+                            color: Colors.white,
+                            size: 28),
                       ),
                     ),
                   ),
@@ -972,15 +1091,22 @@ class _PatientListTabState extends State<PatientListTab> {
                         ),
                         const SizedBox(height: 4),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
                             color: statusColor.withOpacity(0.25),
                             borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: Colors.white.withOpacity(0.3), width: 0.8),
+                            border: Border.all(
+                                color: Colors.white.withOpacity(0.3),
+                                width: 0.8),
                           ),
                           child: Text(
                             patient.assessmentRemarks,
-                            style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ],
@@ -995,11 +1121,20 @@ class _PatientListTabState extends State<PatientListTab> {
               padding: const EdgeInsets.all(20),
               child: Column(
                 children: [
-                  _detailRow(Icons.cake_outlined, 'Age', '${patient.age} months old'),
-                  _detailRow(Icons.calendar_today_outlined, 'Last Visit',
+                  _detailRow(Icons.cake_outlined, 'Age',
+                      '${patient.age} months old'),
+                  _detailRow(
+                      Icons.calendar_today_outlined,
+                      'Last Visit',
                       '${patient.lastVisit.month}/${patient.lastVisit.day}/${patient.lastVisit.year}'),
-                  _detailRow(Icons.phone_outlined, 'Contact', patient.guardianContact.isEmpty ? '—' : patient.guardianContact),
-                  _detailRow(Icons.person_outline_rounded, 'Added by', patient.createdBy),
+                  _detailRow(
+                      Icons.phone_outlined,
+                      'Contact',
+                      patient.guardianContact.isEmpty
+                          ? '—'
+                          : patient.guardianContact),
+                  _detailRow(Icons.person_outline_rounded, 'Added by',
+                      patient.createdBy),
                 ],
               ),
             ),
@@ -1014,11 +1149,16 @@ class _PatientListTabState extends State<PatientListTab> {
                       onPressed: () => Navigator.pop(context),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFF2E8B7B),
-                        side: const BorderSide(color: Color(0xFF2E8B7B)),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        side: const BorderSide(
+                            color: Color(0xFF2E8B7B)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 12),
                       ),
-                      child: const Text('Close', style: TextStyle(fontWeight: FontWeight.w600)),
+                      child: const Text('Close',
+                          style:
+                              TextStyle(fontWeight: FontWeight.w600)),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -1029,18 +1169,23 @@ class _PatientListTabState extends State<PatientListTab> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => PatientProfileOverview(patient: patient),
+                            builder: (_) => PatientProfileOverview(
+                                patient: patient),
                           ),
                         );
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF2E8B7B),
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 12),
                         elevation: 0,
                       ),
-                      child: const Text('View Profile', style: TextStyle(fontWeight: FontWeight.w700)),
+                      child: const Text('View Profile',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w700)),
                     ),
                   ),
                 ],
@@ -1071,7 +1216,8 @@ class _PatientListTabState extends State<PatientListTab> {
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(fontSize: 13, color: Color(0xFF1A1A1A)),
+              style: const TextStyle(
+                  fontSize: 13, color: Color(0xFF1A1A1A)),
               overflow: TextOverflow.ellipsis,
             ),
           ),

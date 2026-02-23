@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart'; // add intl to pubspec.yaml
 import '../../../services/anthropometric_calculator.dart';
-import 'form_card.dart';
-import 'form_field_row.dart';
 
 class AnthropometricDataForm extends StatefulWidget {
   final TextEditingController dateController;
@@ -36,18 +35,6 @@ class AnthropometricDataForm extends StatefulWidget {
 }
 
 class _AnthropometricDataFormState extends State<AnthropometricDataForm> {
-  // ── Theme constants ────────────────────────────────────────────────────────
-  static const Color _primary = Color(0xFFB5651D);       // warm brown
-  static const Color _primaryLight = Color(0xFFFFF3E0);  // amber-50
-  static const Color _surface = Colors.white;
-  static const Color _surfaceAlt = Color(0xFFFDF6EE);    // warm white
-  static const Color _border = Color(0xFFE8C9A0);        // warm tan border
-  static const Color _labelColor = Color(0xFF795548);    // brown-600
-  static const Color _textColor = Color(0xFF3E2723);     // brown-900
-  static const Color _accentGreen = Color(0xFFB5651D);   // reuse brown for results
-  static const Color _accentGreenLight = Color(0xFFFFF8F0); // warm cream
-
-  // ── Recalculation logic ───────────────────────────────────────────────────
   void _recalculate() {
     final r = AnthropometricCalculator.calculate(
       weightStr: widget.weightController.text,
@@ -96,355 +83,355 @@ class _AnthropometricDataFormState extends State<AnthropometricDataForm> {
     super.dispose();
   }
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
+  // ── Calendar helper ─────────────────────────────────────────────────────
+  Future<void> _pickMeasurementDate() async {
+    DateTime initialDate = DateTime.now();
+    final existing = widget.dateController.text.trim();
+    if (existing.isNotEmpty) {
+      try {
+        initialDate = DateFormat('MM-dd-yyyy').parse(existing);
+      } catch (_) {}
+    }
+    if (initialDate.isAfter(DateTime.now())) initialDate = DateTime.now();
 
-  /// A styled input field label above the text field.
-  Widget _buildLabel(String text) => Padding(
-        padding: const EdgeInsets.only(bottom: 6),
-        child: Text(
-          text,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: _labelColor,
-            letterSpacing: 0.3,
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now(),
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: const ColorScheme.light(
+            primary: Color(0xFFF5A962),
+            onPrimary: Colors.white,
+            surface: Colors.white,
+            onSurface: Color(0xFF1A1A1A),
+          ),
+          textButtonTheme: TextButtonThemeData(
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFFF5A962),
+            ),
           ),
         ),
-      );
+        child: child!,
+      ),
+    );
 
-  /// A styled, self-contained input field (replaces FormFieldRow for the new
-  /// layout — individual rows with label on top).
+    if (picked != null) {
+      widget.dateController.text = DateFormat('MM-dd-yyyy').format(picked);
+      // _recalculate() fires via listener automatically
+    }
+  }
+
+  // ── Shared builders ─────────────────────────────────────────────────────
   Widget _buildField({
     required String label,
     required TextEditingController controller,
     TextInputType keyboardType = TextInputType.text,
     String? hint,
     bool readOnly = false,
+    bool hasCalendar = false,
+    VoidCallback? onTap,
     String? Function(String?)? validator,
-    Widget? prefixIcon,
+    IconData? icon,
   }) {
+    final isResult = readOnly && !hasCalendar;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildLabel(label),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: isResult ? const Color(0xFF2E8B7B) : const Color(0xFFF5A962),
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 5),
         TextFormField(
           controller: controller,
           keyboardType: keyboardType,
-          readOnly: readOnly,
+          readOnly: readOnly || hasCalendar,
+          onTap: onTap,
           validator: validator,
           style: TextStyle(
-            fontSize: 14,
+            fontSize: 13,
             fontWeight: FontWeight.w500,
-            color: readOnly ? _accentGreen : _textColor,
+            color: isResult ? const Color(0xFF2E8B7B) : const Color(0xFF1A1A1A),
           ),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: const TextStyle(fontSize: 13, color: Color(0xFFD4A97A)),
-            prefixIcon: prefixIcon,
-            prefixIconColor: readOnly ? _accentGreen : _primary,
+            hintStyle: const TextStyle(fontSize: 12, color: Colors.black26),
+            prefixIcon: icon != null
+                ? Icon(icon,
+                    size: 16,
+                    color: isResult ? const Color(0xFF2E8B7B) : Colors.black38)
+                : null,
+            suffixIcon: hasCalendar
+                ? const Icon(Icons.calendar_month_outlined,
+                    size: 18, color: Color(0xFFF5A962))
+                : null,
             filled: true,
-            fillColor: readOnly ? const Color(0xFFFFF3E0) : _surfaceAlt,
+            fillColor: isResult
+                ? const Color(0xFFEDF7F6)
+                : const Color(0xFFFAFAFA),
             contentPadding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide: BorderSide(
-                color: readOnly
-                    ? const Color(0xFFE8985A) // original orange
-                    : _border,
+                color: isResult
+                    ? const Color(0xFF2E8B7B).withValues(alpha: 0.3)
+                    : const Color(0xFFEEEEEE),
                 width: 1.5,
               ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFFE8985A), width: 2),
+              borderSide: BorderSide(
+                color: isResult
+                    ? const Color(0xFF2E8B7B)
+                    : const Color(0xFFF5A962),
+                width: 2,
+              ),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+              borderSide:
+                  const BorderSide(color: Color(0xFFEF4444), width: 1.5),
             ),
             focusedErrorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 2),
+              borderSide:
+                  const BorderSide(color: Color(0xFFEF4444), width: 2),
             ),
-            errorStyle: const TextStyle(fontSize: 11),
+            errorStyle: const TextStyle(fontSize: 10),
           ),
         ),
       ],
     );
   }
 
-  /// A two-column grid row for the calculated results.
-  Widget _buildResultRow(
-    String label1,
-    TextEditingController c1,
-    Widget icon1,
-    String label2,
-    TextEditingController c2,
-    Widget icon2,
-  ) {
+  Widget _buildCard({required Widget child}) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: child,
+      );
+
+  Widget _buildSectionHeader(String title, IconData icon,
+      {List<Color> gradientColors = const [
+        Color(0xFFF5A962),
+        Color(0xFFF08030),
+      ]}) {
     return Row(
       children: [
-        Expanded(
-          child: _buildField(
-            label: label1,
-            controller: c1,
-            readOnly: true,
-            prefixIcon: icon1,
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: gradientColors,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: [
+              BoxShadow(
+                color: gradientColors.first.withValues(alpha: 0.35),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
           ),
+          child: Icon(icon, color: Colors.white, size: 18),
         ),
         const SizedBox(width: 12),
-        Expanded(
-          child: _buildField(
-            label: label2,
-            controller: c2,
-            readOnly: true,
-            prefixIcon: icon2,
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            color: gradientColors.first,
+            letterSpacing: 1.1,
           ),
         ),
       ],
     );
   }
 
-  // ── Build ─────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: _surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _border, width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ── Section Header ───────────────────────────────────────────────
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            decoration: const BoxDecoration(
-              color: const Color(0xFFFFF3E0),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE8985A),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.monitor_weight_outlined,
-                      size: 18, color: Colors.white),
-                ),
-                const SizedBox(width: 12),
-                const Text(
-                  'Anthropometric Data',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: _textColor,
-                    letterSpacing: 0.2,
-                  ),
-                ),
-              ],
-            ),
-          ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSectionHeader(
+                  'ANTHROPOMETRIC DATA', Icons.monitor_weight_outlined),
+              const SizedBox(height: 14),
 
-          // ── Form Body ────────────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Date of Measurement (full width)
-                _buildField(
-                  label: 'Date of Measurement',
-                  controller: widget.dateController,
-                  keyboardType: TextInputType.datetime,
-                  hint: 'MM-DD-YYYY',
-                  prefixIcon: const Icon(Icons.calendar_today_outlined, size: 18),
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) {
-                      return 'Date of measurement is required';
-                    }
-                    if (!RegExp(r'^\d{2}-\d{2}-\d{4}$').hasMatch(v.trim())) {
-                      return 'Use format MM-DD-YYYY';
-                    }
-                    return null;
-                  },
-                ),
+              // ── Date of Measurement — tap to open calendar ────────────
+              _buildField(
+                label: 'DATE OF MEASUREMENT',
+                controller: widget.dateController,
+                hint: 'Tap to select date',
+                hasCalendar: true,
+                icon: Icons.calendar_today_outlined,
+                onTap: _pickMeasurementDate,
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) {
+                    return 'Date of measurement is required';
+                  }
+                  return null;
+                },
+              ),
 
-                const SizedBox(height: 14),
+              const SizedBox(height: 12),
 
-                // Weight + Height (side by side)
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildField(
-                        label: 'Weight (kg)',
-                        controller: widget.weightController,
-                        keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
-                        hint: '0.0',
-                        prefixIcon:
-                            const Icon(Icons.fitness_center_outlined, size: 18),
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) {
-                            return 'Required';
-                          }
-                          final w = double.tryParse(v.trim());
-                          if (w == null) return 'Invalid number';
-                          if (w <= 0 || w > 300) return 'Invalid weight';
-                          return null;
-                        },
-                      ),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildField(
+                      label: 'WEIGHT (KG)',
+                      controller: widget.weightController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true),
+                      hint: '0.0',
+                      icon: Icons.fitness_center_outlined,
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return 'Required';
+                        final w = double.tryParse(v.trim());
+                        if (w == null) return 'Invalid number';
+                        if (w <= 0 || w > 300) return 'Invalid weight';
+                        return null;
+                      },
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _buildField(
-                        label: 'Height (cm)',
-                        controller: widget.heightController,
-                        keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
-                        hint: '0.0',
-                        prefixIcon: const Icon(Icons.height_outlined, size: 18),
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) {
-                            return 'Required';
-                          }
-                          final h = double.tryParse(v.trim());
-                          if (h == null) return 'Invalid number';
-                          if (h <= 0 || h > 300) return 'Invalid height';
-                          return null;
-                        },
-                      ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _buildField(
+                      label: 'HEIGHT (CM)',
+                      controller: widget.heightController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true),
+                      hint: '0.0',
+                      icon: Icons.height_outlined,
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return 'Required';
+                        final h = double.tryParse(v.trim());
+                        if (h == null) return 'Invalid number';
+                        if (h <= 0 || h > 300) return 'Invalid height';
+                        return null;
+                      },
                     ),
-                  ],
-                ),
-
-                const SizedBox(height: 14),
-
-                // MUAC (full width)
-                _buildField(
-                  label: 'MUAC (cm)',
-                  controller: widget.muacController,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  hint: '0.0',
-                  prefixIcon: const Icon(Icons.straighten_outlined, size: 18),
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) return 'MUAC is required';
-                    final m = double.tryParse(v.trim());
-                    if (m == null) return 'Invalid number';
-                    if (m <= 0) return 'Invalid MUAC value';
-                    return null;
-                  },
-                ),
-
-                const SizedBox(height: 20),
-
-                // ── Calculated Results Section ───────────────────────────
-                Container(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFF8F0),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                        color: const Color(0xFFE8985A), width: 1.5),
                   ),
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Sub-header
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFB5651D),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Icon(Icons.auto_graph_outlined,
-                                size: 14, color: Colors.white),
-                          ),
-                          const SizedBox(width: 10),
-                          const Expanded(
-                            child: Text(
-                              'WHO Z-Score Results',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: const Color(0xFFB5651D),
-                                letterSpacing: 0.2,
-                              ),
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE8985A).withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: const Text(
-                              'Auto-calculated',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: const Color(0xFFB5651D),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                ],
+              ),
 
-                      const SizedBox(height: 4),
-                      const Text(
-                        'Derived from weight, height, age & sex inputs',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: const Color(0xFF8D4E15), // emerald-700
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
+              const SizedBox(height: 12),
 
-                      const SizedBox(height: 14),
-
-                      // Results grid — 2 per row
-                      _buildResultRow(
-                        'Weight-for-Age',
-                        widget.weightForAgeController,
-                        const Icon(Icons.monitor_weight_outlined, size: 16),
-                        'Weight-for-Height',
-                        widget.weightForHeightController,
-                        const Icon(Icons.swap_vert_outlined, size: 16),
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      _buildResultRow(
-                        'Height-for-Age',
-                        widget.heightForAgeController,
-                        const Icon(Icons.height_outlined, size: 16),
-                        'BMI (kg/m²)',
-                        widget.bmiController,
-                        const Icon(Icons.calculate_outlined, size: 16),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+              _buildField(
+                label: 'MUAC (CM)',
+                controller: widget.muacController,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                hint: '0.0',
+                icon: Icons.straighten_outlined,
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'MUAC is required';
+                  final m = double.tryParse(v.trim());
+                  if (m == null) return 'Invalid number';
+                  if (m <= 0) return 'Invalid MUAC value';
+                  return null;
+                },
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+
+        const SizedBox(height: 10),
+
+        _buildCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSectionHeader(
+                'WHO Z-SCORE RESULTS',
+                Icons.auto_graph_outlined,
+                gradientColors: const [Color(0xFF2E8B7B), Color(0xFF5CAA7F)],
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Auto-calculated from inputs above',
+                style: TextStyle(
+                  fontSize: 10,
+                  color: Colors.black38,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildField(
+                      label: 'WEIGHT-FOR-AGE',
+                      controller: widget.weightForAgeController,
+                      readOnly: true,
+                      icon: Icons.monitor_weight_outlined,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _buildField(
+                      label: 'WEIGHT-FOR-HEIGHT',
+                      controller: widget.weightForHeightController,
+                      readOnly: true,
+                      icon: Icons.swap_vert_outlined,
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 12),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildField(
+                      label: 'HEIGHT-FOR-AGE',
+                      controller: widget.heightForAgeController,
+                      readOnly: true,
+                      icon: Icons.height_outlined,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _buildField(
+                      label: 'BMI (KG/M²)',
+                      controller: widget.bmiController,
+                      readOnly: true,
+                      icon: Icons.calculate_outlined,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

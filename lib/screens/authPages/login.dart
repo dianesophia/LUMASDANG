@@ -4,6 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:lumasdang/screens/home/home_page.dart';
 import 'register.dart';
 import 'dart:async';
+import '../../services/connectivity_service.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:math' as math;
 
 class LoginPage extends StatefulWidget {
@@ -20,6 +22,8 @@ class _LoginPageState extends State<LoginPage>
   final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  // Secure storage for offline credential cache (encrypted by OS)
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
 
   bool _isLoading = false;
   bool _obscurePassword = true;
@@ -96,6 +100,37 @@ class _LoginPageState extends State<LoginPage>
 
     setState(() => _isLoading = true);
 
+    // Attempt offline login if no network available.
+    final online = await ConnectivityService.instance.checkOnline();
+    if (!online) {
+      // Resolve input to an email if user typed username previously saved locally
+      String emailToUse = input;
+      if (!input.contains('@')) {
+        final storedEmail = await _secureStorage.read(key: 'cached_email_for_username:${input.toLowerCase()}');
+        if (storedEmail != null && storedEmail.isNotEmpty) {
+          emailToUse = storedEmail;
+        }
+      }
+
+      // Check cached password for this email
+      final cachedPassword = await _secureStorage.read(key: 'cached_password_for_email:${emailToUse.toLowerCase()}');
+      if (cachedPassword != null && cachedPassword == password) {
+        // Allow offline access — navigate to HomePage without attempting Firebase sign-in.
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const HomePage()),
+          );
+        }
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      _showErrorSnackbar('No internet connection. Cannot sign in offline with these credentials.');
+      setState(() => _isLoading = false);
+      return;
+    }
+
     try {
       String emailToUse = input;
 
@@ -135,6 +170,18 @@ class _LoginPageState extends State<LoginPage>
         }
 
         await _ensureUserHasBarangayId(user.uid);
+
+        // Cache credentials for offline login (secure storage)
+        try {
+          final emailLower = emailToUse.toLowerCase();
+          await _secureStorage.write(key: 'cached_password_for_email:$emailLower', value: password);
+          // If user logged in using username (input without @), keep a mapping
+          if (!input.contains('@')) {
+            await _secureStorage.write(key: 'cached_email_for_username:${input.toLowerCase()}', value: emailToUse);
+          }
+        } catch (e) {
+          // ignore storage errors
+        }
 
         if (mounted) {
           Navigator.pushReplacement(
@@ -463,7 +510,7 @@ class _LoginPageState extends State<LoginPage>
                                 ),
                                 const SizedBox(height: 20),
                                 const Text(
-                                  'Lumasdang',
+                                  'Lµmasdαng',
                                   style: TextStyle(
                                     fontSize: 40,
                                     fontWeight: FontWeight.w800,

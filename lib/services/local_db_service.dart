@@ -1,5 +1,7 @@
 import 'package:hive_flutter/hive_flutter.dart';
 import 'firestore_service.dart';
+import 'dart:async';
+import 'package:uuid/uuid.dart';
 
 class LocalDbService {
   LocalDbService._private();
@@ -8,8 +10,10 @@ class LocalDbService {
   static const String _boxName = 'homepageData';
   late Box _box;
   bool _initialized = false;
+  bool _isSyncing = false;
+  final Uuid _uuid = const Uuid();
 
-  /// Initialize Hive
+  /// Initialize Hive (idempotent)
   Future<void> init() async {
     if (_initialized) return;
 
@@ -29,18 +33,26 @@ class LocalDbService {
     return _box;
   }
 
-  /// Save a local record with username included
+  /// Save a local record with username included. Returns the local key (int).
+  /// Keeps parameter name `synced` for backward compatibility but stores `isSynced` internally.
   Future<int> saveLocalRecord(Map<String, dynamic> data,
       {bool synced = false, String? firestoreId}) async {
+    final id = (data['id'] as String?) ?? _uuid.v4();
+    final now = DateTime.now().toIso8601String();
     final record = {
-      'data': data,
+      'id': id,
+      'data': {...data, 'id': id},
       'username': data['username'] ?? '',
-      'createdAt': DateTime.now().toIso8601String(),
-      'synced': synced,
-      'firestoreId': firestoreId,
-      'isDeleted': false, // Soft delete
+      'createdAt': now,
+      'lastModified': now,
+      'isSynced': synced,
+      'synced': synced, // backward compatibility
+      'firestoreId': firestoreId ?? id,
+      'isDeleted': data['isDeleted'] == true ? true : false, // Soft delete
     };
-    return await box.add(record);
+    final key = await box.add(record);
+    print('LocalDbService: saved local record key=$key id=$id synced=$synced firestoreId=${record['firestoreId']}');
+    return key;
   }
 
   /// Get count of patients screened today (records with createdAt date = today)
@@ -49,8 +61,8 @@ class LocalDbService {
     final today = DateTime(now.year, now.month, now.day);
     int count = 0;
 
-    for (var i = 0; i < box.length; i++) {
-      final value = box.getAt(i);
+    for (final key in box.keys) {
+      final value = box.get(key);
       if (value is Map && value['isDeleted'] != true) {
         final createdAtStr = value['createdAt'] as String?;
         if (createdAtStr != null) {
@@ -66,13 +78,22 @@ class LocalDbService {
   }
 
   /// Get all records (optionally include deleted)
+  /// Returns records in a UI-friendly shape: {id, data, timestamp, synced, firestoreId, isDeleted}
   Future<List<Map<String, dynamic>>> getAllRecords({bool includeDeleted = false}) async {
     final results = <Map<String, dynamic>>[];
-    for (var i = 0; i < box.length; i++) {
-      final value = box.getAt(i);
+    for (final key in box.keys) {
+      final value = box.get(key);
       if (value is Map) {
         if (!includeDeleted && value['isDeleted'] == true) continue;
-        results.add({'key': i, 'value': Map<String, dynamic>.from(value)});
+        results.add({
+          'id': value['id'] ?? key,
+          'data': Map<String, dynamic>.from(value['data'] ?? {}),
+          'timestamp': value['createdAt'],
+          'lastModified': value['lastModified'],
+          'synced': (value['isSynced'] == true) || (value['synced'] == true),
+          'firestoreId': value['firestoreId'],
+          'isDeleted': value['isDeleted'] == true,
+        });
       }
     }
     return results;
@@ -81,10 +102,13 @@ class LocalDbService {
   /// Get unsynced records
   Future<List<Map<String, dynamic>>> getUnsyncedRecords() async {
     final results = <Map<String, dynamic>>[];
-    for (var i = 0; i < box.length; i++) {
-      final value = box.getAt(i);
-      if (value is Map && value['synced'] == false && value['isDeleted'] == false) {
-        results.add({'key': i, 'value': Map<String, dynamic>.from(value)});
+    for (final key in box.keys) {
+      final value = box.get(key);
+      if (value is Map && value['isDeleted'] != true) {
+        final isSynced = (value['isSynced'] == true) || (value['synced'] == true);
+        if (!isSynced) {
+          results.add({'key': key, 'value': Map<String, dynamic>.from(value)});
+        }
       }
     }
     return results;
@@ -92,40 +116,67 @@ class LocalDbService {
 
   /// Mark a local record as synced
   Future<void> markAsSynced(int localKey, String firestoreId) async {
-    final value = box.getAt(localKey);
+    final value = box.get(localKey);
     if (value is Map) {
       final updated = Map<String, dynamic>.from(value);
-      updated['synced'] = true;
+      updated['isSynced'] = true;
+      updated['synced'] = true; // backward compatibility
       updated['firestoreId'] = firestoreId;
-      await box.putAt(localKey, updated);
+      updated['syncedAt'] = DateTime.now().toIso8601String();
+      updated['lastModified'] = DateTime.now().toIso8601String();
+      await box.put(localKey, updated);
+      print('LocalDbService: marked localKey=$localKey id=${updated['id']} as synced -> firestoreId=$firestoreId');
     }
   }
 
   /// Save and sync a record to Firestore
   Future<void> saveAndSync(Map<String, dynamic> data, FirestoreService firestoreService) async {
     final localKey = await saveLocalRecord(data, synced: false);
+    print('LocalDbService.saveAndSync: pushing localKey=$localKey to Firestore');
     try {
-      final docId = await firestoreService.saveHomePageData(data);
+      final localRecord = box.get(localKey);
+      final id = (localRecord is Map) ? (localRecord['id'] as String?) : null;
+      final docId = await firestoreService.saveHomePageData({...data, 'id': id ?? ''}, docId: id);
       await markAsSynced(localKey, docId);
-    } catch (_) {
-      rethrow;
+      print('LocalDbService.saveAndSync: success localKey=$localKey docId=$docId');
+    } catch (e) {
+      print('LocalDbService.saveAndSync: failed to push localKey=$localKey error=$e');
+      // Leave unsynced for later
     }
   }
 
-  /// Sync all pending local records
+  /// Sync all pending local records. Returns number of successfully synced records.
   Future<int> syncPending(FirestoreService firestoreService) async {
-    final unsynced = await getUnsyncedRecords();
+    if (_isSyncing) {
+      print('LocalDbService.syncPending: already syncing, skipping');
+      return 0;
+    }
+    _isSyncing = true;
     int success = 0;
+    try {
+      final unsynced = await getUnsyncedRecords();
+      print('LocalDbService.syncPending: starting, unsyncedCount=${unsynced.length}');
 
-    for (final item in unsynced) {
-      final key = item['key'] as int;
-      final value = item['value'] as Map<String, dynamic>;
-      final data = Map<String, dynamic>.from(value['data'] as Map);
-      try {
-        final docId = await firestoreService.saveHomePageData(data);
-        await markAsSynced(key, docId);
-        success++;
-      } catch (_) {}
+      for (final item in unsynced) {
+        final key = item['key'];
+        final value = item['value'] as Map<String, dynamic>;
+        final data = Map<String, dynamic>.from(value['data'] as Map);
+        try {
+          final id = (value['id'] as String?) ?? key.toString();
+          final existingDocId = (value['firestoreId'] as String?)?.isNotEmpty == true ? value['firestoreId'] as String : id;
+          print('LocalDbService.syncPending: pushing id=$id for localKey=$key existingDocId=$existingDocId');
+          final docId = await firestoreService.saveHomePageData({...data, 'id': id}, docId: existingDocId);
+          await markAsSynced(key as int, docId);
+          success++;
+          print('LocalDbService.syncPending: pushed localKey=$key id=$id docId=$docId');
+        } catch (e) {
+          print('LocalDbService.syncPending: failed for localKey=$key error=$e');
+          continue;
+        }
+      }
+    } finally {
+      _isSyncing = false;
+      print('LocalDbService.syncPending: finished, success=$success');
     }
 
     return success;
@@ -133,24 +184,24 @@ class LocalDbService {
 
   /// Soft delete a record by local key
   Future<void> softDeleteByKey(int key) async {
-    final value = box.getAt(key);
+    final value = box.get(key);
     if (value is Map) {
       final updated = Map<String, dynamic>.from(value);
       updated['isDeleted'] = true;
-      await box.putAt(key, updated);
+      await box.put(key, updated);
     }
   }
 
   /// Soft delete all records for a user (using uid field)
   Future<void> softDeleteByUserId(String userId) async {
-    for (var i = 0; i < box.length; i++) {
-      final value = box.getAt(i);
+    for (final key in box.keys) {
+      final value = box.get(key);
       if (value is Map) {
         final data = Map<String, dynamic>.from(value['data'] ?? {});
         if (data['uid'] == userId) {
           final updated = Map<String, dynamic>.from(value);
           updated['isDeleted'] = true;
-          await box.putAt(i, updated);
+          await box.put(key, updated);
         }
       }
     }
@@ -158,13 +209,13 @@ class LocalDbService {
 
   /// Permanently remove a record
   Future<void> hardDeleteByKey(int key) async {
-    await box.deleteAt(key);
+    await box.delete(key);
   }
 
   /// Update email for all records belonging to a user
   Future<void> updateEmailForUser(String userId, String newEmail) async {
-    for (var i = 0; i < box.length; i++) {
-      final value = box.getAt(i);
+    for (final key in box.keys) {
+      final value = box.get(key);
       if (value is Map) {
         final data = Map<String, dynamic>.from(value['data'] ?? {});
         if (data['uid'] == userId) {
@@ -173,7 +224,7 @@ class LocalDbService {
             ...data,
             'email': newEmail,
           };
-          await box.putAt(i, updated);
+          await box.put(key, updated);
         }
       }
     }
@@ -181,8 +232,8 @@ class LocalDbService {
 
   /// Update display name for all records belonging to a user
   Future<void> updateDisplayNameForUser(String userId, String displayName) async {
-    for (var i = 0; i < box.length; i++) {
-      final value = box.getAt(i);
+    for (final key in box.keys) {
+      final value = box.get(key);
       if (value is Map) {
         final data = Map<String, dynamic>.from(value['data'] ?? {});
         if (data['uid'] == userId) {
@@ -191,7 +242,7 @@ class LocalDbService {
             ...data,
             'displayName': displayName,
           };
-          await box.putAt(i, updated);
+          await box.put(key, updated);
         }
       }
     }
@@ -199,8 +250,8 @@ class LocalDbService {
 
   /// Update profile picture for all records belonging to a user
   Future<void> updateProfilePictureForUser(String userId, String profilePicture) async {
-    for (var i = 0; i < box.length; i++) {
-      final value = box.getAt(i);
+    for (final key in box.keys) {
+      final value = box.get(key);
       if (value is Map) {
         final data = Map<String, dynamic>.from(value['data'] ?? {});
         if (data['uid'] == userId) {
@@ -209,7 +260,7 @@ class LocalDbService {
             ...data,
             'profilePicture': profilePicture,
           };
-          await box.putAt(i, updated);
+          await box.put(key, updated);
         }
       }
     }

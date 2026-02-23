@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'local_db_service.dart';
+import 'firestore_service.dart';
 
 class ConnectivityService {
   ConnectivityService._private();
@@ -29,7 +31,29 @@ class ConnectivityService {
     _sub?.cancel();
     _sub = _connectivity.onConnectivityChanged.listen((result) async {
       final online = await checkOnline();
+      print('ConnectivityService: connectivity changed -> online=$online');
       onStatusChanged(online);
+    });
+  }
+
+  /// Convenience helper to automatically sync pending local records when
+  /// connection is restored. Will use provided FirestoreService or create one.
+  void startAutoSync({FirestoreService? firestoreService}) {
+    print('ConnectivityService: startAutoSync called');
+    startMonitoring((online) async {
+      print('ConnectivityService.startAutoSync: online=$online');
+      if (online) {
+        try {
+          final fs = firestoreService ?? FirestoreService();
+          await LocalDbService.instance.init();
+          print('ConnectivityService.startAutoSync: running LocalDbService.syncPending');
+          final synced = await LocalDbService.instance.syncPending(fs);
+          print('ConnectivityService.startAutoSync: syncPending result=$synced');
+        } catch (e) {
+          print('ConnectivityService.startAutoSync: error during sync $e');
+          // swallow; will retry on next connection change
+        }
+      }
     });
   }
 

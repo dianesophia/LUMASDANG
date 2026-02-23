@@ -1,334 +1,330 @@
 import 'package:flutter/material.dart';
 import '../../../services/assessment_service.dart';
 
-/// Assessment table widget displaying patient assessments
 class AssessmentTable extends StatelessWidget {
   final List<Map<String, dynamic>> assessments;
   final String patientId;
   final bool loading;
   final VoidCallback onAddAssessment;
-   final Future<void> Function(Map<String, dynamic>, String patientId)? saveNewAssessment;
+  final Future<void> Function(Map<String, dynamic>, String patientId)?
+      saveNewAssessment;
 
   const AssessmentTable({
     super.key,
-    required this.patientId, // new
+    required this.patientId,
     required this.assessments,
     required this.loading,
     required this.onAddAssessment,
-    this.saveNewAssessment, 
+    this.saveNewAssessment,
   });
 
-  String _getClassification(Map<String, dynamic> assessment) {
-    final wfa = assessment['weightForAge']?.toString().toLowerCase() ?? '';
-    final hfa = assessment['heightForAge']?.toString().toLowerCase() ?? '';
-    final wfh = assessment['weightForHeight']?.toString().toLowerCase() ?? '';
+  // ─── Design Tokens (matches ProfileInfoCard) ────────────────────────────────
+  static const Color _orange       = Color(0xFFF08030);
+  static const Color _orangeLight  = Color(0xFFF5A962);
+  static const Color _surface      = Color(0xFFFFFFFF);
+  static const Color _surfaceDim   = Color(0xFFFAFAFA);
+  static const Color _border       = Color(0xFFE8E8ED);
+  static const Color _ink          = Color(0xFF1C1C1E);
+  static const Color _inkMid       = Color(0xFF6C6C70);
+  static const Color _green        = Color(0xFF34C759);
+  static const Color _greenBg      = Color(0xFFEDF7F1);
+  static const Color _greenText    = Color(0xFF1A7A3C);
+  static const Color _red          = Color(0xFFDC2626);
+  static const Color _redBg        = Color(0xFFFEF2F2);
+  static const Color _warning      = Color(0xFFF08030);
+  static const Color _warningBg    = Color(0xFFFFF6EE);
 
-    if (wfa.contains('severely') ||
-        hfa.contains('severely') ||
-        wfh.contains('severely')) {
+  static const double _r  = 18;
+  static const double _ri = 12;
+
+  static List<BoxShadow> get _shadow => [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.07),
+          blurRadius: 20,
+          offset: const Offset(0, 6),
+        ),
+      ];
+
+  // ─── Classification logic ───────────────────────────────────────────────────
+
+  String _getClassification(Map<String, dynamic> a) {
+    final wfa = a['weightForAge']?.toString().toLowerCase() ?? '';
+    final hfa = a['heightForAge']?.toString().toLowerCase() ?? '';
+    final wfh = a['weightForHeight']?.toString().toLowerCase() ?? '';
+    if (wfa.contains('severely') || hfa.contains('severely') || wfh.contains('severely')) {
       return 'Severely Underweight';
     }
-    if (wfa.contains('underweight') ||
-        hfa.contains('stunted') ||
-        wfh.contains('wasted')) {
-      return 'At risk';
+    if (wfa.contains('underweight') || hfa.contains('stunted') || wfh.contains('wasted')) {
+      return 'At Risk';
     }
-    if (wfa.contains('overweight') || wfh.contains('overweight')) {
-      return 'Overweight';
-    }
-    if (wfa.contains('normal') || wfa.isEmpty) {
-      return 'Normal';
-    }
+    if (wfa.contains('overweight') || wfh.contains('overweight')) return 'Overweight';
     return 'Normal';
   }
 
-  Color _getClassificationColor(String classification) {
-    switch (classification.toLowerCase()) {
-      case 'at risk':
-        return const Color(0xFFFF9800);
-      case 'severely underweight':
-        return const Color(0xFFE53935);
-      case 'overweight':
-        return const Color(0xFFFF9800);
-      case 'normal':
-        return const Color(0xFF4CAF50);
-      default:
-        return const Color(0xFF333333);
+  Color _badgeFg(String c) {
+    switch (c.toLowerCase()) {
+      case 'severely underweight': return _red;
+      case 'at risk':              return _warning;
+      case 'overweight':           return _warning;
+      default:                     return _greenText;
     }
   }
 
-  Color _getRowColor(String classification) {
-    switch (classification.toLowerCase()) {
-      case 'at risk':
-        return const Color(0xFFFFE0B2); // light orange
-      case 'severely underweight':
-        return const Color(0xFFFFCDD2); // light red
-      case 'overweight':
-        return const Color(0xFFFFF9C4); // light yellow
-      case 'normal':
-        return const Color(0xFFC8E6C9); // light green
-      default:
-        return const Color(0xFFF5F5F5);
+  Color _badgeBg(String c) {
+    switch (c.toLowerCase()) {
+      case 'severely underweight': return _redBg;
+      case 'at risk':              return _warningBg;
+      case 'overweight':           return _warningBg;
+      default:                     return _greenBg;
     }
   }
 
-  String _formatDateShort(DateTime? date) {
-    if (date == null) return '--';
-    const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-    ];
-    return '${months[date.month - 1]} ${date.day}';
+  String _formatDate(DateTime? d) {
+    if (d == null) return '--';
+    const m = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return '${m[d.month - 1]} ${d.day}';
   }
+
+  // ─── Build ──────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: _surface,
+        borderRadius: BorderRadius.circular(_r),
+        border: Border.all(color: _border, width: 1),
+        boxShadow: _shadow,
       ),
-      child: loading
-          ? const Padding(
-              padding: EdgeInsets.all(48),
-              child: Center(
-                  child: CircularProgressIndicator(
-                    color: Color(0xFF2E8B7B),
-                    strokeWidth: 3,
-                  )),
-            )
-          : Column(
-              children: [
-                // Table header
-                _buildTableHeader(),
-                // Table rows
-                if (assessments.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Column(
-                      children: [
-                        Icon(
-                          Icons.assessment_outlined,
-                          size: 48,
-                          color: Colors.grey[300],
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          'No assessments found',
-                          style: TextStyle(
-                            color: Colors.grey[500],
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                else ...[
-                  const SizedBox(height: 8),
-                  ...assessments.map((a) => _buildTableRow(a)),
-                  const SizedBox(height: 8),
-                ],
-                
-                // Add New Assessment Button
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: onAddAssessment,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2E8B7B),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(25),
-                        ),
-                        elevation: 2,
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          Icon(Icons.add_circle_outline, size: 22),
-                          SizedBox(width: 8),
-                          Text(
-                            'Add New Assessment',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-    );
-  }
-
-  Widget _buildTableHeader() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-      decoration: const BoxDecoration(
-        color: Color(0xFFF5A962),
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(16),
-          topRight: Radius.circular(16),
-        ),
-      ),
-      child: const Row(
+      clipBehavior: Clip.hardEdge,
+      child: Column(
         children: [
-          Expanded(
-            flex: 2,
-            child: Text('Date',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-                textAlign: TextAlign.center),
+          // Accent bar
+          Container(
+            height: 5,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [_orangeLight, _orange],
+              ),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(_r)),
+            ),
           ),
-          Expanded(
-            flex: 2,
-            child: Text('Height',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-                textAlign: TextAlign.center),
-          ),
-          Expanded(
-            flex: 2,
-            child: Text('Weight',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-                textAlign: TextAlign.center),
-          ),
-          Expanded(
-            flex: 2,
-            child: Text('MUAC',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-                textAlign: TextAlign.center),
-          ),
-          Expanded(
-            flex: 3,
-            child: Text('Classification',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-                textAlign: TextAlign.center),
-          ),
+          if (loading)
+            _buildLoading()
+          else ...[
+            _buildHeader(),
+            const Divider(height: 1, color: _border),
+            if (assessments.isEmpty)
+              _buildEmptyState()
+            else ...[
+              _buildColumnHeaders(),
+              const SizedBox(height: 4),
+              ...assessments.map(_buildTableRow),
+              const SizedBox(height: 8),
+            ],
+            const Divider(height: 1, color: _border),
+            _buildAddButton(),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildTableRow(Map<String, dynamic> assessment) {
-    final classification = _getClassification(assessment);
-    final rowColor = _getRowColor(classification);
-    final date = assessment['date'] as DateTime?;
+  // ─── Header ─────────────────────────────────────────────────────────────────
+
+  Widget _buildHeader() => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        child: Row(
+          children: [
+            _iconBox(Icons.bar_chart_rounded),
+            const SizedBox(width: 12),
+            const Text(
+              'Assessment Records',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1C1C1E),
+                letterSpacing: -0.3,
+              ),
+            ),
+          ],
+        ),
+      );
+
+  Widget _iconBox(IconData icon) => Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: _orange.withOpacity(0.10),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, color: _orange, size: 20),
+      );
+
+  Widget _buildLoading() => const Padding(
+        padding: EdgeInsets.all(36),
+        child: Center(child: CircularProgressIndicator(color: _orange)),
+      );
+
+  Widget _buildEmptyState() => Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          children: [
+            Icon(Icons.assessment_outlined, size: 40, color: _orange.withOpacity(0.35)),
+            const SizedBox(height: 12),
+            const Text(
+              'No assessments recorded yet.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 14, color: Color(0xFF6C6C70)),
+            ),
+          ],
+        ),
+      );
+
+  // ─── Column headers ─────────────────────────────────────────────────────────
+
+  Widget _buildColumnHeaders() => Padding(
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+        child: Row(
+          children: [
+            _colHeader('Date',   flex: 2),
+            _colHeader('Height', flex: 2),
+            _colHeader('Weight', flex: 2),
+            _colHeader('MUAC',   flex: 2),
+            _colHeader('Status', flex: 3),
+          ],
+        ),
+      );
+
+  Widget _colHeader(String text, {required int flex}) => Expanded(
+        flex: flex,
+        child: Text(
+          text.toUpperCase(),
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: _inkMid,
+            letterSpacing: 1.2,
+          ),
+        ),
+      );
+
+  // ─── Data row ───────────────────────────────────────────────────────────────
+
+  Widget _buildTableRow(Map<String, dynamic> a) {
+    final cls   = _getClassification(a);
+    final date  = a['date'] as DateTime?;
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
+      margin: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
       decoration: BoxDecoration(
-        color: rowColor,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: _surfaceDim,
+        borderRadius: BorderRadius.circular(_ri),
+        border: Border.all(color: _border, width: 1),
       ),
       child: Row(
         children: [
           Expanded(
             flex: 2,
             child: Text(
-              _formatDateShort(date),
+              _formatDate(date),
+              textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Colors.black87,
+                fontWeight: FontWeight.w700,
+                color: _orange,
               ),
-              textAlign: TextAlign.center,
             ),
           ),
-          Expanded(
-            flex: 2,
-            child: Text(
-              assessment['height']?.toString() ?? '--',
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: Colors.black87,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ),
-          Expanded(
-            flex: 2,
-            child: Text(
-              assessment['weight']?.toString() ?? '--',
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: Colors.black87,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ),
-          Expanded(
-            flex: 2,
-            child: Text(
-              assessment['muac']?.toString() ?? '--',
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: Colors.black87,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ),
+          _cell(a['height']?.toString() ?? '--', flex: 2),
+          _cell(a['weight']?.toString() ?? '--', flex: 2),
+          _cell(a['muac']?.toString()   ?? '--', flex: 2),
           Expanded(
             flex: 3,
-            child: Text(
-              classification,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: _getClassificationColor(classification),
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _badgeBg(cls),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: _badgeFg(cls).withOpacity(0.30),
+                    width: 1,
+                  ),
+                ),
+                child: Text(
+                  cls,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w700,
+                    color: _badgeFg(cls),
+                    letterSpacing: 0.1,
+                  ),
+                ),
               ),
-              textAlign: TextAlign.center,
             ),
           ),
         ],
       ),
     );
   }
+
+  Widget _cell(String text, {required int flex}) => Expanded(
+        flex: flex,
+        child: Text(
+          text,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: _ink,
+          ),
+        ),
+      );
+
+  // ─── Add button ─────────────────────────────────────────────────────────────
+
+  Widget _buildAddButton() => Padding(
+        padding: const EdgeInsets.all(14),
+        child: Center(
+          child: GestureDetector(
+            onTap: onAddAssessment,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 11),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [_orangeLight, _orange],
+                ),
+                borderRadius: BorderRadius.circular(30),
+                boxShadow: [
+                  BoxShadow(
+                    color: _orange.withOpacity(0.28),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.add_circle_outline_rounded, size: 16, color: Colors.white),
+                  SizedBox(width: 8),
+                  Text(
+                    'Add New Assessment',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
 }
-
-

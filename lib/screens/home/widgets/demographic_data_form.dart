@@ -1,17 +1,7 @@
 import 'package:flutter/material.dart';
-import 'form_card.dart';
-import 'form_field_row.dart';
+import 'package:intl/intl.dart'; // add intl to pubspec.yaml
 
-class DemographicDataForm extends StatelessWidget {
-  // ── Theme constants (mirrors AnthropometricDataForm) ──────────────────────
-  static const Color _primary = Color(0xFFB5651D);
-  static const Color _primaryLight = Color(0xFFFFF3E0);
-  static const Color _surface = Colors.white;
-  static const Color _surfaceAlt = Color(0xFFFDF6EE);
-  static const Color _border = Color(0xFFE8C9A0);
-  static const Color _labelColor = Color(0xFF795548);
-  static const Color _textColor = Color(0xFF3E2723);
-
+class DemographicDataForm extends StatefulWidget {
   final TextEditingController firstNameController;
   final TextEditingController lastNameController;
   final TextEditingController ageController;
@@ -39,59 +29,131 @@ class DemographicDataForm extends StatelessWidget {
     required this.fatherContactController,
   });
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
+  @override
+  State<DemographicDataForm> createState() => _DemographicDataFormState();
+}
 
-  Widget _buildLabel(String text) => Padding(
-        padding: const EdgeInsets.only(bottom: 6),
-        child: Text(
-          text,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: _labelColor,
-            letterSpacing: 0.3,
+class _DemographicDataFormState extends State<DemographicDataForm> {
+  // ── Phone number validation ─────────────────────────────────────────────
+  // Accepts: 09XXXXXXXXX  (11 digits) OR +639XXXXXXXXX (13 chars)
+  static final _phoneRegex = RegExp(r'^(09\d{9}|\+639\d{9})$');
+
+  String? _validatePhone(String? v) {
+    if (v == null || v.trim().isEmpty) return 'Contact number is required';
+    if (!_phoneRegex.hasMatch(v.trim())) {
+      return 'Enter a valid PH number (09XXXXXXXXX or +639XXXXXXXXX)';
+    }
+    return null;
+  }
+
+  // ── Calendar date picker ────────────────────────────────────────────────
+  Future<void> _pickDate(BuildContext context) async {
+    // Parse existing value so the picker opens on the already-set date
+    DateTime initialDate = DateTime.now();
+    final existing = widget.dobController.text.trim();
+    if (existing.isNotEmpty) {
+      try {
+        initialDate = DateFormat('MM-dd-yyyy').parse(existing);
+      } catch (_) {}
+    }
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      // Children can be at most 5 years old (60 months) — allow up to today
+      firstDate: DateTime(DateTime.now().year - 6),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFFF5A962),
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: Color(0xFF1A1A1A),
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFFF5A962),
+              ),
+            ),
           ),
-        ),
-      );
+          child: child!,
+        );
+      },
+    );
 
+    if (picked != null) {
+      widget.dobController.text = DateFormat('MM-dd-yyyy').format(picked);
+
+      // Auto-calculate age in months
+      final now = DateTime.now();
+      final months = (now.year - picked.year) * 12 + (now.month - picked.month);
+      widget.ageController.text = months.clamp(0, 60).toString();
+    }
+  }
+
+  // ── Shared field builder ────────────────────────────────────────────────
   Widget _buildField({
     required String label,
     required TextEditingController controller,
     TextInputType keyboardType = TextInputType.text,
     String? hint,
     String? Function(String?)? validator,
-    Widget? prefixIcon,
+    IconData? icon,
+    bool readOnly = false,
+    VoidCallback? onTap,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildLabel(label),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFFF5A962),
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 5),
         TextFormField(
           controller: controller,
           keyboardType: keyboardType,
           validator: validator,
+          readOnly: readOnly,
+          onTap: onTap,
           style: const TextStyle(
-            fontSize: 14,
+            fontSize: 13,
             fontWeight: FontWeight.w500,
-            color: _textColor,
+            color: Color(0xFF1A1A1A),
           ),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: const TextStyle(fontSize: 13, color: Color(0xFFD4A97A)),
-            prefixIcon: prefixIcon,
-            prefixIconColor: _primary,
+            hintStyle: const TextStyle(fontSize: 12, color: Colors.black26),
+            prefixIcon: icon != null
+                ? Icon(icon, size: 16, color: Colors.black38)
+                : null,
+            // Show calendar icon suffix for the DOB field
+            suffixIcon: onTap != null
+                ? const Icon(Icons.calendar_month_outlined,
+                    size: 18, color: Color(0xFFF5A962))
+                : null,
             filled: true,
-            fillColor: _surfaceAlt,
+            fillColor: readOnly
+                ? const Color(0xFFF5F5F5) // slightly different for read-only
+                : const Color(0xFFFAFAFA),
             contentPadding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: _border, width: 1.5),
+              borderSide:
+                  const BorderSide(color: Color(0xFFEEEEEE), width: 1.5),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide:
-                  const BorderSide(color: Color(0xFFE8985A), width: 2),
+                  const BorderSide(color: Color(0xFFF5A962), width: 2),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
@@ -103,345 +165,279 @@ class DemographicDataForm extends StatelessWidget {
               borderSide:
                   const BorderSide(color: Color(0xFFEF4444), width: 2),
             ),
-            errorStyle: const TextStyle(fontSize: 11),
+            errorStyle: const TextStyle(fontSize: 10),
           ),
         ),
       ],
     );
   }
 
-  /// Grouped sub-section with a subtle header divider (used for Parent info).
-  Widget _buildSubSection({
-    required String title,
-    required IconData icon,
-    required List<Widget> children,
-  }) {
+  // ── Card wrapper ────────────────────────────────────────────────────────
+  Widget _buildCard({required Widget child}) {
     return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       decoration: BoxDecoration(
-        color: _primaryLight,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _border, width: 1.5),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: _primary,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Icon(icon, size: 14, color: Colors.white),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: _primary,
-                  letterSpacing: 0.2,
-                ),
+      child: child,
+    );
+  }
+
+  // ── Section header ──────────────────────────────────────────────────────
+  Widget _buildSectionHeader(String title, IconData icon) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFFF5A962), Color(0xFFF08030)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFF5A962).withValues(alpha: 0.35),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          ...children,
-        ],
-      ),
+          child: Icon(icon, color: Colors.white, size: 18),
+        ),
+        const SizedBox(width: 12),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFFF5A962),
+            letterSpacing: 1.1,
+          ),
+        ),
+      ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: _surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _border, width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ── Section Header ───────────────────────────────────────────────
-          Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            decoration: const BoxDecoration(
-              color: _primaryLight,
-              borderRadius:
-                  BorderRadius.vertical(top: Radius.circular(14)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: _primary,
-                    borderRadius: BorderRadius.circular(8),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── Card 1: Basic Info ─────────────────────────────────────────
+        _buildCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSectionHeader('BASIC INFORMATION', Icons.person_outline),
+              const SizedBox(height: 14),
+
+              // First + Last Name
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildField(
+                      label: 'FIRST NAME',
+                      controller: widget.firstNameController,
+                      icon: Icons.badge_outlined,
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return 'Required';
+                        if (v.trim().length < 2) return 'Min. 2 characters';
+                        return null;
+                      },
+                    ),
                   ),
-                  child: const Icon(Icons.person_outline,
-                      size: 18, color: Colors.white),
-                ),
-                const SizedBox(width: 12),
-                const Text(
-                  'Demographic Data',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: _textColor,
-                    letterSpacing: 0.2,
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _buildField(
+                      label: 'LAST NAME',
+                      controller: widget.lastNameController,
+                      icon: Icons.badge_outlined,
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return 'Required';
+                        if (v.trim().length < 2) return 'Min. 2 characters';
+                        return null;
+                      },
+                    ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
+
+              const SizedBox(height: 12),
+
+              // Age + Sex
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildField(
+                      label: 'AGE (MONTHS)',
+                      controller: widget.ageController,
+                      keyboardType: TextInputType.number,
+                      hint: '0 – 60',
+                      icon: Icons.cake_outlined,
+                      // Age is auto-filled from DOB; still allow manual entry
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return 'Required';
+                        final age = int.tryParse(v.trim());
+                        if (age == null) return 'Enter a number';
+                        if (age < 0 || age > 60) return 'Must be 0–60';
+                        return null;
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _buildField(
+                      label: 'SEX',
+                      controller: widget.sexController,
+                      hint: 'M or F',
+                      icon: Icons.wc_outlined,
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return 'Required';
+                        final s = v.trim().toUpperCase();
+                        if (s != 'M' && s != 'F' && s != 'MALE' && s != 'FEMALE') {
+                          return 'Enter M or F';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 12),
+
+              // ── Date of Birth — tap to open calendar ─────────────────
+              _buildField(
+                label: 'DATE OF BIRTH',
+                controller: widget.dobController,
+                hint: 'Tap to select date',
+                icon: Icons.calendar_today_outlined,
+                readOnly: true,
+                onTap: () => _pickDate(context),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) {
+                    return 'Date of birth is required';
+                  }
+                  return null;
+                },
+              ),
+            ],
           ),
+        ),
 
-          // ── Form Body ────────────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // First + Last Name
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildField(
-                        label: 'First Name',
-                        controller: firstNameController,
-                        prefixIcon: const Icon(Icons.badge_outlined, size: 18),
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) {
-                            return 'Required';
-                          }
-                          if (v.trim().length < 2) {
-                            return 'Min. 2 characters';
-                          }
-                          return null;
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _buildField(
-                        label: 'Last Name',
-                        controller: lastNameController,
-                        prefixIcon: const Icon(Icons.badge_outlined, size: 18),
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) {
-                            return 'Required';
-                          }
-                          if (v.trim().length < 2) {
-                            return 'Min. 2 characters';
-                          }
-                          return null;
-                        },
-                      ),
-                    ),
-                  ],
-                ),
+        const SizedBox(height: 10),
 
-                const SizedBox(height: 14),
+        // ── Card 2: Address ────────────────────────────────────────────
+        _buildCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSectionHeader('ADDRESS', Icons.home_outlined),
+              const SizedBox(height: 14),
 
-                // Age + Sex
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildField(
-                        label: 'Age (months)',
-                        controller: ageController,
-                        keyboardType: TextInputType.number,
-                        hint: '0 – 60',
-                        prefixIcon:
-                            const Icon(Icons.cake_outlined, size: 18),
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) {
-                            return 'Required';
-                          }
-                          final age = int.tryParse(v.trim());
-                          if (age == null) return 'Enter a number';
-                          if (age < 0 || age > 60) {
-                            return 'Must be 0–60';
-                          }
-                          return null;
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _buildField(
-                        label: 'Sex',
-                        controller: sexController,
-                        hint: 'M or F',
-                        prefixIcon: const Icon(
-                            Icons.wc_outlined, size: 18),
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) {
-                            return 'Required';
-                          }
-                          final sex = v.trim().toUpperCase();
-                          if (sex != 'M' &&
-                              sex != 'F' &&
-                              sex != 'MALE' &&
-                              sex != 'FEMALE') {
-                            return 'Enter M or F';
-                          }
-                          return null;
-                        },
-                      ),
-                    ),
-                  ],
-                ),
+              _buildField(
+                label: 'ADDRESS',
+                controller: widget.addressController,
+                icon: Icons.home_outlined,
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'Address is required';
+                  return null;
+                },
+              ),
 
-                const SizedBox(height: 14),
+              const SizedBox(height: 12),
 
-                // Date of Birth
-                _buildField(
-                  label: 'Date of Birth',
-                  controller: dobController,
-                  keyboardType: TextInputType.datetime,
-                  hint: 'MM-DD-YYYY',
-                  prefixIcon:
-                      const Icon(Icons.calendar_today_outlined, size: 18),
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) {
-                      return 'Date of birth is required';
-                    }
-                    if (!RegExp(r'^\d{2}-\d{2}-\d{4}$')
-                        .hasMatch(v.trim())) {
-                      return 'Use format MM-DD-YYYY';
-                    }
-                    return null;
-                  },
-                ),
-
-                const SizedBox(height: 14),
-
-                // Address
-                _buildField(
-                  label: 'Address',
-                  controller: addressController,
-                  prefixIcon:
-                      const Icon(Icons.home_outlined, size: 18),
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) {
-                      return 'Address is required';
-                    }
-                    return null;
-                  },
-                ),
-
-                const SizedBox(height: 14),
-
-                // Place of Birth
-                _buildField(
-                  label: 'Place of Birth',
-                  controller: placeOfBirthController,
-                  prefixIcon:
-                      const Icon(Icons.location_on_outlined, size: 18),
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) {
-                      return 'Place of birth is required';
-                    }
-                    return null;
-                  },
-                ),
-
-                const SizedBox(height: 20),
-
-                // ── Mother sub-section ───────────────────────────────────
-                _buildSubSection(
-                  title: 'Mother\'s Information',
-                  icon: Icons.woman_outlined,
-                  children: [
-                    _buildField(
-                      label: 'Mother\'s Full Name',
-                      controller: motherController,
-                      prefixIcon:
-                          const Icon(Icons.person_outline, size: 18),
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) {
-                          return 'Mother\'s name is required';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    _buildField(
-                      label: 'Contact Number',
-                      controller: motherContactController,
-                      keyboardType: TextInputType.phone,
-                      hint: '09XXXXXXXXX',
-                      prefixIcon:
-                          const Icon(Icons.phone_outlined, size: 18),
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) {
-                          return 'Contact number is required';
-                        }
-                        if (v.trim().length != 11) {
-                          return 'Enter a valid 11-digit number';
-                        }
-                        return null;
-                      },
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 14),
-
-                // ── Father sub-section ───────────────────────────────────
-                _buildSubSection(
-                  title: 'Father\'s Information',
-                  icon: Icons.man_outlined,
-                  children: [
-                    _buildField(
-                      label: 'Father\'s Full Name',
-                      controller: fatherController,
-                      prefixIcon:
-                          const Icon(Icons.person_outline, size: 18),
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) {
-                          return 'Father\'s name is required';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    _buildField(
-                      label: 'Contact Number',
-                      controller: fatherContactController,
-                      keyboardType: TextInputType.phone,
-                      hint: '09XXXXXXXXX',
-                      prefixIcon:
-                          const Icon(Icons.phone_outlined, size: 18),
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) {
-                          return 'Contact number is required';
-                        }
-                        if (v.trim().length != 11) {
-                          return 'Enter a valid 11-digit number';
-                        }
-                        return null;
-                      },
-                    ),
-                  ],
-                ),
-              ],
-            ),
+              _buildField(
+                label: 'PLACE OF BIRTH',
+                controller: widget.placeOfBirthController,
+                icon: Icons.location_on_outlined,
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'Place of birth is required';
+                  return null;
+                },
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+
+        const SizedBox(height: 10),
+
+        // ── Card 3: Mother's Info ──────────────────────────────────────
+        _buildCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSectionHeader("MOTHER'S INFORMATION", Icons.woman_outlined),
+              const SizedBox(height: 14),
+
+              _buildField(
+                label: "MOTHER'S FULL NAME",
+                controller: widget.motherController,
+                icon: Icons.person_outline,
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return "Mother's name is required";
+                  return null;
+                },
+              ),
+
+              const SizedBox(height: 12),
+
+              _buildField(
+                label: 'CONTACT NUMBER',
+                controller: widget.motherContactController,
+                keyboardType: TextInputType.phone,
+                hint: '09XXXXXXXXX',
+                icon: Icons.phone_outlined,
+                validator: _validatePhone,
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 10),
+
+        // ── Card 4: Father's Info ──────────────────────────────────────
+        _buildCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSectionHeader("FATHER'S INFORMATION", Icons.man_outlined),
+              const SizedBox(height: 14),
+
+              _buildField(
+                label: "FATHER'S FULL NAME",
+                controller: widget.fatherController,
+                icon: Icons.person_outline,
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return "Father's name is required";
+                  return null;
+                },
+              ),
+
+              const SizedBox(height: 12),
+
+              _buildField(
+                label: 'CONTACT NUMBER',
+                controller: widget.fatherContactController,
+                keyboardType: TextInputType.phone,
+                hint: '09XXXXXXXXX',
+                icon: Icons.phone_outlined,
+                validator: _validatePhone,
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'form_card.dart';
 import 'vaccine_dose_selector.dart';
 
 class VaccinationForm extends StatefulWidget {
@@ -12,17 +11,23 @@ class VaccinationForm extends StatefulWidget {
 }
 
 class _VaccinationFormState extends State<VaccinationForm> {
-  // ── Theme constants (mirrors other forms) ─────────────────────────────────
-  static const Color _primary = Color(0xFFB5651D);
-  static const Color _primaryLight = Color(0xFFFFF3E0);
+  // ── Theme constants (mirrors AnthropometricDataForm) ──────────────────────
+  static const Color _primary = Color(0xFFF5A962);
+  static const Color _primaryDark = Color(0xFFF08030);
   static const Color _surface = Colors.white;
-  static const Color _surfaceAlt = Color(0xFFFDF6EE);
-  static const Color _border = Color(0xFFE8C9A0);
-  static const Color _labelColor = Color(0xFF795548);
-  static const Color _textColor = Color(0xFF3E2723);
+  static const Color _surfaceAlt = Color(0xFFFAFAFA);
+  static const Color _border = Color(0xFFEEEEEE);
+  static const Color _labelColor = Color(0xFFF5A962);
+  static const Color _textColor = Color(0xFF1A1A1A);
 
   static const _vaccineNames = [
-    'BCG', 'HEP B', 'PENTAVALENT', 'OPV', 'IPV', 'PCV', 'MMR'
+    'BCG',
+    'HEP B',
+    'PENTAVALENT',
+    'OPV',
+    'IPV',
+    'PCV',
+    'MMR',
   ];
   static const _columnHeaders = ['BIRTH', '1½', '2½', '3½', '9', '1 YR'];
 
@@ -97,117 +102,123 @@ class _VaccinationFormState extends State<VaccinationForm> {
     widget.onDataChanged!(data);
   }
 
+  // ── Shared builders (identical to AnthropometricDataForm) ─────────────────
+  Widget _buildCard({required Widget child}) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        decoration: BoxDecoration(
+          color: _surface,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: child,
+      );
+
+  Widget _buildSectionHeader(
+    String title,
+    IconData icon, {
+    List<Color> gradientColors = const [Color(0xFFF5A962), Color(0xFFF08030)],
+  }) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: gradientColors,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: [
+              BoxShadow(
+                color: gradientColors.first.withValues(alpha: 0.35),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Icon(icon, color: Colors.white, size: 18),
+        ),
+        const SizedBox(width: 12),
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            color: gradientColors.first,
+            letterSpacing: 1.1,
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: _surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _border, width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
+    return _buildCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Section Header ───────────────────────────────────────────────
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            decoration: const BoxDecoration(
-              color: _primaryLight,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: _primary,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.vaccines_outlined,
-                      size: 18, color: Colors.white),
-                ),
-                const SizedBox(width: 12),
-                const Text(
-                  'Vaccination',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: _textColor,
-                    letterSpacing: 0.2,
-                  ),
-                ),
-                const Spacer(),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: _primary.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Text(
-                    'Tap cell to record dose',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: _primary,
-                    ),
-                  ),
-                ),
-              ],
+          // ── Section Header ─────────────────────────────────────────────
+          _buildSectionHeader('VACCINATION', Icons.vaccines_outlined),
+          const SizedBox(height: 4),
+          const Text(
+            'Tap a cell to record a dose',
+            style: TextStyle(
+              fontSize: 10,
+              color: Colors.black38,
+              fontStyle: FontStyle.italic,
             ),
           ),
+          const SizedBox(height: 14),
 
-          // ── Table ────────────────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Container(
-              decoration: BoxDecoration(
-                color: _surface,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: _border, width: 1.5),
-              ),
-              clipBehavior: Clip.hardEdge,
-              child: Column(
-                children: [
-                  // Column headers row
-                  Container(
-                    color: _surfaceAlt,
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    child: Row(
-                      children: [
-                        const SizedBox(width: 88),
-                        for (final header in _columnHeaders)
-                          Expanded(
-                            child: Text(
-                              header,
-                              style: const TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w800,
-                                color: _labelColor,
-                                letterSpacing: 0.4,
-                              ),
-                              textAlign: TextAlign.center,
+          // ── Table ──────────────────────────────────────────────────────
+          Container(
+            decoration: BoxDecoration(
+              color: _surface,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: _border, width: 1.5),
+            ),
+            clipBehavior: Clip.hardEdge,
+            child: Column(
+              children: [
+                // Column headers row
+                Container(
+                  color: _surfaceAlt,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Row(
+                    children: [
+                      const SizedBox(width: 90),
+                      for (final header in _columnHeaders)
+                        Expanded(
+                          child: Text(
+                            header,
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w800,
+                              color: _primary,
+                              letterSpacing: 0.4,
                             ),
+                            textAlign: TextAlign.center,
                           ),
-                      ],
-                    ),
+                        ),
+                    ],
                   ),
-                  Container(height: 1.5, color: _border),
-                  // Vaccine rows
-                  for (int vi = 0; vi < _vaccineNames.length; vi++) ...[
-                    _buildVaccineRow(_vaccineNames[vi], vi),
-                    if (vi < _vaccineNames.length - 1)
-                      Container(height: 1, color: _border),
-                  ],
+                ),
+                Container(height: 1.5, color: _border),
+                // Vaccine rows
+                for (int vi = 0; vi < _vaccineNames.length; vi++) ...[
+                  _buildVaccineRow(_vaccineNames[vi], vi),
+                  if (vi < _vaccineNames.length - 1)
+                    Container(height: 1, color: _border),
                 ],
-              ),
+              ],
             ),
           ),
         ],
@@ -222,7 +233,7 @@ class _VaccinationFormState extends State<VaccinationForm> {
       child: Row(
         children: [
           SizedBox(
-            width: 88,
+            width: 90,
             child: Padding(
               padding: const EdgeInsets.only(left: 14),
               child: Text(

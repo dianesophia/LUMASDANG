@@ -187,7 +187,7 @@ class MainSettings extends StatelessWidget {
                       tiles: [
                         _TileData(
                           icon: Icons.info_outline_rounded,
-                          text: "About Lumasdang",
+                          text: "About Lµmasdαng",
                           option: SettingsOption.about,
                         ),
                       ],

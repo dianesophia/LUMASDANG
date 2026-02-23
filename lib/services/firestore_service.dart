@@ -28,7 +28,7 @@ class FirestoreService {
   /// Saves a map containing data from HomePage under:
   /// users/{uid}/homepageData/{autoId}
   /// Returns the generated document id on success.
-  Future<String> saveHomePageData(Map<String, dynamic> data) async {
+  Future<String> saveHomePageData(Map<String, dynamic> data, {String? docId}) async {
     final user = _auth.currentUser;
     if (user == null) {
       throw FirebaseAuthException(
@@ -38,11 +38,12 @@ class FirestoreService {
     }
 
     final uid = user.uid;
+    print('FirestoreService.saveHomePageData: called by uid=$uid');
     final docRef = _firestore
-        .collection('users')
-        .doc(uid)
-        .collection('homepageData')
-        .doc(); // auto id
+      .collection('users')
+      .doc(uid)
+      .collection('homepageData')
+      .doc(docId); // use provided docId or auto-generate when null
 
     final payload = {
       ...data,
@@ -52,6 +53,34 @@ class FirestoreService {
 
     await docRef.set(payload);
     return docRef.id;
+  }
+
+  /// Update an existing homepageData document by document id.
+  /// Uses merge so it won't overwrite unrelated fields.
+  Future<void> updateHomePageData(String docId, Map<String, dynamic> data) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw FirebaseAuthException(
+        code: 'no-current-user',
+        message: 'No authenticated user found',
+      );
+    }
+
+    final uid = user.uid;
+    print('FirestoreService.updateHomePageData: called uid=$uid docId=$docId');
+    final docRef = _firestore
+        .collection('users')
+        .doc(uid)
+        .collection('homepageData')
+        .doc(docId);
+
+    final payload = {
+      ...data,
+      'lastModifiedAt': FieldValue.serverTimestamp(),
+      'ownerUid': uid,
+    };
+
+    await docRef.set(payload, SetOptions(merge: true));
   }
 
   /// Saves vaccination status for Profile Overview (keyed by child name).
@@ -710,6 +739,16 @@ Future<String> savePatientToBarangay(Map<String, dynamic> patientData) async {
   }
 
   print('💾 Saving patient to barangay...');
+
+   print('💾 Saving patient to barangay...');
+  
+  // ── ADD THIS BLOCK ──────────────────────────────────────────
+  final userDocDebug = await _firestore.collection('users').doc(user.uid).get();
+  print('🔍 User UID: ${user.uid}');
+  print('🔍 User doc exists: ${userDocDebug.exists}');
+  print('🔍 User doc fields: ${userDocDebug.data()?.keys.toList()}');
+  print('🔍 barangayId: ${userDocDebug.data()?['barangayId']}');
+  // ── END ADD ─────────────────────────────────────────────────
   
   // Get user's barangay
   final userDoc = await _firestore.collection('users').doc(user.uid).get();
@@ -1400,36 +1439,34 @@ Future<Map<String, int>> getTodayStatusCounts() async {
       final anthropometric = doc.data()['anthropometric'] as Map<String, dynamic>?;
       if (anthropometric == null) continue;
 
-      final weightForAge   = (anthropometric['weightForAge']   as String? ?? '').toLowerCase();
-      final heightForAge   = (anthropometric['heightForAge']   as String? ?? '').toLowerCase();
-      final weightForHeight= (anthropometric['weightForHeight'] as String? ?? '').toLowerCase();
-      final bmi            = (anthropometric['bmi']            as String? ?? '').toLowerCase();
+      final wfa  = (anthropometric['weightForAge']    as String? ?? '').toLowerCase();
+      final hfa  = (anthropometric['heightForAge']    as String? ?? '').toLowerCase();
+      final wfh  = (anthropometric['weightForHeight'] as String? ?? '').toLowerCase();
+      final bmi  = (anthropometric['bmi']             as String? ?? '').toLowerCase();
 
-      // ── Underweight ───────────────────────────────────────────────
-      if (weightForAge.contains('underweight') ||
-          weightForAge.contains('severely underweight')) {
+      // ── Underweight (includes severely underweight) ───────────────
+      if (wfa.contains('underweight') || bmi.contains('underweight')) {
         counts['Underweight'] = counts['Underweight']! + 1;
       }
 
-      // ── Overweight / Obese ────────────────────────────────────────
-      if (weightForAge.contains('overweight') ||
-          weightForAge.contains('obese') ||
-          weightForHeight.contains('overweight') ||
-          weightForHeight.contains('obese') ||
-          bmi.contains('overweight') ||
-          bmi.contains('obese')) {
+      // ── Overweight / Obese (includes "at risk of overweight") ─────
+      // Matches: "overweight", "obese", "at risk of overweight"
+      if (wfa.contains('overweight') || wfa.contains('obese') ||
+          wfh.contains('overweight') || wfh.contains('obese') ||
+          bmi.contains('overweight') || bmi.contains('obese')) {
         counts['Overweight'] = counts['Overweight']! + 1;
       }
 
-      // ── Stunted ───────────────────────────────────────────────────
-      if (heightForAge.contains('stunted')) {
+      // ── Stunted (includes severely stunted) ───────────────────────
+      if (hfa.contains('stunted')) {
         counts['Stunted'] = counts['Stunted']! + 1;
       }
 
-      // ── At Risk ───────────────────────────────────────────────────
-      if (weightForAge.contains('at risk') ||
-          weightForHeight.contains('at risk') ||
-          bmi.contains('at risk')) {
+      // ── At Risk (wasted / severe wasting / at risk of overweight) ─
+      if (wfh.contains('wasted') ||
+          wfa.contains('at risk') ||
+          bmi.contains('at risk') ||
+          wfh.contains('at risk')) {
         counts['At Risk'] = counts['At Risk']! + 1;
       }
     }
@@ -1439,6 +1476,198 @@ Future<Map<String, int>> getTodayStatusCounts() async {
 
   } catch (e) {
     print('❌ Error getting status counts: $e');
+    return {};
+  }
+}
+
+ double? _extractZScore(String? raw) {
+    if (raw == null || raw.isEmpty) return null;
+    final match = RegExp(r'^-?\d+(\.\d+)?').firstMatch(raw.trim());
+    if (match == null) return null;
+    return double.tryParse(match.group(0)!);
+  }
+
+  /// Overall status counts for ALL non-deleted patients in the user's barangay.
+  /// Uses WHO SD thresholds — same logic as _buildAssessmentRemarks.
+ /* Future<Map<String, int>> getStatusCounts() async {
+    final user = _auth.currentUser;
+    if (user == null) return {};
+
+    try {
+      final userDoc =
+          await _firestore.collection('users').doc(user.uid).get();
+      final barangayId = userDoc.data()?['barangayId'] as String?;
+      if (barangayId == null || barangayId.isEmpty) return {};
+
+      debugPrint('📊 getStatusCounts() for barangayId: $barangayId');
+
+      final snapshot = await _firestore
+          .collection('barangays')
+          .doc(barangayId)
+          .collection('patients')
+          .where('isDeleted', isEqualTo: false)
+          .get();
+
+      final counts = {
+        'Underweight': 0,
+        'Overweight/Obese': 0,
+        'Stunted': 0,
+        'At Risk': 0,
+        'Normal': 0,
+      };
+
+      for (final doc in snapshot.docs) {
+        final anthropometric =
+            doc.data()['anthropometric'] as Map<String, dynamic>?;
+        if (anthropometric == null) continue;
+
+        final double? wfa =
+            _extractZScore(anthropometric['weightForAge']?.toString());
+        final double? hfa =
+            _extractZScore(anthropometric['heightForAge']?.toString());
+        final double? wfh =
+            _extractZScore(anthropometric['weightForHeight']?.toString());
+        final double? bmi =
+            _extractZScore(anthropometric['bmi']?.toString());
+
+        // Skip docs with no z-scores at all
+        if (wfa == null && hfa == null && wfh == null && bmi == null) {
+          continue;
+        }
+
+        final tags = <String>{};
+
+        // Weight-for-Age: Underweight < -2 SD | At Risk -2 to -1 SD
+        if (wfa != null) {
+          if (wfa < -2) {
+            tags.add('Underweight');
+          } else if (wfa >= -2 && wfa < -1) {
+            tags.add('At Risk');
+          }
+        }
+
+        // Height-for-Age: Stunted < -2 SD | At Risk -2 to -1 SD
+        if (hfa != null) {
+          if (hfa < -2) {
+            tags.add('Stunted');
+          } else if (hfa >= -2 && hfa < -1) {
+            tags.add('At Risk');
+          }
+        }
+
+        // Weight-for-Height: Overweight/Obese > +1 SD | At Risk -2 to -1 SD
+        if (wfh != null) {
+          if (wfh > 1) {
+            tags.add('Overweight/Obese');
+          } else if (wfh >= -2 && wfh < -1) {
+            tags.add('At Risk');
+          }
+        }
+
+        // BMI: Overweight/Obese > +2 SD | At Risk -2 to -1 SD
+        if (bmi != null) {
+          if (bmi > 2) {
+            tags.add('Overweight/Obese');
+          } else if (bmi >= -2 && bmi < -1) {
+            tags.add('At Risk');
+          }
+        }
+
+        if (tags.isEmpty) {
+          // All z-scores within healthy range → Normal
+          counts['Normal'] = counts['Normal']! + 1;
+        } else {
+          // A patient can belong to multiple statuses
+          for (final tag in tags) {
+            counts[tag] = counts[tag]! + 1;
+          }
+        }
+      }
+
+      debugPrint('✅ Status counts: $counts');
+      return counts;
+    } catch (e) {
+      debugPrint('❌ Error getting status counts: $e');
+      return {};
+    }
+  }*/
+  Future<Map<String, int>> getStatusCounts() async {
+  final user = _auth.currentUser;
+  if (user == null) return {};
+
+  try {
+    final userDoc = await _firestore.collection('users').doc(user.uid).get();
+    final barangayId = userDoc.data()?['barangayId'] as String?;
+    if (barangayId == null || barangayId.isEmpty) return {};
+
+    debugPrint('📊 getStatusCounts() for barangayId: $barangayId');
+
+    final snapshot = await _firestore
+        .collection('barangays')
+        .doc(barangayId)
+        .collection('patients')
+        .where('isDeleted', isEqualTo: false)
+        .get();
+
+    final counts = {
+      'Underweight': 0,
+      'Overweight/Obese': 0,
+      'Stunted': 0,
+      'At Risk': 0,
+      'Normal': 0,
+    };
+
+    for (final doc in snapshot.docs) {
+      final anthropometric =
+          doc.data()['anthropometric'] as Map<String, dynamic>?;
+      if (anthropometric == null) continue;
+
+      final double? wfa = _extractZScore(anthropometric['weightForAge']?.toString());
+      final double? hfa = _extractZScore(anthropometric['heightForAge']?.toString());
+      final double? wfh = _extractZScore(anthropometric['weightForHeight']?.toString());
+      final double? bmi = _extractZScore(anthropometric['bmi']?.toString());
+
+      // Skip docs with no z-scores at all
+      if (wfa == null && hfa == null && wfh == null && bmi == null) continue;
+
+      // One status per patient — same priority order as _buildAssessmentRemarks
+
+      // Priority 1: Underweight
+      if (wfa != null && wfa < -2) {
+        counts['Underweight'] = counts['Underweight']! + 1;
+        continue;
+      }
+
+      // Priority 2: Stunted
+      if (hfa != null && hfa < -2) {
+        counts['Stunted'] = counts['Stunted']! + 1;
+        continue;
+      }
+
+      // Priority 3: Overweight/Obese
+      if ((wfh != null && wfh > 1) || (bmi != null && bmi > 2)) {
+        counts['Overweight/Obese'] = counts['Overweight/Obese']! + 1;
+        continue;
+      }
+
+      // Priority 4: At Risk
+      final atRisk = (wfa != null && wfa >= -2 && wfa < -1) ||
+          (hfa != null && hfa >= -2 && hfa < -1) ||
+          (wfh != null && wfh >= -2 && wfh < -1) ||
+          (bmi != null && bmi >= -2 && bmi < -1);
+      if (atRisk) {
+        counts['At Risk'] = counts['At Risk']! + 1;
+        continue;
+      }
+
+      // Priority 5: Normal
+      counts['Normal'] = counts['Normal']! + 1;
+    }
+
+    debugPrint('✅ Status counts: $counts');
+    return counts;
+  } catch (e) {
+    debugPrint('❌ Error getting status counts: $e');
     return {};
   }
 }

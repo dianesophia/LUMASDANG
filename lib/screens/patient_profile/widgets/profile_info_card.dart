@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../patient_list.dart';
 
-/// Patient information card with avatar and details
+/// Patient information card — clean clinical dark-accent style.
 class ProfileInfoCard extends StatelessWidget {
   final Patient patient;
 
@@ -10,135 +10,296 @@ class ProfileInfoCard extends StatelessWidget {
     required this.patient,
   });
 
-  Widget _buildInfoRow(String label, String value) {
-    return RichText(
-      text: TextSpan(
+  // ─── Design Tokens ─────────────────────────────────────────────
+  static const Color _orange      = Color(0xFFF08030);
+  static const Color _orangeLight = Color(0xFFF5A962);
+  static const Color _surface     = Color(0xFFFFFFFF);
+  static const Color _border      = Color(0xFFE8E8ED);
+
+  static const double _r = 18;
+
+  @override
+  Widget build(BuildContext context) {
+    final int ageMonths = patient.age; // age displayed in months
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: _surface,
+        borderRadius: BorderRadius.circular(_r),
+        border: Border.all(color: _border, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.07),
+            blurRadius: 20,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          TextSpan(
-            text: '$label: ',
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1A3C34),
+          // ── Top accent bar ──
+          Container(
+            height: 5,
+            decoration: BoxDecoration(
+              //gradient: const LinearGradient(
+                //colors: [_orangeLight, _orange],
+              //),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(_r),
+              ),
             ),
           ),
-          TextSpan(
-            text: value,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF2A4F47),
+
+          // ── Header row ──
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Avatar
+                _Avatar(patient: patient),
+
+                const SizedBox(width: 16),
+
+                // Name + tags
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${patient.firstName} ${patient.lastName}',
+                        style: const TextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1C1C1E),
+                          letterSpacing: -0.4,
+                          height: 1.1,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          _Tag(label: patient.sex, color: _orange),
+                          const SizedBox(width: 6),
+                          _Tag(label: '$ageMonths mo', color: _orangeLight),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Active pill
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEDF7F1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF34C759),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      const Text(
+                        'Active',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1A7A3C),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // ── Divider ──
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Divider(height: 1, color: _border),
+          ),
+
+          // ── Info Grid ──
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: _InfoTile(
+                        icon: Icons.cake_outlined,
+                        label: 'Date of Birth',
+                        value: patient.dateOfBirth,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _InfoTile(
+                        icon: Icons.child_care_outlined,
+                        label: 'Age',
+                        value: '$ageMonths months',
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                _InfoTile(
+                  icon: Icons.location_on_outlined,
+                  label: 'Address',
+                  value: patient.address,
+                  fullWidth: true,
+                ),
+              ],
             ),
           ),
         ],
       ),
     );
   }
+}
+
+// ─── Avatar ────────────────────────────────────────────────────────────────
+class _Avatar extends StatelessWidget {
+  final Patient patient;
+  const _Avatar({required this.patient});
 
   @override
   Widget build(BuildContext context) {
     return Container(
+      width: 64,
+      height: 64,
       decoration: BoxDecoration(
-        color: const Color(0xFFB5DDD4),
-        borderRadius: BorderRadius.circular(20),
+        shape: BoxShape.circle,
+        gradient: const LinearGradient(
+          colors: [Color(0xFFF5A962), Color(0xFFF08030)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 6,
-            offset: const Offset(0, 3),
+            color: const Color(0xFFF08030).withOpacity(0.28),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: Column(
-        children: [
-          // ── Name header pill ──
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Text(
-              '${patient.firstName.toUpperCase()} ${patient.lastName.toUpperCase()}',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF1A3C34),
-                letterSpacing: 1.2,
-              ),
-            ),
+      padding: const EdgeInsets.all(2.5),
+      child: ClipOval(
+        child: Image.network(
+          'https://ui-avatars.com/api/?name=${patient.firstName}+${patient.lastName}'
+          '&background=F5A962&color=ffffff&size=200&bold=true',
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => const Icon(
+            Icons.person_rounded,
+            size: 32,
+            color: Colors.white,
           ),
+        ),
+      ),
+    );
+  }
+}
 
-          // ── Avatar + Info ──
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-            child: Row(
+// ─── Tag Badge ─────────────────────────────────────────────────────────────
+class _Tag extends StatelessWidget {
+  final String label;
+  final Color color;
+  const _Tag({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11.5,
+          fontWeight: FontWeight.w700,
+          color: color,
+          letterSpacing: 0.2,
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Info Tile ─────────────────────────────────────────────────────────────
+class _InfoTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final bool fullWidth;
+
+  const _InfoTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.fullWidth = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: fullWidth ? double.infinity : null,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFAFAFA),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE8E8ED), width: 1),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF08030).withOpacity(0.10),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, size: 15, color: const Color(0xFFF08030)),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Avatar
-                Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white,
-                    border: Border.all(
-                      color: const Color(0xFF7FBFB3),
-                      width: 3,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: ClipOval(
-                    child: Image.network(
-                      'https://ui-avatars.com/api/?name=${patient.firstName}+${patient.lastName}&background=7FBFB3&color=1A3C34&size=200',
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return const Icon(
-                          Icons.person,
-                          size: 50,
-                          color: Color(0xFF7FBFB3),
-                        );
-                      },
-                    ),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF6C6C70),
+                    letterSpacing: 0.3,
                   ),
                 ),
-                const SizedBox(width: 16),
-
-                // Info column
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildInfoRow(
-                        'Address',
-                        patient.address.isNotEmpty ? patient.address : 'N/A',
-                      ),
-                      const SizedBox(height: 10),
-                      _buildInfoRow(
-                        'Birthdate',
-                        patient.dateOfBirth.isNotEmpty ? patient.dateOfBirth : 'N/A',
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildInfoRow('Age', '${patient.age}'),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: _buildInfoRow(
-                              'Sex',
-                              patient.sex.isNotEmpty ? patient.sex : 'N/A',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                const SizedBox(height: 2),
+                Text(
+                  value.isNotEmpty ? value : 'N/A',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1C1C1E),
+                    letterSpacing: -0.1,
                   ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
                 ),
               ],
             ),
