@@ -8,6 +8,8 @@ import 'lumasdang_records/lumasdang_records_screen.dart';
 import 'archived_patients_screen.dart';
 import '../services/age_utils.dart';
 import '../services/auto_archive_preferences.dart';
+import '../services/connectivity_service.dart';
+import '../services/local_db_service.dart';
 import 'shared/status_color.dart';
 
 // ==================== PATIENT LIST TAB ====================
@@ -40,7 +42,15 @@ class _PatientListTabState extends State<PatientListTab> {
   String _buildAssessmentRemarks(Map<String, dynamic> data, int assessmentCount) {
     if (assessmentCount == 0) return 'No assessments';
 
-    final anthropometric = (data['anthropometric'] ?? {}) as Map<String, dynamic>;
+    final rawAnthro = data['anthropometric'];
+    final Map<String, dynamic> anthropometric;
+    if (rawAnthro is Map<String, dynamic>) {
+      anthropometric = rawAnthro;
+    } else if (rawAnthro is Map) {
+      anthropometric = Map<String, dynamic>.from(rawAnthro);
+    } else {
+      anthropometric = <String, dynamic>{};
+    }
 
     final double? weightForAge    = _extractZScore(anthropometric['weightForAge']?.toString());
     final double? heightForAge    = _extractZScore(anthropometric['heightForAge']?.toString());
@@ -205,11 +215,115 @@ class _PatientListTabState extends State<PatientListTab> {
     setState(() => _loading = true);
     try {
       final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        setState(() => _loading = false);
+      await LocalDbService.instance.init();
+      final online = await ConnectivityService.instance.checkOnline();
+
+      // Offline or offline-authenticated session: build patient list from local homepageData
+      if (!online || LocalDbService.instance.offlineAuthenticated || user == null) {
+        final records =
+            await LocalDbService.instance.getAllRecords(includeDeleted: false);
+
+        final Map<String, List<Map<String, dynamic>>> patientGroups = {};
+        for (final record in records) {
+          final rawData = record['data'];
+          Map<String, dynamic>? data;
+          if (rawData is Map<String, dynamic>) {
+            data = rawData;
+          } else if (rawData is Map) {
+            data = Map<String, dynamic>.from(rawData);
+          }
+          if (data == null) continue;
+
+          final rawDemo = data['demographic'];
+          final Map<String, dynamic> demographic;
+          if (rawDemo is Map<String, dynamic>) {
+            demographic = rawDemo;
+          } else if (rawDemo is Map) {
+            demographic = Map<String, dynamic>.from(rawDemo);
+          } else {
+            demographic = <String, dynamic>{};
+          }
+
+          final key =
+              '${(demographic['firstName'] ?? '').toString().toLowerCase().trim()}_'
+              '${(demographic['lastName'] ?? '').toString().toLowerCase().trim()}';
+          if (key.isEmpty || key == '_') continue;
+          patientGroups.putIfAbsent(key, () => []);
+          patientGroups[key]!.add(data);
+        }
+
+        setState(() {
+          _patients = patientGroups.entries.map((entry) {
+            final recordsForPatient = entry.value;
+            final assessmentCount = recordsForPatient.length;
+
+            // Sort by created/modified time descending
+            recordsForPatient.sort((a, b) {
+              final tsA = (a['lastModified'] as String?) ??
+                  (a['createdAt'] as String?) ??
+                  '';
+              final tsB = (b['lastModified'] as String?) ??
+                  (b['createdAt'] as String?) ??
+                  '';
+              final dA = DateTime.tryParse(tsA) ?? DateTime(1970);
+              final dB = DateTime.tryParse(tsB) ?? DateTime(1970);
+              return dB.compareTo(dA);
+            });
+
+            final mostRecent = recordsForPatient.first;
+            final rawDemo = mostRecent['demographic'];
+            final Map<String, dynamic> demographic;
+            if (rawDemo is Map<String, dynamic>) {
+              demographic = rawDemo;
+            } else if (rawDemo is Map) {
+              demographic = Map<String, dynamic>.from(rawDemo);
+            } else {
+              demographic = <String, dynamic>{};
+            }
+
+            final createdAtStr =
+                mostRecent['lastModified'] as String? ??
+                mostRecent['createdAt'] as String? ??
+                '';
+            final lastVisit =
+                DateTime.tryParse(createdAtStr) ?? DateTime.now();
+            final assessmentRemarks =
+                _buildAssessmentRemarks(mostRecent, assessmentCount);
+
+            // Try to approximate age in months from demographic; fall back to parsed "age" field.
+            final ageMonths =
+                ageInMonthsFromDemographic(demographic) ??
+                int.tryParse(demographic['age']?.toString() ?? '0') ??
+                0;
+
+            return Patient(
+              firstName: demographic['firstName'] ?? '',
+              lastName: demographic['lastName'] ?? '',
+              age: ageMonths,
+              assessmentRemarks: assessmentRemarks,
+              lastVisit: lastVisit,
+              guardianContact: demographic['fatherContact'] ??
+                  demographic['motherContact'] ??
+                  '',
+              avatarColor: const Color(0xFF2E8B7B),
+              address: demographic['address'] ?? '',
+              dateOfBirth: demographic['dateOfBirth'] ?? '',
+              sex: demographic['sex'] ?? '',
+              docId: (mostRecent['id'] as String?) ?? '',
+              motherName: demographic['mother'] ?? '',
+              motherContact: demographic['motherContact'] ?? '',
+              fatherName: demographic['father'] ?? '',
+              fatherContact: demographic['fatherContact'] ?? '',
+              createdBy: mostRecent['createdByName'] ?? 'Unknown',
+              barangayId: '',
+            );
+          }).toList();
+          _loading = false;
+        });
         return;
       }
 
+      // Online: use barangay-shared patients from Firestore (existing behavior)
       final userDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
@@ -232,7 +346,8 @@ class _PatientListTabState extends State<PatientListTab> {
       final archivedDocIds = <String>{};
       final archiveBatch = FirebaseFirestore.instance.batch();
       var hasArchiveUpdates = false;
-      final autoArchiveEnabled = await AutoArchivePreferences.isAutoArchiveEnabled();
+      final autoArchiveEnabled =
+          await AutoArchivePreferences.isAutoArchiveEnabled();
       for (var doc in snapshot.docs) {
         final data = doc.data();
         if (data['isArchived'] == true) {
@@ -240,7 +355,8 @@ class _PatientListTabState extends State<PatientListTab> {
           continue;
         }
         if (!autoArchiveEnabled) continue;
-        final demographic = (data['demographic'] ?? {}) as Map<String, dynamic>;
+        final demographic =
+            (data['demographic'] ?? {}) as Map<String, dynamic>;
         final ageMonths = ageInMonthsFromDemographic(demographic);
         if (ageMonths != null && ageMonths >= 60) {
           archivedDocIds.add(doc.id);
@@ -272,48 +388,112 @@ class _PatientListTabState extends State<PatientListTab> {
         }
       }
 
-      setState(() {
-        _patients = patientGroups.entries.map((entry) {
-          final docs = entry.value;
-          final assessmentCount = docs.length;
-          docs.sort((a, b) {
-            final dataA = a.data() as Map<String, dynamic>;
-            final dataB = b.data() as Map<String, dynamic>;
-            final timeA = (dataA['createdAt'] as Timestamp?)?.toDate()
-                ?? DateTime(1970);
-            final timeB = (dataB['createdAt'] as Timestamp?)?.toDate()
-                ?? DateTime(1970);
-            return timeB.compareTo(timeA);
-          });
+      // Build patients from barangay shared collection
+      final List<Patient> barangayPatients = patientGroups.entries.map((entry) {
+        final docs = entry.value;
+        final assessmentCount = docs.length;
+        docs.sort((a, b) {
+          final dataA = a.data() as Map<String, dynamic>;
+          final dataB = b.data() as Map<String, dynamic>;
+          final timeA =
+              (dataA['createdAt'] as Timestamp?)?.toDate() ?? DateTime(1970);
+          final timeB =
+              (dataB['createdAt'] as Timestamp?)?.toDate() ?? DateTime(1970);
+          return timeB.compareTo(timeA);
+        });
 
-          final mostRecentDoc = docs.first;
-          final data = mostRecentDoc.data() as Map<String, dynamic>;
-          final demographic = data['demographic'] ?? {};
-          final createdAt = data['createdAt'] as Timestamp?;
-          final assessmentRemarks =
-              _buildAssessmentRemarks(data, assessmentCount);
+        final mostRecentDoc = docs.first;
+        final data = mostRecentDoc.data() as Map<String, dynamic>;
+        final demographic = data['demographic'] ?? {};
+        final createdAt = data['createdAt'] as Timestamp?;
+        final assessmentRemarks =
+            _buildAssessmentRemarks(data, assessmentCount);
 
-          return Patient(
-            firstName: demographic['firstName'] ?? '',
-            lastName: demographic['lastName'] ?? '',
-            age: int.tryParse(demographic['age'] ?? '0') ?? 0,
+        final ageMonths = ageInMonthsFromDemographic(demographic) ??
+            int.tryParse(demographic['age']?.toString() ?? '0') ??
+            0;
+
+        return Patient(
+          firstName: demographic['firstName'] ?? '',
+          lastName: demographic['lastName'] ?? '',
+          age: ageMonths,
+          assessmentRemarks: assessmentRemarks,
+          lastVisit: createdAt?.toDate() ?? DateTime.now(),
+          guardianContact: demographic['fatherContact'] ??
+              demographic['motherContact'] ??
+              '',
+          avatarColor: const Color(0xFF2E8B7B),
+          address: demographic['address'] ?? '',
+          dateOfBirth: demographic['dateOfBirth'] ?? '',
+          sex: demographic['sex'] ?? '',
+          docId: mostRecentDoc.id,
+          motherName: demographic['mother'] ?? '',
+          motherContact: demographic['motherContact'] ?? '',
+          fatherName: demographic['father'] ?? '',
+          fatherContact: demographic['fatherContact'] ?? '',
+          createdBy: data['createdByName'] ?? 'Unknown',
+          barangayId: barangayId,
+        );
+      }).toList();
+
+      // Also include any homepageData-only patients (e.g., historical or offline-created)
+      final homeSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('homepageData')
+          .get();
+
+      final existingKeys = <String>{};
+      for (final p in barangayPatients) {
+        final key =
+            '${p.firstName.toLowerCase().trim()}_${p.lastName.toLowerCase().trim()}';
+        existingKeys.add(key);
+      }
+
+      final List<Patient> extraPatients = [];
+      for (final doc in homeSnapshot.docs) {
+        final data = doc.data();
+        if (data['isDeleted'] == true) continue;
+        final demographic = data['demographic'] ?? {};
+        final firstName = (demographic['firstName'] ?? '').toString();
+        final lastName = (demographic['lastName'] ?? '').toString();
+        final key =
+            '${firstName.toLowerCase().trim()}_${lastName.toLowerCase().trim()}';
+        if (key.isEmpty || key == '_' || existingKeys.contains(key)) continue;
+
+        final createdAt = data['createdAt'] as Timestamp?;
+        final assessmentRemarks = _buildAssessmentRemarks(data, 1);
+        final ageMonths = ageInMonthsFromDemographic(demographic) ??
+            int.tryParse(demographic['age']?.toString() ?? '0') ??
+            0;
+
+        extraPatients.add(
+          Patient(
+            firstName: firstName,
+            lastName: lastName,
+            age: ageMonths,
             assessmentRemarks: assessmentRemarks,
             lastVisit: createdAt?.toDate() ?? DateTime.now(),
             guardianContact: demographic['fatherContact'] ??
-                demographic['motherContact'] ?? '',
+                demographic['motherContact'] ??
+                '',
             avatarColor: const Color(0xFF2E8B7B),
             address: demographic['address'] ?? '',
             dateOfBirth: demographic['dateOfBirth'] ?? '',
             sex: demographic['sex'] ?? '',
-            docId: mostRecentDoc.id,
+            docId: doc.id,
             motherName: demographic['mother'] ?? '',
             motherContact: demographic['motherContact'] ?? '',
             fatherName: demographic['father'] ?? '',
             fatherContact: demographic['fatherContact'] ?? '',
             createdBy: data['createdByName'] ?? 'Unknown',
             barangayId: barangayId,
-          );
-        }).toList();
+          ),
+        );
+      }
+
+      setState(() {
+        _patients = [...barangayPatients, ...extraPatients];
         _loading = false;
       });
     } catch (e) {

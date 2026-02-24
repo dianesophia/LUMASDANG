@@ -123,6 +123,33 @@ class LocalDbService {
     return results;
   }
 
+  /// Clear all records that are already synced to Firestore.
+  /// Returns the number of deleted records.
+  Future<int> clearSyncedRecords() async {
+    if (!_initialized) {
+      await init();
+    }
+
+    final keysToDelete = <int>[];
+
+    for (final key in box.keys) {
+      final value = box.get(key);
+      if (value is Map) {
+        final isSynced =
+            (value['isSynced'] == true) || (value['synced'] == true);
+        if (isSynced) {
+          keysToDelete.add(key as int);
+        }
+      }
+    }
+
+    if (keysToDelete.isNotEmpty) {
+      await box.deleteAll(keysToDelete);
+    }
+
+    return keysToDelete.length;
+  }
+
   /// Mark a local record as synced
   Future<void> markAsSynced(int localKey, String firestoreId) async {
     final value = box.get(localKey);
@@ -174,10 +201,40 @@ class LocalDbService {
           final id = (value['id'] as String?) ?? key.toString();
           final existingDocId = (value['firestoreId'] as String?)?.isNotEmpty == true ? value['firestoreId'] as String : id;
           print('LocalDbService.syncPending: pushing id=$id for localKey=$key existingDocId=$existingDocId');
-          final docId = await firestoreService.saveHomePageData({...data, 'id': id}, docId: existingDocId);
+          final docId = await firestoreService.saveHomePageData(
+            {...data, 'id': id},
+            docId: existingDocId,
+          );
+
+          // Also project this assessment into the shared barangay patient list,
+          // mirroring the online _saveAllData behavior so patients created
+          // offline appear in the Patient List once online, and create a
+          // notification when that projection happens.
+          try {
+            final barangayPatientId =
+                await firestoreService.savePatientToBarangay(data);
+            final barangayId =
+                await firestoreService.getCurrentUserBarangayId();
+            if (barangayId != null &&
+                barangayId.isNotEmpty &&
+                barangayPatientId.isNotEmpty) {
+              await firestoreService.createPatientNotification(
+                barangayId: barangayId,
+                patientId: barangayPatientId,
+                patientData: data,
+              );
+            }
+          } catch (e) {
+            print(
+                'LocalDbService.syncPending: savePatientToBarangay/notification failed for localKey=$key error=$e');
+            // Keep this record unsynced so we retry on the next connectivity change.
+            continue;
+          }
+
           await markAsSynced(key as int, docId);
           success++;
-          print('LocalDbService.syncPending: pushed localKey=$key id=$id docId=$docId');
+          print(
+              'LocalDbService.syncPending: pushed localKey=$key id=$id docId=$docId');
         } catch (e) {
           print('LocalDbService.syncPending: failed for localKey=$key error=$e');
           continue;

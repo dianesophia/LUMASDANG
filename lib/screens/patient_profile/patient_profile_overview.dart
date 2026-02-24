@@ -85,27 +85,58 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
         await LocalDbService.instance.init();
         final all = await LocalDbService.instance.getAllRecords(includeDeleted: true);
         final match = all.firstWhere(
-            (r) => (r['id'] == widget.patient.docId) || (r['firestoreId'] == widget.patient.docId),
+            (r) =>
+                (r['id'] == widget.patient.docId) ||
+                (r['firestoreId'] == widget.patient.docId),
             orElse: () => {});
         if (match.isNotEmpty) {
-          final prefs = (match['data'] as Map<String, dynamic>?)?['contactPreferences'] as Map<String, dynamic>? ?? {};
-          if (mounted) setState(() {
-            _preferPhoneCall = prefs['phoneCall'] ?? true;
-            _preferSMS = prefs['sms'] ?? false;
-          });
+          final rawData = match['data'];
+          Map<String, dynamic>? data;
+          if (rawData is Map<String, dynamic>) {
+            data = rawData;
+          } else if (rawData is Map) {
+            data = Map<String, dynamic>.from(rawData);
+          }
+          Map<String, dynamic> prefs = {};
+          if (data != null) {
+            final rawPrefs = data['contactPreferences'];
+            if (rawPrefs is Map<String, dynamic>) {
+              prefs = rawPrefs;
+            } else if (rawPrefs is Map) {
+              prefs = Map<String, dynamic>.from(rawPrefs);
+            }
+          }
+          if (mounted) {
+            setState(() {
+              _preferPhoneCall = prefs['phoneCall'] ?? true;
+              _preferSMS = prefs['sms'] ?? false;
+            });
+          }
         }
         return;
       }
 
       final doc = await FirebaseFirestore.instance
-          .collection('users').doc(user.uid)
-          .collection('homepageData').doc(widget.patient.docId).get();
+          .collection('users')
+          .doc(user.uid)
+          .collection('homepageData')
+          .doc(widget.patient.docId)
+          .get();
       if (doc.exists) {
-        final prefs = (doc.data() ?? {})['contactPreferences'] as Map<String, dynamic>? ?? {};
-        if (mounted) setState(() {
-          _preferPhoneCall = prefs['phoneCall'] ?? true;
-          _preferSMS = prefs['sms'] ?? false;
-        });
+        final data = doc.data() ?? {};
+        Map<String, dynamic> prefs = {};
+        final rawPrefs = data['contactPreferences'];
+        if (rawPrefs is Map<String, dynamic>) {
+          prefs = rawPrefs;
+        } else if (rawPrefs is Map) {
+          prefs = Map<String, dynamic>.from(rawPrefs);
+        }
+        if (mounted) {
+          setState(() {
+            _preferPhoneCall = prefs['phoneCall'] ?? true;
+            _preferSMS = prefs['sms'] ?? false;
+          });
+        }
       }
     } catch (e) { debugPrint('Error loading contact preferences: $e'); }
   }
@@ -156,11 +187,19 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
   // ── Assessment fetching ────────────────────────────────────────────────────
   Map<String, dynamic> _extractAssessment(Map<String, dynamic> data, String docId) {
     final anthropometric = data['anthropometric'] ?? {};
-    final createdAt = data['createdAt'] as Timestamp?;
+    final createdAt = data['createdAt'];
     DateTime? measurementDate;
     final dateOfMeasurement = anthropometric['dateOfMeasurement']?.toString() ?? '';
     if (dateOfMeasurement.isNotEmpty) measurementDate = _parseDate(dateOfMeasurement);
-    measurementDate ??= createdAt?.toDate();
+    if (measurementDate == null && createdAt != null) {
+      if (createdAt is Timestamp) {
+        measurementDate = createdAt.toDate();
+      } else if (createdAt is String) {
+        measurementDate = DateTime.tryParse(createdAt);
+      } else if (createdAt is DateTime) {
+        measurementDate = createdAt;
+      }
+    }
     return {
       'date': measurementDate,
       'height': anthropometric['height'] ?? '',
@@ -174,6 +213,7 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
       'dietary': data['dietary'],
       'oral': data['oral'],
       'deworming': data['deworming'],
+      'vaccination': data['vaccination'],
       'docId': docId,
     };
   }
@@ -187,63 +227,243 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
     return '$first $last' == '$patientFirst $patientLast';
   }
 
+  Map<String, String>? _computeLocalVaccinationStatuses() {
+    if (_assessments.isEmpty) return null;
+
+    // Find the most recent assessment that has vaccination data.
+    Map<String, dynamic>? latest;
+    for (var i = _assessments.length - 1; i >= 0; i--) {
+      if (_assessments[i]['vaccination'] != null) {
+        latest = _assessments[i];
+        break;
+      }
+    }
+    if (latest == null) return null;
+
+    final rawVacc = latest['vaccination'];
+    Map<String, dynamic> vaccination;
+    if (rawVacc is Map<String, dynamic>) {
+      vaccination = rawVacc;
+    } else if (rawVacc is Map) {
+      vaccination = Map<String, dynamic>.from(rawVacc);
+    } else {
+      return null;
+    }
+
+    Map<String, dynamic>? dosesFor(String vaccine) {
+      final raw = vaccination[vaccine];
+      if (raw is Map<String, dynamic>) return raw;
+      if (raw is Map) return Map<String, dynamic>.from(raw);
+      return null;
+    }
+
+    int highestDoseNumber(String vaccine) {
+      final doses = dosesFor(vaccine);
+      if (doses == null) return 0;
+      const birth = 'BIRTH';
+      const m1_5 = '1½';
+      const m2_5 = '2½';
+      const m3_5 = '3½';
+      const m9 = '9';
+      const y1 = '1 YR';
+      List<String> relevantHeaders;
+      switch (vaccine) {
+        case 'BCG':
+          relevantHeaders = [birth];
+          break;
+        case 'HEP B':
+          relevantHeaders = [birth, m1_5, m2_5];
+          break;
+        case 'PENTAVALENT':
+          relevantHeaders = [m1_5, m2_5, m3_5, y1];
+          break;
+        case 'OPV':
+          relevantHeaders = [birth, m2_5, m9];
+          break;
+        case 'IPV':
+          relevantHeaders = [m1_5, m2_5, m3_5, y1];
+          break;
+        case 'PCV':
+          relevantHeaders = [m1_5, m2_5, m3_5, y1];
+          break;
+        case 'MMR':
+          relevantHeaders = [m9, y1];
+          break;
+        default:
+          relevantHeaders = [birth, m1_5, m2_5, m3_5, m9, y1];
+      }
+      for (int i = relevantHeaders.length - 1; i >= 0; i--) {
+        if (doses[relevantHeaders[i]] == true) return i + 1;
+      }
+      return 0;
+    }
+
+    String doseLabelForNumber(int number) {
+      if (number <= 0) return 'Pending';
+      switch (number) {
+        case 1:
+          return '1st dose';
+        case 2:
+          return '2nd dose';
+        case 3:
+          return '3rd dose';
+        case 4:
+          return '4th dose';
+        case 5:
+          return '5th dose';
+        default:
+          return 'Booster';
+      }
+    }
+
+    String vaccineStatus(String name) =>
+        doseLabelForNumber(highestDoseNumber(name));
+    final opvNumber = highestDoseNumber('OPV');
+    final ipvNumber = highestDoseNumber('IPV');
+
+    // Keys here must match _vaccines keys in VaccinationStatusSection.
+    return <String, String>{
+      'bcg': vaccineStatus('BCG'),
+      'hepatitisB': vaccineStatus('HEP B'),
+      'dtap': vaccineStatus('PENTAVALENT'),
+      'opv': vaccineStatus('OPV'),
+      'ipv': vaccineStatus('IPV'),
+      'mmr': vaccineStatus('MMR'),
+      'pcv': vaccineStatus('PCV'),
+    };
+  }
+
   Future<void> _fetchAssessments() async {
     try {
       final firestoreService = FirestoreService();
-      if (widget.isSharedPatient && widget.sharedPatientId != null) {
-        final assessments = await firestoreService
-            .getAssessmentsForBarangayPatient(widget.sharedPatientId!);
-        final processed = assessments
-            .map((a) => _extractAssessment(a, a['id']))
-            .toList();
-        processed.sort((a, b) =>
-            (a['date'] as DateTime?)
-                ?.compareTo(b['date'] as DateTime? ?? DateTime(1970)) ?? 0);
-        setState(() { _assessments = processed; _loading = false; });
+      final user = FirebaseAuth.instance.currentUser;
+      final List<Map<String, dynamic>> matched = [];
+
+      // 1) Always load local cached assessments (offline‑first)
+      try {
+        await LocalDbService.instance.init();
+        final localRecords =
+            await LocalDbService.instance.getAllRecords(includeDeleted: false);
+
+        for (final record in localRecords) {
+          final rawData = record['data'] as Map<String, dynamic>?;
+          if (rawData == null) continue;
+
+          final data = Map<String, dynamic>.from(rawData);
+          final demographic = data['demographic'] ?? {};
+          final firstName = (demographic['firstName'] ?? '').toString();
+          final lastName = (demographic['lastName'] ?? '').toString();
+          final nameField = (demographic['name'] ?? '').toString();
+
+          bool matchesByName = _namesMatch(firstName, lastName);
+          if (!matchesByName && nameField.isNotEmpty) {
+            final parts = nameField.trim().split(RegExp(r'\s+'));
+            final derivedFirst = parts.isNotEmpty ? parts.first : '';
+            final derivedLast =
+                parts.length > 1 ? parts.sublist(1).join(' ') : '';
+            matchesByName = _namesMatch(derivedFirst, derivedLast);
+          }
+
+          if (!matchesByName) continue;
+
+          // Attach a createdAt value usable by _extractAssessment.
+          final createdAtString =
+              (record['lastModified'] ?? record['timestamp'])?.toString();
+          if (createdAtString != null) {
+            data['createdAt'] = createdAtString;
+          }
+
+          final docId =
+              (record['firestoreId'] as String?) ??
+              (record['id'] as String?) ??
+              widget.patient.docId;
+
+          matched.add(_extractAssessment(data, docId));
+        }
+      } catch (e) {
+        debugPrint('[ProfileOverview] Error loading local assessments: $e');
+      }
+
+      // If there is no Firebase user, we can still show the local data.
+      if (user == null) {
+        final finalList = List<Map<String, dynamic>>.from(matched)
+          ..sort((a, b) =>
+              (a['date'] as DateTime?)
+                  ?.compareTo(b['date'] as DateTime? ?? DateTime(1970)) ?? 0);
+        setState(() {
+          _assessments = finalList;
+          _loading = false;
+        });
         return;
       }
 
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) { setState(() => _loading = false); return; }
+      // 2) When online, enrich with Firestore data
+      final online = await ConnectivityService.instance.checkOnline();
+      if (online) {
+        if (widget.isSharedPatient && widget.sharedPatientId != null) {
+          final assessments = await firestoreService
+              .getAssessmentsForBarangayPatient(widget.sharedPatientId!);
+          matched.addAll(
+            assessments.map((a) => _extractAssessment(a, a['id'])).toList(),
+          );
+        } else {
+          // Barangay‑level shared assessments for this patient
+          try {
+            final barangayAssessments = await firestoreService
+                .getAssessmentsForBarangayPatient(widget.patient.docId);
+            matched.addAll(
+              barangayAssessments
+                  .map((a) => _extractAssessment(a, a['id']))
+                  .toList(),
+            );
+          } catch (e) {
+            debugPrint(
+                '[ProfileOverview] Error fetching barangay assessments: $e');
+          }
 
-      final List<Map<String, dynamic>> matched = [];
-      try {
-        final barangayAssessments = await firestoreService
-            .getAssessmentsForBarangayPatient(widget.patient.docId);
-        matched.addAll(barangayAssessments
-            .map((a) => _extractAssessment(a, a['id'])));
-      } catch (e) {
-        debugPrint('[ProfileOverview] Error fetching barangay assessments: $e');
-      }
+          // Legacy user‑scoped homepageData assessments
+          try {
+            final snapshot = await FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .collection('homepageData')
+                .get();
+            Map<String, dynamic>? fallbackByDocId;
 
-      final snapshot = await FirebaseFirestore.instance
-          .collection('users').doc(user.uid).collection('homepageData').get();
-      Map<String, dynamic>? fallbackByDocId;
+            for (var doc in snapshot.docs) {
+              final data = doc.data();
+              final demographic = data['demographic'] ?? {};
+              final firstName = (demographic['firstName'] ?? '').toString();
+              final lastName = (demographic['lastName'] ?? '').toString();
+              final nameField = (demographic['name'] ?? '').toString();
+              if (doc.id == widget.patient.docId) {
+                fallbackByDocId = data;
+              }
+              if (_namesMatch(firstName, lastName)) {
+                matched.add(_extractAssessment(data, doc.id));
+              } else if (nameField.isNotEmpty) {
+                final parts = nameField.trim().split(RegExp(r'\s+'));
+                final derivedFirst = parts.isNotEmpty ? parts.first : '';
+                final derivedLast =
+                    parts.length > 1 ? parts.sublist(1).join(' ') : '';
+                if (_namesMatch(derivedFirst, derivedLast)) {
+                  matched.add(_extractAssessment(data, doc.id));
+                }
+              }
+            }
 
-      for (var doc in snapshot.docs) {
-        final data = doc.data();
-        final demographic = data['demographic'] ?? {};
-        final firstName = (demographic['firstName'] ?? '').toString();
-        final lastName = (demographic['lastName'] ?? '').toString();
-        final nameField = (demographic['name'] ?? '').toString();
-        if (doc.id == widget.patient.docId) fallbackByDocId = data;
-        if (_namesMatch(firstName, lastName)) {
-          matched.add(_extractAssessment(data, doc.id));
-        } else if (nameField.isNotEmpty) {
-          final parts = nameField.trim().split(RegExp(r'\s+'));
-          final derivedFirst = parts.isNotEmpty ? parts.first : '';
-          final derivedLast =
-              parts.length > 1 ? parts.sublist(1).join(' ') : '';
-          if (_namesMatch(derivedFirst, derivedLast)) {
-            matched.add(_extractAssessment(data, doc.id));
+            if (matched.isEmpty && fallbackByDocId != null) {
+              matched.add(
+                  _extractAssessment(fallbackByDocId, widget.patient.docId));
+            }
+          } catch (e) {
+            debugPrint(
+                '[ProfileOverview] Error fetching user homepageData: $e');
           }
         }
       }
 
-      if (matched.isEmpty && fallbackByDocId != null) {
-        matched.add(_extractAssessment(fallbackByDocId, widget.patient.docId));
-      }
-
+      // 3) De‑duplicate and sort all sources together
       final unique = <String, Map<String, dynamic>>{};
       for (var a in matched) {
         final key =
@@ -255,7 +475,10 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
             (a['date'] as DateTime?)
                 ?.compareTo(b['date'] as DateTime? ?? DateTime(1970)) ?? 0);
 
-      setState(() { _assessments = finalList; _loading = false; });
+      setState(() {
+        _assessments = finalList;
+        _loading = false;
+      });
     } catch (e) {
       debugPrint('Error fetching assessments: $e');
       setState(() => _loading = false);
@@ -308,6 +531,10 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
             patientId: patient.docId,
             barangayId: patient.barangayId,
             useSharedStorage: true,
+            localStatuses: _computeLocalVaccinationStatuses(),
+            localLastReviewDate: _assessments.isNotEmpty
+                ? _assessments.last['date'] as DateTime?
+                : null,
           ),
           const SizedBox(height: 20),
           DewormingStatusSection(assessments: _assessments),

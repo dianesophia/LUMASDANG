@@ -170,7 +170,10 @@ class DewormingStatusSection extends StatelessWidget {
   // ─── Content ────────────────────────────────────────────────────────────────
 
   Widget _buildContent(Map<String, dynamic> latest) {
-    final deworming   = latest['deworming'] as Map<String, dynamic>;
+    final rawDeworming = latest['deworming'];
+    final Map<String, dynamic> deworming = rawDeworming is Map<String, dynamic>
+        ? rawDeworming
+        : Map<String, dynamic>.from(rawDeworming as Map);
     final isNA        = deworming['isNA'] == true;
     final drugGiven   = deworming['drugGiven']?.toString() ?? '';
     final dateStr     = deworming['dateOfLastDeworming']?.toString() ?? '';

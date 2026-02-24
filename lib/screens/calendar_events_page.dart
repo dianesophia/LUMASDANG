@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:lumasdang/services/firestore_service.dart';
 import 'package:lumasdang/screens/shared/app_buttom_navbar.dart'; // ← adjust path if needed
+import 'package:lumasdang/services/local_calendar_service.dart';
+import 'package:lumasdang/services/connectivity_service.dart';
 
 // ─── Model ────────────────────────────────────────────────────────────────────
 class CalEvent {
@@ -62,22 +64,66 @@ class CalendarService {
       .collection('calendarEvents');
 
   Stream<List<CalEvent>> eventsStream() async* {
-    final barangayId = await _getBarangayId();
-    if (barangayId == null) { yield <CalEvent>[]; return; }
-    yield* _eventsRef(barangayId)!
+    final online = await ConnectivityService.instance.checkOnline();
+    String? barangayId;
+
+    if (online) {
+      barangayId = await _getBarangayId();
+    } else {
+      barangayId = await LocalCalendarService.instance.getLastBarangayId();
+    }
+
+    if (barangayId == null) {
+      yield <CalEvent>[];
+      return;
+    }
+
+    if (!online) {
+      // Offline: return cached events if available.
+      yield await LocalCalendarService.instance.getCachedEvents(barangayId);
+      return;
+    }
+
+    // Online: first try to sync any pending local operations, then stream.
+    final ref = _eventsRef(barangayId)!;
+    await LocalCalendarService.instance.syncPending(barangayId, ref);
+
+    yield* ref
         .orderBy('date', descending: false)
         .snapshots()
-        .map((snap) => snap.docs
-            .map((d) => CalEvent.fromMap(d.id, d.data() as Map<String, dynamic>))
-            .toList());
+        .asyncMap((snap) async {
+          final events = snap.docs
+              .map((d) => CalEvent.fromMap(d.id, d.data() as Map<String, dynamic>))
+              .toList();
+          // Cache latest events for offline use.
+          await LocalCalendarService.instance.cacheEvents(
+            barangayId: barangayId!,
+            events: events,
+          );
+          return events;
+        });
   }
 
   Future<void> addEvent(CalEvent event) async {
+    final online = await ConnectivityService.instance.checkOnline();
     final user = _auth.currentUser;
-    if (user == null) return;
-    final barangayId = await _getBarangayId();
+    if (user == null && online) return;
+
+    String? barangayId;
+    if (online) {
+      barangayId = await _getBarangayId();
+    } else {
+      barangayId = await LocalCalendarService.instance.getLastBarangayId();
+    }
     if (barangayId == null) return;
-    final userDoc = await _db.collection('users').doc(user.uid).get();
+
+    if (!online) {
+      // Offline: store locally and mark as pending for sync.
+      await LocalCalendarService.instance.addLocalEvent(barangayId, event);
+      return;
+    }
+
+    final userDoc = await _db.collection('users').doc(user!.uid).get();
     final creatorName = userDoc.data()?['fullName'] ??
         userDoc.data()?['username'] ??
         user.email ??
@@ -102,8 +148,20 @@ class CalendarService {
   }
 
   Future<void> updateEvent(CalEvent event) async {
-    final barangayId = await _getBarangayId();
+    final online = await ConnectivityService.instance.checkOnline();
+    String? barangayId;
+    if (online) {
+      barangayId = await _getBarangayId();
+    } else {
+      barangayId = await LocalCalendarService.instance.getLastBarangayId();
+    }
     if (barangayId == null || event.id == null) return;
+
+    if (!online) {
+      await LocalCalendarService.instance.updateLocalEvent(barangayId, event);
+      return;
+    }
+
     await _eventsRef(barangayId)!.doc(event.id).update({
       ...event.toMap(),
       'updatedAt': FieldValue.serverTimestamp(),
@@ -111,8 +169,20 @@ class CalendarService {
   }
 
   Future<void> deleteEvent(String eventId) async {
-    final barangayId = await _getBarangayId();
+    final online = await ConnectivityService.instance.checkOnline();
+    String? barangayId;
+    if (online) {
+      barangayId = await _getBarangayId();
+    } else {
+      barangayId = await LocalCalendarService.instance.getLastBarangayId();
+    }
     if (barangayId == null) return;
+
+    if (!online) {
+      await LocalCalendarService.instance.deleteLocalEvent(barangayId, eventId);
+      return;
+    }
+
     await _eventsRef(barangayId)!.doc(eventId).delete();
   }
 }

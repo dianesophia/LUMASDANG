@@ -37,7 +37,13 @@ class StatusSections extends StatelessWidget {
   String _getHealthStatusSummary() {
     if (assessments.isEmpty) return 'No health data available';
     for (var i = assessments.length - 1; i >= 0; i--) {
-      final hs = assessments[i]['healthStatus'] as Map<String, dynamic>?;
+      final rawHs = assessments[i]['healthStatus'];
+      Map<String, dynamic>? hs;
+      if (rawHs is Map<String, dynamic>) {
+        hs = rawHs;
+      } else if (rawHs is Map) {
+        hs = Map<String, dynamic>.from(rawHs);
+      }
       if (hs != null) {
         final illnesses = <String>[
           if (hs['diarrhea'] == true) 'Diarrhea',
@@ -57,7 +63,13 @@ class StatusSections extends StatelessWidget {
 
   bool _isHealthPositive() {
     for (var i = assessments.length - 1; i >= 0; i--) {
-      final hs = assessments[i]['healthStatus'] as Map<String, dynamic>?;
+      final rawHs = assessments[i]['healthStatus'];
+      Map<String, dynamic>? hs;
+      if (rawHs is Map<String, dynamic>) {
+        hs = rawHs;
+      } else if (rawHs is Map) {
+        hs = Map<String, dynamic>.from(rawHs);
+      }
       if (hs != null) {
         return hs['diarrhea'] != true &&
             hs['fever'] != true &&
@@ -72,7 +84,13 @@ class StatusSections extends StatelessWidget {
   String _getDietaryStatusSummary() {
     if (assessments.isEmpty) return 'No dietary data available';
     for (var i = assessments.length - 1; i >= 0; i--) {
-      final dietary = assessments[i]['dietary'] as Map<String, dynamic>?;
+      final rawDietary = assessments[i]['dietary'];
+      Map<String, dynamic>? dietary;
+      if (rawDietary is Map<String, dynamic>) {
+        dietary = rawDietary;
+      } else if (rawDietary is Map) {
+        dietary = Map<String, dynamic>.from(rawDietary);
+      }
       if (dietary != null) {
         if (dietary['purelyBreastfed'] == true) return 'Purely breastfed';
         if (dietary['purelyBreastfed'] == false) {
@@ -92,7 +110,13 @@ class StatusSections extends StatelessWidget {
 
   bool _isDietaryPositive() {
     for (var i = assessments.length - 1; i >= 0; i--) {
-      final dietary = assessments[i]['dietary'] as Map<String, dynamic>?;
+      final rawDietary = assessments[i]['dietary'];
+      Map<String, dynamic>? dietary;
+      if (rawDietary is Map<String, dynamic>) {
+        dietary = rawDietary;
+      } else if (rawDietary is Map) {
+        dietary = Map<String, dynamic>.from(rawDietary);
+      }
       if (dietary != null) return dietary['purelyBreastfed'] != null;
     }
     return false;
@@ -101,7 +125,13 @@ class StatusSections extends StatelessWidget {
   String _getOralStatusSummary() {
     if (assessments.isEmpty) return 'No oral assessment data';
     for (var i = assessments.length - 1; i >= 0; i--) {
-      final oral = assessments[i]['oral'] as Map<String, dynamic>?;
+      final rawOral = assessments[i]['oral'];
+      Map<String, dynamic>? oral;
+      if (rawOral is Map<String, dynamic>) {
+        oral = rawOral;
+      } else if (rawOral is Map) {
+        oral = Map<String, dynamic>.from(rawOral);
+      }
       if (oral != null) {
         final raw = oral['overallRisk']?.toString().trim() ?? '';
         if (raw.isNotEmpty) {
@@ -115,7 +145,13 @@ class StatusSections extends StatelessWidget {
 
   bool _isOralPositive() {
     for (var i = assessments.length - 1; i >= 0; i--) {
-      final oral = assessments[i]['oral'] as Map<String, dynamic>?;
+      final rawOral = assessments[i]['oral'];
+      Map<String, dynamic>? oral;
+      if (rawOral is Map<String, dynamic>) {
+        oral = rawOral;
+      } else if (rawOral is Map) {
+        oral = Map<String, dynamic>.from(rawOral);
+      }
       if (oral != null) {
         return oral['overallRisk']?.toString().trim().toLowerCase() == 'low';
       }
@@ -563,8 +599,11 @@ class _HealthHistorySheet extends StatelessWidget {
               itemCount: filtered.length,
               separatorBuilder: (_, __) => const Divider(height: 28, color: Color(0xFFE8E8ED)),
               itemBuilder: (_, i) {
-                final a           = filtered[i];
-                final hs          = a['healthStatus'] as Map<String, dynamic>;
+                final a = filtered[i];
+                final rawHs = a['healthStatus'];
+                final Map<String, dynamic> hs = rawHs is Map<String, dynamic>
+                    ? rawHs
+                    : Map<String, dynamic>.from(rawHs as Map);
                 final diarrhea    = hs['diarrhea'] == true;
                 final fever       = hs['fever'] == true;
                 final cough       = hs['cough'] == true;
@@ -620,8 +659,11 @@ class _DietaryDetailsSheet extends StatelessWidget {
               itemCount: filtered.length,
               separatorBuilder: (_, __) => const Divider(height: 28, color: Color(0xFFE8E8ED)),
               itemBuilder: (_, i) {
-                final a        = filtered[i];
-                final dietary  = a['dietary'] as Map<String, dynamic>;
+                final a = filtered[i];
+                final rawDietary = a['dietary'];
+                final Map<String, dynamic> dietary = rawDietary is Map<String, dynamic>
+                    ? rawDietary
+                    : Map<String, dynamic>.from(rawDietary as Map);
                 final purelyBF = dietary['purelyBreastfed'];
                 final cfAge    = dietary['cfAge']?.toString() ?? '';
                 final cfFreq   = dietary['cfFrequency']?.toString() ?? '';
@@ -694,8 +736,11 @@ class _OralDetailsSheet extends StatelessWidget {
               itemCount: filtered.length,
               separatorBuilder: (_, __) => const Divider(height: 28, color: Color(0xFFE8E8ED)),
               itemBuilder: (_, i) {
-                final a    = filtered[i];
-                final oral = a['oral'] as Map<String, dynamic>;
+                final a = filtered[i];
+                final rawOral = a['oral'];
+                final Map<String, dynamic> oral = rawOral is Map<String, dynamic>
+                    ? rawOral
+                    : Map<String, dynamic>.from(rawOral as Map);
                 final risk = oral['overallRisk']?.toString() ?? '';
                 final fg   = _riskFg(risk);
                 final bg   = _riskBg(risk);
