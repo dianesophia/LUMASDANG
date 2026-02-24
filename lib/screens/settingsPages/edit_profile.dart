@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
+// import 'package:image_picker/image_picker.dart';
 import '../../services/firestore_service.dart';
 import '../../services/local_db_service.dart';
 import '../authPages/login.dart';
@@ -16,7 +16,7 @@ class EditProfile extends StatefulWidget {
 class _EditProfileState extends State<EditProfile> {
   final _firestoreService = FirestoreService();
   final _localDbService = LocalDbService.instance;
-  final _imagePicker = ImagePicker();
+  // final _imagePicker = ImagePicker();
 
   final TextEditingController _displayNameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
@@ -26,7 +26,7 @@ class _EditProfileState extends State<EditProfile> {
   bool _loadingProfile = true;
   bool _emailChanged = false;
   bool _obscurePassword = true;
-  String? _profilePicturePath;
+  // String? _profilePicturePath;
   String? _originalEmail;
   int _displayNameLength = 0;
   int _emailLength = 0;
@@ -67,7 +67,7 @@ class _EditProfileState extends State<EditProfile> {
             _displayNameController.text = profile['displayName'] ?? user.displayName ?? '';
             _emailController.text = profile['email'] ?? user.email ?? '';
             _originalEmail = user.email;
-            _profilePicturePath = profile['profilePicture'];
+            // _profilePicturePath = profile['profilePicture'];
             _displayNameLength = _displayNameController.text.length;
             _emailLength = _emailController.text.length;
           });
@@ -80,49 +80,49 @@ class _EditProfileState extends State<EditProfile> {
     }
   }
 
-  Future<void> _takePhoto() async {
-    try {
-      final XFile? photo = await _imagePicker.pickImage(
-        source: ImageSource.camera,
-        maxWidth: 800,
-        maxHeight: 800,
-        imageQuality: 85,
-      );
-      if (photo != null) await _uploadProfilePicture(photo.path);
-    } catch (e) {
-      _showErrorSnackBar('Error taking photo: $e');
-    }
-  }
+  // Future<void> _takePhoto() async {
+  //   try {
+  //     final XFile? photo = await _imagePicker.pickImage(
+  //       source: ImageSource.camera,
+  //       maxWidth: 800,
+  //       maxHeight: 800,
+  //       imageQuality: 85,
+  //     );
+  //     if (photo != null) await _uploadProfilePicture(photo.path);
+  //   } catch (e) {
+  //     _showErrorSnackBar('Error taking photo: $e');
+  //   }
+  // }
 
-  Future<void> _uploadPhoto() async {
-    try {
-      final XFile? image = await _imagePicker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 800,
-        maxHeight: 800,
-        imageQuality: 85,
-      );
-      if (image != null) await _uploadProfilePicture(image.path);
-    } catch (e) {
-      _showErrorSnackBar('Error uploading photo: $e');
-    }
-  }
+  // Future<void> _uploadPhoto() async {
+  //   try {
+  //     final XFile? image = await _imagePicker.pickImage(
+  //       source: ImageSource.gallery,
+  //       maxWidth: 800,
+  //       maxHeight: 800,
+  //       imageQuality: 85,
+  //     );
+  //     if (image != null) await _uploadProfilePicture(image.path);
+  //   } catch (e) {
+  //     _showErrorSnackBar('Error uploading photo: $e');
+  //   }
+  // }
 
-  Future<void> _uploadProfilePicture(String imagePath) async {
-    setState(() => _loading = true);
-    try {
-      final user = _firestoreService.auth.currentUser;
-      if (user == null) return;
-
-      final uploadedPath = await _firestoreService.updateProfilePicture(user.uid, imagePath);
-      if (uploadedPath != null) {
-        setState(() => _profilePicturePath = uploadedPath);
-        await _localDbService.updateProfilePictureForUser(user.uid, uploadedPath);
-      }
-    } finally {
-      setState(() => _loading = false);
-    }
-  }
+  // Future<void> _uploadProfilePicture(String imagePath) async {
+  //   setState(() => _loading = true);
+  //   try {
+  //     final user = _firestoreService.auth.currentUser;
+  //     if (user == null) return;
+  //
+  //     final uploadedPath = await _firestoreService.updateProfilePicture(user.uid, imagePath);
+  //     if (uploadedPath != null) {
+  //       setState(() => _profilePicturePath = uploadedPath);
+  //       await _localDbService.updateProfilePictureForUser(user.uid, uploadedPath);
+  //     }
+  //   } finally {
+  //     setState(() => _loading = false);
+  //   }
+  // }
 
   void _showErrorSnackBar(String message) {
     if (!mounted) return;
@@ -282,76 +282,76 @@ class _EditProfileState extends State<EditProfile> {
     );
   }
 
-  void _showPhotoOptions() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        margin: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 8),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              "Update Photo",
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 8),
-            _bottomSheetOption(
-              icon: Icons.camera_alt_rounded,
-              label: "Take Photo",
-              onTap: () {
-                Navigator.pop(context);
-                _takePhoto();
-              },
-            ),
-            _bottomSheetOption(
-              icon: Icons.photo_library_rounded,
-              label: "Choose from Gallery",
-              onTap: () {
-                Navigator.pop(context);
-                _uploadPhoto();
-              },
-            ),
-            const SizedBox(height: 16),
-          ],
-        ),
-      ),
-    );
-  }
+  // void _showPhotoOptions() {
+  //   showModalBottomSheet(
+  //     context: context,
+  //     backgroundColor: Colors.transparent,
+  //     builder: (context) => Container(
+  //       margin: const EdgeInsets.all(16),
+  //       decoration: BoxDecoration(
+  //         color: Colors.white,
+  //         borderRadius: BorderRadius.circular(20),
+  //       ),
+  //       child: Column(
+  //         mainAxisSize: MainAxisSize.min,
+  //         children: [
+  //           const SizedBox(height: 8),
+  //           Container(
+  //             width: 40,
+  //             height: 4,
+  //             decoration: BoxDecoration(
+  //               color: Colors.grey.shade300,
+  //               borderRadius: BorderRadius.circular(2),
+  //             ),
+  //           ),
+  //           const SizedBox(height: 16),
+  //           const Text(
+  //             "Update Photo",
+  //             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+  //           ),
+  //           const SizedBox(height: 8),
+  //           _bottomSheetOption(
+  //             icon: Icons.camera_alt_rounded,
+  //             label: "Take Photo",
+  //             onTap: () {
+  //               Navigator.pop(context);
+  //               _takePhoto();
+  //             },
+  //           ),
+  //           _bottomSheetOption(
+  //             icon: Icons.photo_library_rounded,
+  //             label: "Choose from Gallery",
+  //             onTap: () {
+  //               Navigator.pop(context);
+  //               _uploadPhoto();
+  //             },
+  //           ),
+  //           const SizedBox(height: 16),
+  //         ],
+  //       ),
+  //     ),
+  //   );
+  // }
 
-  Widget _bottomSheetOption({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return ListTile(
-      leading: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: const Color(0xFF2E8B7B).withOpacity(0.1),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(icon, color: const Color(0xFF2E8B7B), size: 22),
-      ),
-      title: Text(label, style: const TextStyle(fontWeight: FontWeight.w500)),
-      onTap: onTap,
-    );
-  }
+  // Widget _bottomSheetOption({
+  //   required IconData icon,
+  //   required String label,
+  //   required VoidCallback onTap,
+  // }) {
+  //   return ListTile(
+  //     leading: Container(
+  //       width: 40,
+  //       height: 40,
+  //       decoration: BoxDecoration(
+  //         color: const Color(0xFF2E8B7B).withOpacity(0.1),
+  //         borderRadius: BorderRadius.circular(10),
+  //       ),
+  //       child: Icon(icon, color: const Color(0xFF2E8B7B), size: 22),
+  //     ),
+  //     title: Text(label, style: const TextStyle(fontWeight: FontWeight.w500)),
+  //     onTap: onTap,
+  //   );
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -446,103 +446,101 @@ class _EditProfileState extends State<EditProfile> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
 
-                            /// ── Profile Photo ────────────────────────────
-                            Center(
-                              child: Stack(
-                                children: [
-                                  // Avatar ring
-                                  Container(
-                                    width: 108,
-                                    height: 108,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: Colors.white.withOpacity(0.6),
-                                        width: 3,
-                                      ),
-                                    ),
-                                    child: ClipOval(
-                                      child: _profilePicturePath != null &&
-                                              _profilePicturePath!.isNotEmpty
-                                          ? Builder(builder: (context) {
-                                              try {
-                                                return Image.memory(
-                                                  base64Decode(_profilePicturePath!),
-                                                  fit: BoxFit.cover,
-                                                );
-                                              } catch (_) {
-                                                return _defaultAvatar();
-                                              }
-                                            })
-                                          : _defaultAvatar(),
-                                    ),
-                                  ),
-
-                                  // Loading overlay
-                                  if (_loading)
-                                    Positioned.fill(
-                                      child: Container(
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          color: Colors.black.withOpacity(0.45),
-                                        ),
-                                        child: const Center(
-                                          child: CircularProgressIndicator(
-                                            color: Colors.white,
-                                            strokeWidth: 2,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-
-                                  // Edit badge
-                                  Positioned(
-                                    bottom: 2,
-                                    right: 2,
-                                    child: GestureDetector(
-                                      onTap: _loading ? null : _showPhotoOptions,
-                                      child: Container(
-                                        width: 32,
-                                        height: 32,
-                                        decoration: BoxDecoration(
-                                          color: Colors.white,
-                                          shape: BoxShape.circle,
-                                          border: Border.all(
-                                            color: const Color(0xFF2E8B7B),
-                                            width: 2,
-                                          ),
-                                        ),
-                                        child: const Icon(
-                                          Icons.camera_alt_rounded,
-                                          color: Color(0xFF2E8B7B),
-                                          size: 16,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            const SizedBox(height: 8),
-
-                            Center(
-                              child: TextButton(
-                                onPressed: _loading ? null : _showPhotoOptions,
-                                child: Text(
-                                  "Change Photo",
-                                  style: TextStyle(
-                                    color: Colors.white.withOpacity(0.85),
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    decoration: TextDecoration.underline,
-                                    decorationColor: Colors.white.withOpacity(0.6),
-                                  ),
-                                ),
-                              ),
-                            ),
-
-                            const SizedBox(height: 28),
+                            /// ── Profile Photo (commented out) ────────────
+                            // Center(
+                            //   child: Stack(
+                            //     children: [
+                            //       // Avatar ring
+                            //       Container(
+                            //         width: 108,
+                            //         height: 108,
+                            //         decoration: BoxDecoration(
+                            //           shape: BoxShape.circle,
+                            //           border: Border.all(
+                            //             color: Colors.white.withOpacity(0.6),
+                            //             width: 3,
+                            //           ),
+                            //         ),
+                            //         child: ClipOval(
+                            //           child: _profilePicturePath != null &&
+                            //                   _profilePicturePath!.isNotEmpty
+                            //               ? Builder(builder: (context) {
+                            //                   try {
+                            //                     return Image.memory(
+                            //                       base64Decode(_profilePicturePath!),
+                            //                       fit: BoxFit.cover,
+                            //                     );
+                            //                   } catch (_) {
+                            //                     return _defaultAvatar();
+                            //                   }
+                            //                 })
+                            //               : _defaultAvatar(),
+                            //         ),
+                            //       ),
+                            //       // Loading overlay
+                            //       if (_loading)
+                            //         Positioned.fill(
+                            //           child: Container(
+                            //             decoration: BoxDecoration(
+                            //               shape: BoxShape.circle,
+                            //               color: Colors.black.withOpacity(0.45),
+                            //             ),
+                            //             child: const Center(
+                            //               child: CircularProgressIndicator(
+                            //                 color: Colors.white,
+                            //                 strokeWidth: 2,
+                            //               ),
+                            //             ),
+                            //           ),
+                            //         ),
+                            //       // Edit badge
+                            //       Positioned(
+                            //         bottom: 2,
+                            //         right: 2,
+                            //         child: GestureDetector(
+                            //           onTap: _loading ? null : _showPhotoOptions,
+                            //           child: Container(
+                            //             width: 32,
+                            //             height: 32,
+                            //             decoration: BoxDecoration(
+                            //               color: Colors.white,
+                            //               shape: BoxShape.circle,
+                            //               border: Border.all(
+                            //                 color: const Color(0xFF2E8B7B),
+                            //                 width: 2,
+                            //               ),
+                            //             ),
+                            //             child: const Icon(
+                            //               Icons.camera_alt_rounded,
+                            //               color: Color(0xFF2E8B7B),
+                            //               size: 16,
+                            //             ),
+                            //           ),
+                            //         ),
+                            //       ),
+                            //     ],
+                            //   ),
+                            // ),
+                            //
+                            // const SizedBox(height: 8),
+                            //
+                            // Center(
+                            //   child: TextButton(
+                            //     onPressed: _loading ? null : _showPhotoOptions,
+                            //     child: Text(
+                            //       "Change Photo",
+                            //       style: TextStyle(
+                            //         color: Colors.white.withOpacity(0.85),
+                            //         fontSize: 13,
+                            //         fontWeight: FontWeight.w600,
+                            //         decoration: TextDecoration.underline,
+                            //         decorationColor: Colors.white.withOpacity(0.6),
+                            //       ),
+                            //     ),
+                            //   ),
+                            // ),
+                            //
+                            // const SizedBox(height: 28),
 
                             /// ── Display Name ─────────────────────────────
                             _sectionLabel("Display Name"),
@@ -715,12 +713,12 @@ class _EditProfileState extends State<EditProfile> {
     );
   }
 
-  Widget _defaultAvatar() {
-    return Container(
-      color: Colors.white.withOpacity(0.25),
-      child: const Icon(Icons.person_rounded, size: 56, color: Colors.white),
-    );
-  }
+  // Widget _defaultAvatar() {
+  //   return Container(
+  //     color: Colors.white.withOpacity(0.25),
+  //     child: const Icon(Icons.person_rounded, size: 56, color: Colors.white),
+  //   );
+  // }
 
   Widget _sectionLabel(String label) {
     return Padding(

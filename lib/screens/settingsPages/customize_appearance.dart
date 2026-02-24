@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 
 class CustomizeAppearance extends StatefulWidget {
   const CustomizeAppearance({super.key});
@@ -9,65 +8,9 @@ class CustomizeAppearance extends StatefulWidget {
 }
 
 class _CustomizeAppearanceState extends State<CustomizeAppearance> {
-  Color selectedColor = Colors.black;
   String selectedFont = 'Roboto';
 
-  final List<Color> presetColors = [
-    Colors.white,
-    Colors.black,
-    const Color(0xFFFFF9C4),
-    const Color(0xFF737373),
-    Colors.redAccent,
-    Colors.blueGrey,
-    const Color(0xFFD9D9D9),
-    Colors.purpleAccent,
-  ];
-
   final List<String> fonts = ['Roboto', 'Poppins', 'Montserrat', 'Open Sans'];
-
-  bool _isDarkColor(Color color) => color.computeLuminance() < 0.5;
-  Color _getContrastColor(Color color) =>
-      _isDarkColor(color) ? Colors.white : Colors.black;
-
-  void _openColorPicker() {
-    Color tempColor = selectedColor;
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
-          "Pick a Color",
-          style: TextStyle(fontWeight: FontWeight.w700),
-        ),
-        content: SingleChildScrollView(
-          child: ColorPicker(
-            pickerColor: selectedColor,
-            onColorChanged: (color) => tempColor = color,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              setState(() => selectedColor = tempColor);
-              Navigator.pop(context);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2E8B7B),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-              elevation: 0,
-            ),
-            child: const Text("Select", style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -162,138 +105,6 @@ class _CustomizeAppearanceState extends State<CustomizeAppearance> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
 
-                      /// ── Color Theme ─────────────────────────────────────
-                      _sectionLabel("Color Theme"),
-                      const SizedBox(height: 12),
-
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.18),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.28),
-                            width: 1,
-                          ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-
-                            // Preset color circles
-                            LayoutBuilder(
-                              builder: (context, constraints) {
-                                final size =
-                                    ((constraints.maxWidth - 12 * 7) / 8)
-                                        .clamp(32.0, 48.0);
-                                return Wrap(
-                                  spacing: 12,
-                                  runSpacing: 12,
-                                  children: presetColors.map((color) {
-                                    final isSelected = color == selectedColor;
-                                    final contrast = _getContrastColor(color);
-                                    return GestureDetector(
-                                      onTap: () =>
-                                          setState(() => selectedColor = color),
-                                      child: AnimatedContainer(
-                                        duration: const Duration(milliseconds: 180),
-                                        width: size,
-                                        height: size,
-                                        decoration: BoxDecoration(
-                                          color: color,
-                                          shape: BoxShape.circle,
-                                          border: Border.all(
-                                            color: isSelected
-                                                ? contrast
-                                                : Colors.white.withOpacity(0.3),
-                                            width: isSelected ? 2.5 : 1,
-                                          ),
-                                          boxShadow: isSelected
-                                              ? [
-                                                  BoxShadow(
-                                                    color: color.withOpacity(0.5),
-                                                    blurRadius: 8,
-                                                    spreadRadius: 1,
-                                                  )
-                                                ]
-                                              : null,
-                                        ),
-                                        child: isSelected
-                                            ? Icon(Icons.check_rounded,
-                                                color: contrast, size: 18)
-                                            : null,
-                                      ),
-                                    );
-                                  }).toList(),
-                                );
-                              },
-                            ),
-
-                            const SizedBox(height: 14),
-
-                            // Divider
-                            Divider(
-                              color: Colors.white.withOpacity(0.2),
-                              height: 1,
-                            ),
-
-                            const SizedBox(height: 14),
-
-                            // Custom color picker row
-                            GestureDetector(
-                              onTap: _openColorPicker,
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 36,
-                                    height: 36,
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.2),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: const Icon(
-                                      Icons.palette_outlined,
-                                      color: Colors.white,
-                                      size: 20,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 14),
-                                  Text(
-                                    "Custom Color",
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  const Spacer(),
-                                  Container(
-                                    width: 26,
-                                    height: 26,
-                                    decoration: BoxDecoration(
-                                      color: selectedColor,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: Colors.white.withOpacity(0.5),
-                                        width: 1.5,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Icon(
-                                    Icons.chevron_right_rounded,
-                                    color: Colors.white.withOpacity(0.55),
-                                    size: 22,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 28),
-
                       /// ── Font Family ──────────────────────────────────────
                       _sectionLabel("Font Family"),
                       const SizedBox(height: 12),
@@ -331,10 +142,8 @@ class _CustomizeAppearanceState extends State<CustomizeAppearance> {
                                               height: 36,
                                               decoration: BoxDecoration(
                                                 color: isSelected
-                                                    ? Colors.white
-                                                        .withOpacity(0.3)
-                                                    : Colors.white
-                                                        .withOpacity(0.15),
+                                                    ? Colors.white.withOpacity(0.3)
+                                                    : Colors.white.withOpacity(0.15),
                                                 borderRadius:
                                                     BorderRadius.circular(10),
                                               ),
@@ -426,7 +235,7 @@ class _CustomizeAppearanceState extends State<CustomizeAppearance> {
                                   width: 36,
                                   height: 36,
                                   decoration: BoxDecoration(
-                                    color: selectedColor,
+                                    color: Colors.white.withOpacity(0.3),
                                     shape: BoxShape.circle,
                                     border: Border.all(
                                       color: Colors.white.withOpacity(0.4),
@@ -467,24 +276,6 @@ class _CustomizeAppearanceState extends State<CustomizeAppearance> {
                                 color: Colors.white.withOpacity(0.8),
                                 fontSize: 13,
                                 height: 1.5,
-                              ),
-                            ),
-                            const SizedBox(height: 14),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 10),
-                              decoration: BoxDecoration(
-                                color: selectedColor,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Text(
-                                "Button Preview",
-                                style: TextStyle(
-                                  fontFamily: selectedFont,
-                                  color: _getContrastColor(selectedColor),
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 13,
-                                ),
                               ),
                             ),
                           ],
