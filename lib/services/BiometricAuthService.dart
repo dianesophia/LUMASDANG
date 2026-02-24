@@ -2,6 +2,7 @@ import 'package:local_auth/local_auth.dart';
 import 'package:local_auth/error_codes.dart' as auth_error;
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class BiometricAuthService {
   static final BiometricAuthService _instance = BiometricAuthService._internal();
@@ -9,6 +10,7 @@ class BiometricAuthService {
   BiometricAuthService._internal();
 
   final LocalAuthentication _localAuth = LocalAuthentication();
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
 
   static const String _biometricEnabledKey = 'biometric_enabled';
   static const String _savedEmailKey = 'biometric_saved_email';
@@ -90,7 +92,7 @@ class BiometricAuthService {
     }
   }
 
-  // ── SharedPreferences helpers ─────────────────────────────────────────────
+  // ── SharedPreferences helpers (for biometric enabled flag) ────────────────
   Future<bool> isBiometricLoginEnabled() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getBool(_biometricEnabledKey) ?? false;
@@ -100,30 +102,40 @@ class BiometricAuthService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_biometricEnabledKey, enabled);
     if (!enabled) {
-      await prefs.remove(_savedEmailKey);
-      await prefs.remove(_savedPasswordKey);
+      await clearSavedCredentials();
     }
   }
 
+  // ── Secure storage helpers using Flutter Secure Storage ──────────────────
   Future<void> saveCredentials(String email, String password) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_savedEmailKey, email);
-    await prefs.setString(_savedPasswordKey, password);
+    try {
+      await _secureStorage.write(key: _savedEmailKey, value: email);
+      await _secureStorage.write(key: _savedPasswordKey, value: password);
+    } catch (e) {
+      throw Exception('Failed to save credentials securely: $e');
+    }
   }
 
   Future<Map<String, String>?> getSavedCredentials() async {
-    final prefs = await SharedPreferences.getInstance();
-    final email = prefs.getString(_savedEmailKey);
-    final password = prefs.getString(_savedPasswordKey);
-    if (email == null || password == null) return null;
-    return {'email': email, 'password': password};
+    try {
+      final email = await _secureStorage.read(key: _savedEmailKey);
+      final password = await _secureStorage.read(key: _savedPasswordKey);
+      if (email == null || password == null) return null;
+      return {'email': email, 'password': password};
+    } catch (e) {
+      throw Exception('Failed to retrieve saved credentials: $e');
+    }
   }
 
   Future<void> clearSavedCredentials() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_savedEmailKey);
-    await prefs.remove(_savedPasswordKey);
-    await prefs.remove(_biometricEnabledKey);
+    try {
+      await _secureStorage.delete(key: _savedEmailKey);
+      await _secureStorage.delete(key: _savedPasswordKey);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_biometricEnabledKey);
+    } catch (e) {
+      throw Exception('Failed to clear saved credentials: $e');
+    }
   }
 }
 

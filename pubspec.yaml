@@ -56,6 +56,7 @@ dependencies:
   shared_preferences: ^2.3.0
   flutter_secure_storage: ^8.0.0
   uuid: ^3.0.7
+  provider: ^6.0.0
 
 
 dev_dependencies:
@@ -97,25 +98,10 @@ flutter:
   # For details regarding adding assets from package dependencies, see
   # https://flutter.dev/to/asset-from-package
 
-  # To add custom fonts to your application, add a fonts section here,
-  # in this "flutter" section. Each entry in this list should have a
-  # "family" key with the font family name, and a "fonts" key with a
-  # list giving the asset and other descriptors for the font. For
-  # example:
-  # fonts:
-  #   - family: Schyler
-  #     fonts:
-  #       - asset: fonts/Schyler-Regular.ttf
-  #       - asset: fonts/Schyler-Italic.ttf
-  #         style: italic
-  #   - family: Trajan Pro
-  #     fonts:
-  #       - asset: fonts/TrajanPro.ttf
-  #       - asset: fonts/TrajanPro_Bold.ttf
-  #         weight: 700
-  #
-  # For details regarding fonts from package dependencies,
-  # see https://flutter.dev/to/font-from-package
+  # If you want to bundle custom fonts, add a `fonts:` section here
+  # and include the font asset files under `assets/fonts/`.
+  # The project currently does not include bundled font files, so
+  # custom font entries were removed to avoid referencing missing assets.
 
 flutter_icons:
   android: true

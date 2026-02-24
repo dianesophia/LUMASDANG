@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../providers/theme_provider.dart';
 
 class CustomizeAppearance extends StatefulWidget {
   const CustomizeAppearance({super.key});
@@ -8,9 +10,15 @@ class CustomizeAppearance extends StatefulWidget {
 }
 
 class _CustomizeAppearanceState extends State<CustomizeAppearance> {
-  String selectedFont = 'Roboto';
-
+  late String selectedFont;
   final List<String> fonts = ['Roboto', 'Poppins', 'Montserrat', 'Open Sans'];
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize selectedFont from ThemeProvider
+    selectedFont = context.read<ThemeProvider>().selectedFont;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -288,17 +296,29 @@ class _CustomizeAppearanceState extends State<CustomizeAppearance> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: const Text("Appearance saved!"),
-                                backgroundColor: const Color(0xFF2E8B7B),
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12)),
-                                margin: const EdgeInsets.all(16),
-                              ),
-                            );
+                          onPressed: () async {
+                            // Save the selected font to ThemeProvider
+                            await context.read<ThemeProvider>().setFont(selectedFont);
+                            
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: const Text("Appearance saved!"),
+                                  backgroundColor: const Color(0xFF2E8B7B),
+                                  behavior: SnackBarBehavior.floating,
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12)),
+                                  margin: const EdgeInsets.all(16),
+                                ),
+                              );
+                              
+                              // Optional: pop after saving
+                              Future.delayed(const Duration(milliseconds: 500), () {
+                                if (mounted) {
+                                  Navigator.pop(context);
+                                }
+                              });
+                            }
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.white,

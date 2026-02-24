@@ -7,6 +7,7 @@ import 'dart:async';
 import '../../services/connectivity_service.dart';
 import '../../services/local_db_service.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../../services/BiometricAuthService.dart';
 import 'dart:math' as math;
 
 class LoginPage extends StatefulWidget {
@@ -25,9 +26,17 @@ class _LoginPageState extends State<LoginPage>
   final FirebaseAuth _auth = FirebaseAuth.instance;
   // Secure storage for offline credential cache (encrypted by OS)
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
+  
+  // Biometric authentication service
+  final BiometricAuthService _biometricService = BiometricAuthService();
 
   bool _isLoading = false;
   bool _obscurePassword = true;
+  
+  // Biometric login state
+  bool _isBiometricAvailable = false;
+  bool _isBiometricEnabled = false;
+  bool _isBiometricLoading = false;
 
   late AnimationController _backgroundController;
   late AnimationController _contentController;
@@ -79,6 +88,38 @@ class _LoginPageState extends State<LoginPage>
     Future.delayed(const Duration(milliseconds: 200), () {
       _contentController.forward();
     });
+    
+    // Initialize biometric status
+    _checkBiometricAvailability();
+  }
+
+  Future<void> _checkBiometricAvailability() async {
+    try {
+      final isSupported = await _biometricService.isDeviceSupported();
+      final canCheck = await _biometricService.canCheckBiometrics();
+      final isEnabled = await _biometricService.isBiometricLoginEnabled();
+      final credentials = await _biometricService.getSavedCredentials();
+      
+      if (mounted) {
+        setState(() {
+          _isBiometricAvailable = isSupported && canCheck && credentials != null;
+          _isBiometricEnabled = isEnabled;
+        });
+      }
+      
+      // Auto-prompt biometric login if available and enabled
+      if (_isBiometricAvailable && _isBiometricEnabled && credentials != null) {
+        // Small delay to ensure UI is fully rendered
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            _promptBiometricLogin();
+          }
+        });
+      }
+    } catch (e) {
+      // Silently fail - biometric login is optional
+      debugPrint('Biometric availability check failed: $e');
+    }
   }
 
   @override
@@ -227,6 +268,140 @@ class _LoginPageState extends State<LoginPage>
         margin: const EdgeInsets.all(16),
       ),
     );
+  }
+
+  Future<void> _promptBiometricLogin() async {
+    if (_isBiometricLoading) return;
+    
+    setState(() => _isBiometricLoading = true);
+    
+    final result = await _biometricService.authenticate(
+      reason: 'Sign in to Lumasdang with biometrics',
+    );
+    
+    if (!mounted) return;
+    
+    if (result == BiometricResult.success) {
+      await _loginWithBiometric();
+    } else if (result != BiometricResult.failed) {
+      // Only show error for actual failures, not user cancellation
+      String errorMsg = _getBiometricErrorMessage(result);
+      if (errorMsg.isNotEmpty) {
+        _showErrorSnackbar(errorMsg);
+      }
+      setState(() => _isBiometricLoading = false);
+    } else {
+      setState(() => _isBiometricLoading = false);
+    }
+  }
+
+  Future<void> _loginWithBiometric() async {
+    try {
+      // Get saved credentials from secure storage
+      final credentials = await _biometricService.getSavedCredentials();
+      if (credentials == null) {
+        _showErrorSnackbar('No saved credentials found. Please log in with your password first.');
+        setState(() => _isBiometricLoading = false);
+        return;
+      }
+
+      final email = credentials['email']!;
+      final password = credentials['password']!;
+
+      setState(() => _isLoading = true);
+
+      // Check if online
+      final online = await ConnectivityService.instance.checkOnline();
+      if (!online) {
+        // Offline biometric login not supported - must verify with server
+        _showErrorSnackbar('Internet connection required for biometric login.');
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      // Try to sign in with saved credentials
+      try {
+        final userCredential = await _auth.signInWithEmailAndPassword(
+          email: email,
+          password: password,
+        );
+
+        final user = userCredential.user;
+        if (user != null) {
+          // Check if account is deleted
+          final doc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .get();
+
+          if (doc.exists && doc.data()?['isDeleted'] == true) {
+            await _auth.signOut();
+            _showErrorSnackbar("This account has been deleted.");
+            setState(() => _isLoading = false);
+            return;
+          }
+
+          await _ensureUserHasBarangayId(user.uid);
+
+          // Mark session as online‑authenticated
+          LocalDbService.instance.setOfflineAuthenticated(false);
+
+          if (mounted) {
+            // Show success message
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Row(
+                  children: [
+                    const Icon(Icons.check_circle_outline, color: Colors.white, size: 18),
+                    const SizedBox(width: 10),
+                    const Expanded(child: Text('Signed in with biometrics!')),
+                  ],
+                ),
+                backgroundColor: const Color(0xFF3A8C6E),
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                margin: const EdgeInsets.all(16),
+              ),
+            );
+
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const HomePage()),
+            );
+          }
+        }
+      } on FirebaseAuthException catch (e) {
+        String message = 'Biometric login failed. Please try again.';
+        if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
+          message = 'Saved credentials are invalid. Please log in with your password.';
+          // Clear corrupted credentials
+          await _biometricService.clearSavedCredentials();
+        } else if (e.code == 'user-not-found') {
+          message = 'Account not found.';
+          await _biometricService.clearSavedCredentials();
+        }
+        _showErrorSnackbar(message);
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      _showErrorSnackbar('Biometric login error: ${e.toString()}');
+      setState(() => _isLoading = false);
+    }
+  }
+
+  String _getBiometricErrorMessage(BiometricResult result) {
+    switch (result) {
+      case BiometricResult.notSupported:
+        return 'Biometric authentication is not supported on this device.';
+      case BiometricResult.notEnrolled:
+        return 'No biometrics enrolled. Please set up in device settings.';
+      case BiometricResult.lockedOut:
+        return 'Too many failed attempts. Try again later.';
+      case BiometricResult.error:
+        return 'An authentication error occurred. Please try again.';
+      default:
+        return '';
+    }
   }
 
   Future<void> _ensureUserHasBarangayId(String uid) async {
@@ -638,6 +813,54 @@ class _LoginPageState extends State<LoginPage>
                                     ),
                                   ),
                                 ),
+
+                                const SizedBox(height: 8),
+
+                                // Biometric login button (only show if available and enabled)
+                                if (_isBiometricAvailable && _isBiometricEnabled)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: SizedBox(
+                                      width: double.infinity,
+                                      height: 48,
+                                      child: OutlinedButton.icon(
+                                        onPressed: _isBiometricLoading ? null : _promptBiometricLogin,
+                                        style: OutlinedButton.styleFrom(
+                                          side: const BorderSide(
+                                            color: Color(0xFF2E8B7B),
+                                            width: 1.5,
+                                          ),
+                                          foregroundColor: const Color(0xFF2E8B7B),
+                                          disabledForegroundColor: Colors.grey.shade300,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(14),
+                                          ),
+                                        ),
+                                        icon: _isBiometricLoading
+                                            ? const SizedBox(
+                                                width: 20,
+                                                height: 20,
+                                                child: CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                                    Color(0xFF2E8B7B),
+                                                  ),
+                                                ),
+                                              )
+                                            : const Icon(Icons.fingerprint_rounded, size: 20),
+                                        label: Text(
+                                          _isBiometricLoading
+                                              ? 'Authenticating...'
+                                              : 'Sign in with Biometrics',
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w600,
+                                            letterSpacing: 0.3,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
 
                                 const SizedBox(height: 8),
 

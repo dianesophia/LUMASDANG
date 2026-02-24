@@ -7,7 +7,9 @@ import '../screens/calendar_events_page.dart';
 import '../screens/patient_list.dart';
 
 class NotificationsTab extends StatefulWidget {
-  const NotificationsTab({super.key});
+  final VoidCallback? onNavigateToPatients;
+
+  const NotificationsTab({super.key, this.onNavigateToPatients});
 
   @override
   State<NotificationsTab> createState() => _NotificationsTabState();
@@ -170,19 +172,11 @@ class _NotificationsTabState extends State<NotificationsTab> {
     }
   }
 
-  // Solid avatar color — no opacity, fully opaque
   Color _avatarColor(String sex) {
     final s = sex.toLowerCase();
     if (s == 'male' || s == 'm') return const Color(0xFF4A9B6F);
     if (s == 'female' || s == 'f') return const Color(0xFFE8924A);
     return const Color(0xFF6EB56D);
-  }
-
-  IconData _avatarIcon(String sex) {
-    final s = sex.toLowerCase();
-    if (s == 'male' || s == 'm') return Icons.person;
-    if (s == 'female' || s == 'f') return Icons.person;
-    return Icons.person;
   }
 
   // ── Delete single notification ─────────────────────────────────────────────
@@ -334,59 +328,7 @@ class _NotificationsTabState extends State<NotificationsTab> {
   }
 
   void _navigateToPatientList() {
-    Navigator.push(
-      context,
-      PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) => Scaffold(
-          body: Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color(0xFF2E8B7B),
-                  Color(0xFF5CAA7F),
-                  Color(0xFF8BC88A)
-                ],
-              ),
-            ),
-            child: SafeArea(
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(4, 8, 16, 4),
-                    child: Row(
-                      children: [
-                        IconButton(
-                          onPressed: () => Navigator.pop(context),
-                          icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                              color: Colors.white, size: 18),
-                        ),
-                        const Text(
-                          'Patient List',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Expanded(child: PatientListTab()),
-                ],
-              ),
-            ),
-          ),
-        ),
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          final tween = Tween(begin: const Offset(1.0, 0.0), end: Offset.zero)
-              .chain(CurveTween(curve: Curves.easeInOutCubic));
-          return SlideTransition(position: animation.drive(tween), child: child);
-        },
-        transitionDuration: const Duration(milliseconds: 350),
-      ),
-    );
+    widget.onNavigateToPatients?.call();
   }
 
   // ── Build ──────────────────────────────────────────────────────────────────
@@ -446,7 +388,6 @@ class _NotificationsTabState extends State<NotificationsTab> {
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Row(
         children: [
-          // Smaller, simpler notification icon container
           Stack(
             clipBehavior: Clip.none,
             children: [
@@ -456,7 +397,6 @@ class _NotificationsTabState extends State<NotificationsTab> {
                   color: Colors.white.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                // Smaller icon: 22 instead of 28
                 child: const Icon(Icons.notifications, color: Colors.white, size: 22),
               ),
               if (unread > 0)
@@ -482,8 +422,8 @@ class _NotificationsTabState extends State<NotificationsTab> {
             ],
           ),
           const SizedBox(width: 10),
-          Expanded(
-            child: const Text(
+          const Expanded(
+            child: Text(
               'Notifications',
               style: TextStyle(
                 fontSize: 19,
@@ -492,7 +432,6 @@ class _NotificationsTabState extends State<NotificationsTab> {
               ),
             ),
           ),
-          // Clear All button
           if (all.isNotEmpty) ...[
             GestureDetector(
               onTap: () => _clearAllNotifications(all),
@@ -681,7 +620,6 @@ class _NotificationsTabState extends State<NotificationsTab> {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
             child: Row(
               children: [
-                // Solid color avatar — smaller, no border ring
                 Container(
                   width: 42,
                   height: 42,
@@ -742,7 +680,6 @@ class _NotificationsTabState extends State<NotificationsTab> {
                         ),
                       ),
                       const SizedBox(height: 5),
-                      // Meta row — smaller icons
                       Row(
                         children: [
                           Icon(Icons.cake_outlined,
@@ -845,7 +782,6 @@ class _NotificationsTabState extends State<NotificationsTab> {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
             child: Row(
               children: [
-                // Solid color avatar — square rounded, no outline ring
                 Container(
                   width: 42,
                   height: 42,

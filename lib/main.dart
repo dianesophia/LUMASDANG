@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:lumasdang/loading.dart';
 import 'package:lumasdang/screens/authPages/login.dart';
+import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'services/local_db_service.dart';
 import 'services/connectivity_service.dart';
+import 'providers/theme_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,31 +17,40 @@ void main() async {
   await LocalDbService.instance.init();
   // Start a global auto-sync so that pending records are pushed when connection restores
   ConnectivityService.instance.startAutoSync();
-  runApp(const MyApp());
+  
+  // Initialize ThemeProvider
+  final themeProvider = ThemeProvider();
+  await themeProvider.init();
+  
+  runApp(MyApp(themeProvider: themeProvider));
 }
 
 
-
-
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final ThemeProvider themeProvider;
+
+  const MyApp({super.key, required this.themeProvider});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Lumasdang',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2E8B7B)),
-        useMaterial3: true,
+    return ChangeNotifierProvider<ThemeProvider>.value(
+      value: themeProvider,
+      child: Consumer<ThemeProvider>(
+        builder: (context, provider, child) {
+          return MaterialApp(
+            title: 'Lumasdang',
+            debugShowCheckedModeBanner: false,
+            theme: ThemeData(
+              fontFamily: provider.selectedFont,
+              colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2E8B7B)),
+              useMaterial3: true,
+            ),
+            home: const LoadingScreen(),
+          );
+        },
       ),
-     // home: const LoginPage(),
-     home: const LoadingScreen(),
     );
   }
-
-
-  
 }
 
 // ==================== SPLASH/LOADING SCREEN ====================

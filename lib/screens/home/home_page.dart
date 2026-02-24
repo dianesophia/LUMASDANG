@@ -794,8 +794,8 @@ class _HomePageState extends State<HomePage>
                     width: 1.2,
                   ),
                 ),
-                child: const Icon(Icons.local_hospital_outlined,
-                    color: Colors.white, size: 18),
+                    child: const Icon(Icons.eco_rounded,
+                      color: Colors.white, size: 18),
               ),
               const SizedBox(width: 12),
               const Text(
@@ -1065,9 +1065,13 @@ class _HomePageState extends State<HomePage>
     return PatientListTab(refreshTrigger: _patientListRefreshTrigger);
   }
 
-  Widget _buildNotificationsTab() {
+ /* Widget _buildNotificationsTab() {
     return const NotificationsTab();
-  }
-
-
+  }*/
+  
+  Widget _buildNotificationsTab() {
+  return NotificationsTab(
+    onNavigateToPatients: () => _tabController.animateTo(1),
+  );
+}
 }

@@ -601,7 +601,7 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
   Widget build(BuildContext context) {
     return Scaffold(
       // ── BOTTOM NAV BAR ────────────────────────────────────────────────────
-      bottomNavigationBar: AppBottomNavBar(controller: _tabController),
+      //bottomNavigationBar: AppBottomNavBar(controller: _tabController),
 
       body: Container(
         decoration: const BoxDecoration(
@@ -1364,7 +1364,7 @@ void _showAddAssessmentSheet() {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  Color(0xFF2E8B7B),
+                  Color.fromARGB(255, 255, 255, 255),
                   Color(0xFF5CAA7F),
                 ],
               ),

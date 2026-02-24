@@ -51,9 +51,8 @@ class MainAboutLumasdang extends StatelessWidget {
                                   width: 1.2,
                                 ),
                               ),
-                              child: const Icon(
-                                Icons.arrow_back_ios_new_rounded,
-                                color: Colors.white,
+                              child: const Icon(Icons.eco_rounded,
+                                 color: Colors.white,
                                 size: 18,
                               ),
                             ),
@@ -62,7 +61,7 @@ class MainAboutLumasdang extends StatelessWidget {
                         const Expanded(
                           child: Center(
                             child: Text(
-                              "About Lumasdang",
+                              "About Lµmasdαng",
                               style: TextStyle(
                                 fontSize: 22,
                                 fontWeight: FontWeight.w700,
