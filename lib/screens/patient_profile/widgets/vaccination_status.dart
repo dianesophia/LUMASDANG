@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../../../services/connectivity_service.dart';
 
 /// National Immunization Program vaccines (Philippines)
 class _Vaccine {
@@ -27,6 +28,8 @@ class VaccinationStatusSection extends StatefulWidget {
   final String? patientId;
   final String? barangayId;
   final bool useSharedStorage;
+  final Map<String, String>? localStatuses;
+  final DateTime? localLastReviewDate;
 
   const VaccinationStatusSection({
     super.key,
@@ -35,6 +38,8 @@ class VaccinationStatusSection extends StatefulWidget {
     this.patientId,
     this.barangayId,
     this.useSharedStorage = false,
+    this.localStatuses,
+    this.localLastReviewDate,
   });
 
   @override
@@ -75,34 +80,110 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
   String get _patientKey =>
       '${widget.firstName.trim().toLowerCase()}_${widget.lastName.trim().toLowerCase()}';
 
-  DocumentReference get _docRef {
-    if (widget.useSharedStorage && widget.patientId != null && widget.barangayId != null) {
-      return FirebaseFirestore.instance
-          .collection('barangays')
-          .doc(widget.barangayId)
-          .collection('patients')
-          .doc(widget.patientId)
-          .collection('vaccination')
-          .doc('record');
-    }
-    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
-    return FirebaseFirestore.instance.collection('users').doc(uid).collection('vaccinations').doc(_patientKey);
-  }
-
   @override
   void initState() {
     super.initState();
+    _init();
+  }
+
+  Future<void> _init() async {
+    // If we have local statuses and we're offline, prefer them and skip Firestore.
+    final online = await ConnectivityService.instance.checkOnline();
+    if (!online && widget.localStatuses != null && widget.localStatuses!.isNotEmpty) {
+      setState(() {
+        _statuses = Map<String, String>.from(widget.localStatuses!);
+        _lastReviewDate = widget.localLastReviewDate;
+        _loading = false;
+      });
+      return;
+    }
     _fetchVaccination();
+  }
+
+  @override
+  void didUpdateWidget(covariant VaccinationStatusSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // When assessments update and we get new local statuses while offline, apply them.
+    if (widget.localStatuses != null &&
+        widget.localStatuses!.isNotEmpty &&
+        widget.localStatuses != oldWidget.localStatuses) {
+      _applyLocalIfOffline();
+    }
+  }
+
+  Future<void> _applyLocalIfOffline() async {
+    final online = await ConnectivityService.instance.checkOnline();
+    if (!online && widget.localStatuses != null && widget.localStatuses!.isNotEmpty) {
+      setState(() {
+        _statuses = Map<String, String>.from(widget.localStatuses!);
+        _lastReviewDate = widget.localLastReviewDate ?? _lastReviewDate;
+        _loading = false;
+      });
+    }
   }
 
   Future<void> _fetchVaccination() async {
     try {
-      final snap = await _docRef.get();
+      // Avoid invalid document paths in offline / missing-id scenarios.
+      DocumentReference? ref;
+      if (widget.useSharedStorage) {
+        final pid = widget.patientId;
+        final bid = widget.barangayId;
+        if (pid == null || pid.isEmpty || bid == null || bid.isEmpty) {
+          setState(() {
+            _statuses = {for (final v in _vaccines) v.key: 'Pending'};
+            _loading = false;
+          });
+          return;
+        }
+        ref = FirebaseFirestore.instance
+            .collection('barangays')
+            .doc(bid)
+            .collection('patients')
+            .doc(pid)
+            .collection('vaccination')
+            .doc('record');
+      } else {
+        final uid = FirebaseAuth.instance.currentUser?.uid;
+        if (uid == null || uid.isEmpty) {
+          setState(() {
+            _statuses = {for (final v in _vaccines) v.key: 'Pending'};
+            _loading = false;
+          });
+          return;
+        }
+        ref = FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .collection('vaccinationStatus')
+            .doc(_patientKey);
+      }
+
+      final snap = await ref.get();
       if (snap.exists) {
-        final data = snap.data() as Map<String, dynamic>? ?? {};
+        final raw = snap.data();
+        final Map<String, dynamic> data =
+            raw is Map<String, dynamic> ? raw : Map<String, dynamic>.from(raw as Map);
+
+        // For shared records, vaccine fields are at the root.
+        // For per-user records, they live inside a "statuses" map.
+        Map<String, dynamic> source;
+        if (widget.useSharedStorage) {
+          source = data;
+        } else {
+          final rawStatuses = data['statuses'];
+          if (rawStatuses is Map<String, dynamic>) {
+            source = rawStatuses;
+          } else if (rawStatuses is Map) {
+            source = Map<String, dynamic>.from(rawStatuses);
+          } else {
+            source = <String, dynamic>{};
+          }
+        }
+
         final Map<String, String> loaded = {};
         for (final v in _vaccines) {
-          final value = data[v.key];
+          final value = source[v.key];
           if (value is bool) {
             loaded[v.key] = value ? v.possibleDoses.last : 'Pending';
           } else if (value is String) {
@@ -113,7 +194,9 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
             loaded[v.key] = 'Pending';
           }
         }
-        final ts = data['lastReviewDate'] as Timestamp?;
+        final Timestamp? ts = widget.useSharedStorage
+            ? data['lastReviewDate'] as Timestamp?
+            : data['updatedAt'] as Timestamp?;
         setState(() {
           _statuses           = loaded;
           _lastReviewDate     = ts?.toDate();
@@ -141,7 +224,36 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
         final userDoc = await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).get();
         userName = userDoc.data()?['fullName'] ?? userDoc.data()?['username'] ?? currentUser.email ?? 'Unknown';
       }
-      await _docRef.set({
+      // Build the same document reference logic as in _fetchVaccination
+      DocumentReference? ref;
+      if (widget.useSharedStorage) {
+        final pid = widget.patientId;
+        final bid = widget.barangayId;
+        if (pid == null || pid.isEmpty || bid == null || bid.isEmpty) {
+          // No valid shared document to write to.
+          return;
+        }
+        ref = FirebaseFirestore.instance
+            .collection('barangays')
+            .doc(bid)
+            .collection('patients')
+            .doc(pid)
+            .collection('vaccination')
+            .doc('record');
+      } else {
+        final uid = currentUser?.uid;
+        if (uid == null || uid.isEmpty) {
+          // Cannot save without a logged-in user.
+          return;
+        }
+        ref = FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .collection('vaccinationStatus')
+            .doc(_patientKey);
+      }
+
+      await ref.set({
         'firstName': widget.firstName,
         'lastName':  widget.lastName,
         'lastReviewDate':     Timestamp.fromDate(now),

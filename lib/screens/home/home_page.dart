@@ -365,7 +365,8 @@ class _HomePageState extends State<HomePage>
           'pcv': vaccineStatus('PCV'),
         };
 
-        await FirestoreService().saveVaccinationStatus(
+        final fs = FirestoreService();
+        await fs.saveVaccinationStatus(
           firstName: firstNameController.text.trim(),
           lastName: lastNameController.text.trim(),
           statuses: statuses,
@@ -376,6 +377,16 @@ class _HomePageState extends State<HomePage>
           try {
             final barangayId = await firestore.getCurrentUserBarangayId();
             if (barangayId != null && barangayId.isNotEmpty) {
+              // Save vaccination status into the barangay/shared patient record
+              await firestore.saveVaccinationStatusToBarangayPatient(
+                barangayId: barangayId,
+                patientId: barangayPatientId,
+                firstName: firstNameController.text.trim(),
+                lastName: lastNameController.text.trim(),
+                statuses: statuses,
+              );
+
+              // Create notification as before
               await firestore.createPatientNotification(
                 barangayId: barangayId,
                 patientId: barangayPatientId,
@@ -386,7 +397,7 @@ class _HomePageState extends State<HomePage>
             debugPrint('Notification error: $eBarangay');
             if (mounted) {
               _showSnackBar(
-                'Saved to server but could not create notification.',
+                'Saved to server but could not update shared vaccination or notification.',
                 color: Colors.orange,
               );
             }

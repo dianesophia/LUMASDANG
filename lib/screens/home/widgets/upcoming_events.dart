@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:lumasdang/screens/calendar_events_page.dart';
+import 'package:lumasdang/services/connectivity_service.dart';
 
 class UpcomingEvents extends StatefulWidget {
   const UpcomingEvents({super.key});
@@ -11,40 +10,7 @@ class UpcomingEvents extends StatefulWidget {
 }
 
 class _UpcomingEventsState extends State<UpcomingEvents> {
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-
-  Future<String?> _getBarangayId() async {
-    final user = _auth.currentUser;
-    if (user == null) return null;
-    final doc = await _db.collection('users').doc(user.uid).get();
-    return doc.data()?['barangayId'] as String?;
-  }
-
-  Stream<List<Map<String, dynamic>>> _upcomingEventsStream() async* {
-    final barangayId = await _getBarangayId();
-    if (barangayId == null) {
-      yield <Map<String, dynamic>>[];
-      return;
-    }
-
-    final now = DateTime.now();
-    final startOfToday = DateTime(now.year, now.month, now.day);
-
-    yield* _db
-        .collection('barangays')
-        .doc(barangayId)
-        .collection('calendarEvents')
-        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfToday))
-        .orderBy('date', descending: false)
-        .limit(3)
-        .snapshots()
-        .map((snap) => snap.docs.map((d) {
-              final data = d.data();
-              data['id'] = d.id;
-              return data;
-            }).toList());
-  }
+  final CalendarService _calendarService = CalendarService();
 
   void _navigateToCalendar(BuildContext context) {
     Navigator.push(
@@ -63,9 +29,7 @@ class _UpcomingEventsState extends State<UpcomingEvents> {
     );
   }
 
-  String _formatDate(dynamic timestamp) {
-    if (timestamp == null) return '';
-    final date = (timestamp as Timestamp).toDate();
+  String _formatDate(DateTime date) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final tomorrow = today.add(const Duration(days: 1));
@@ -208,11 +172,10 @@ class _UpcomingEventsState extends State<UpcomingEvents> {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    StreamBuilder<List<Map<String, dynamic>>>(
-                      stream: _upcomingEventsStream(),
+                    StreamBuilder<List<CalEvent>>(
+                      stream: _calendarService.eventsStream(),
                       builder: (context, snapshot) {
-                        if (snapshot.connectionState ==
-                            ConnectionState.waiting) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
                           return const SizedBox(
                             height: 40,
                             child: Center(
@@ -228,7 +191,15 @@ class _UpcomingEventsState extends State<UpcomingEvents> {
                           );
                         }
 
-                        final events = snapshot.data ?? [];
+                        final allEvents = snapshot.data ?? <CalEvent>[];
+                        final now = DateTime.now();
+                        final startOfToday = DateTime(now.year, now.month, now.day);
+                        final upcoming = allEvents
+                            .where((e) =>
+                                !e.date.isBefore(startOfToday)) // today or future
+                            .toList()
+                          ..sort((a, b) => a.date.compareTo(b.date));
+                        final events = upcoming.take(3).toList();
 
                         if (events.isEmpty) {
                           return const Text(
@@ -244,11 +215,13 @@ class _UpcomingEventsState extends State<UpcomingEvents> {
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: events
-                              .map((e) => _eventItem(
-                                    e['title'] ?? 'Untitled',
-                                    _formatDate(e['date']),
-                                    Color(e['colorValue'] ?? 0xFFF5A962),
-                                  ))
+                              .map(
+                                (e) => _eventItem(
+                                  e.title.isNotEmpty ? e.title : 'Untitled',
+                                  _formatDate(e.date),
+                                  e.color,
+                                ),
+                              )
                               .toList(),
                         );
                       },

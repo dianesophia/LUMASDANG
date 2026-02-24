@@ -5,6 +5,7 @@ import 'package:lumasdang/screens/home/home_page.dart';
 import 'register.dart';
 import 'dart:async';
 import '../../services/connectivity_service.dart';
+import '../../services/local_db_service.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:math' as math;
 
@@ -115,7 +116,8 @@ class _LoginPageState extends State<LoginPage>
       // Check cached password for this email
       final cachedPassword = await _secureStorage.read(key: 'cached_password_for_email:${emailToUse.toLowerCase()}');
       if (cachedPassword != null && cachedPassword == password) {
-        // Allow offline access — navigate to HomePage without attempting Firebase sign-in.
+        // Allow offline access — mark session as offline‑authenticated and navigate to HomePage
+        LocalDbService.instance.setOfflineAuthenticated(true);
         if (mounted) {
           Navigator.pushReplacement(
             context,
@@ -182,6 +184,9 @@ class _LoginPageState extends State<LoginPage>
         } catch (e) {
           // ignore storage errors
         }
+
+        // Mark session as online‑authenticated (not offline cached mode)
+        LocalDbService.instance.setOfflineAuthenticated(false);
 
         if (mounted) {
           Navigator.pushReplacement(
