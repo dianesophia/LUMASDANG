@@ -34,13 +34,83 @@ class _StatsRowState extends State<StatsRow> {
     await LocalDbService.instance.init();
     final online = await ConnectivityService.instance.checkOnline();
     if (online) return FirestoreService().getStatusCounts();
-    return {
+
+    // Offline: compute rough status counts from locally cached homepageData
+    final records =
+        await LocalDbService.instance.getAllRecords(includeDeleted: false);
+    final counts = <String, int>{
       'Underweight': 0,
       'Overweight/Obese': 0,
       'Stunted': 0,
       'At Risk': 0,
       'Normal': 0,
     };
+
+    for (final record in records) {
+      final data = record['data'] as Map<String, dynamic>?;
+      if (data == null) continue;
+      final anthropometric =
+          data['anthropometric'] as Map<String, dynamic>? ?? {};
+
+      final wfa =
+          (anthropometric['weightForAge'] as String? ?? '').toLowerCase();
+      final hfa =
+          (anthropometric['heightForAge'] as String? ?? '').toLowerCase();
+      final wfh =
+          (anthropometric['weightForHeight'] as String? ?? '').toLowerCase();
+      final bmi = (anthropometric['bmi'] as String? ?? '').toLowerCase();
+
+      // Underweight (includes severely underweight)
+      if (wfa.contains('underweight') || bmi.contains('underweight')) {
+        counts['Underweight'] = counts['Underweight']! + 1;
+      }
+
+      // Overweight / Obese (includes "at risk of overweight")
+      if (wfa.contains('overweight') ||
+          wfa.contains('obese') ||
+          wfh.contains('overweight') ||
+          wfh.contains('obese') ||
+          bmi.contains('overweight') ||
+          bmi.contains('obese')) {
+        counts['Overweight/Obese'] = counts['Overweight/Obese']! + 1;
+      }
+
+      // Stunted (includes severely stunted)
+      if (hfa.contains('stunted')) {
+        counts['Stunted'] = counts['Stunted']! + 1;
+      }
+
+      // At Risk (wasted / severe wasting / at risk of overweight)
+      if (wfh.contains('wasted') ||
+          wfa.contains('at risk') ||
+          bmi.contains('at risk') ||
+          wfh.contains('at risk')) {
+        counts['At Risk'] = counts['At Risk']! + 1;
+      }
+
+      // If none of the above tags matched but we have any anthropometric data,
+      // consider the child "Normal" for offline summary purposes.
+      final hasAny =
+          wfa.isNotEmpty || hfa.isNotEmpty || wfh.isNotEmpty || bmi.isNotEmpty;
+      if (hasAny &&
+          !wfa.contains('underweight') &&
+          !bmi.contains('underweight') &&
+          !wfa.contains('overweight') &&
+          !wfa.contains('obese') &&
+          !wfh.contains('overweight') &&
+          !wfh.contains('obese') &&
+          !bmi.contains('overweight') &&
+          !bmi.contains('obese') &&
+          !hfa.contains('stunted') &&
+          !wfh.contains('wasted') &&
+          !wfa.contains('at risk') &&
+          !bmi.contains('at risk') &&
+          !wfh.contains('at risk')) {
+        counts['Normal'] = counts['Normal']! + 1;
+      }
+    }
+
+    return counts;
   }
 
   String _formatDate(DateTime d) {

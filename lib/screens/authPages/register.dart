@@ -3,6 +3,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:lumasdang/screens/home/home_page.dart';
+import '../../services/connectivity_service.dart';
+import '../../services/local_db_service.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -24,6 +27,7 @@ class _RegisterPageState extends State<RegisterPage> with TickerProviderStateMix
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
 
   bool _isLoading = false;
   bool _checkingUsername = false;
@@ -212,6 +216,14 @@ class _RegisterPageState extends State<RegisterPage> with TickerProviderStateMix
 
     setState(() => _isLoading = true);
 
+    // Registration requires an internet connection (Firebase account + Firestore docs).
+    final online = await ConnectivityService.instance.checkOnline();
+    if (!online) {
+      _showSnack('Internet connection is required to create a new account. You can log in offline only after a successful online sign-in.');
+      setState(() => _isLoading = false);
+      return;
+    }
+
     try {
       final credential = await _auth.createUserWithEmailAndPassword(
         email: email,
@@ -269,6 +281,21 @@ class _RegisterPageState extends State<RegisterPage> with TickerProviderStateMix
         );
 
         await batch.commit();
+
+        // Cache credentials so this account can log in offline later.
+        try {
+          final emailLower = email.toLowerCase();
+          await _secureStorage.write(
+              key: 'cached_password_for_email:$emailLower', value: password);
+          await _secureStorage.write(
+              key: 'cached_email_for_username:${username.toLowerCase()}',
+              value: email);
+        } catch (_) {
+          // ignore storage errors
+        }
+
+        // Mark session as online‑authenticated
+        LocalDbService.instance.setOfflineAuthenticated(false);
 
         if (mounted) {
           Navigator.pushReplacement(
