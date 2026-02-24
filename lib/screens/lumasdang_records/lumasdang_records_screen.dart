@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:path/path.dart' as p;
+import 'package:downloadsfolder/downloadsfolder.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../services/lumasdang_records_service.dart';
@@ -13,19 +15,56 @@ class LumasdangRecordsScreen extends StatefulWidget {
 class _LumasdangRecordsScreenState extends State<LumasdangRecordsScreen> {
   bool _isGenerating = false;
 
-  Future<void> _generateAndShare() async {
+  Future<void> _downloadExcel() async {
     if (_isGenerating) return;
     setState(() => _isGenerating = true);
 
     try {
       final path = await LumasdangRecordsService.generateExcelFile();
-      await Share.shareXFiles(
-        [XFile(path)],
-        text: 'Lumasdang records (child list with assessments)',
-      );
+      final fileName = p.basename(path);
+      // Save to the device's visible Downloads folder (uses MediaStore on Android)
+      final saved = await copyFileIntoDownloadFolder(path, fileName);
+      if (saved == true && mounted) {
+        // Open the Downloads folder so the user sees the file
+        await openDownloadFolder();
+        if (mounted) {
+          ScaffoldMessenger.of(this.context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Saved: $fileName\nDownloads folder opened so you can see the file.',
+                style: const TextStyle(fontSize: 13),
+              ),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 4),
+              action: SnackBarAction(
+                label: 'OK',
+                textColor: Colors.white,
+                onPressed: () {},
+              ),
+            ),
+          );
+        }
+      } else {
+        // Fallback: share so user can save to Files/Downloads manually
+        await Share.shareXFiles(
+          [XFile(path, name: fileName)],
+          text: 'Lumasdang records (child list with assessments). Choose "Save to Files" or "Downloads" to save.',
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(this.context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Choose "Save to Files" or "Downloads" to save the file to your device.',
+                style: TextStyle(fontSize: 13),
+              ),
+              backgroundColor: Color(0xFF2E8B7B),
+            ),
+          );
+        }
+      }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(this.context).showSnackBar(
           SnackBar(
             content: Text('Failed to generate Lumasdang records file: $e'),
             backgroundColor: Colors.red,
@@ -83,7 +122,7 @@ class _LumasdangRecordsScreenState extends State<LumasdangRecordsScreen> {
         children: [
           IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.of(this.context).pop(),
           ),
           const SizedBox(width: 8),
           const Expanded(
@@ -156,7 +195,7 @@ class _LumasdangRecordsScreenState extends State<LumasdangRecordsScreen> {
       child: SizedBox(
         width: double.infinity,
         child: ElevatedButton.icon(
-          onPressed: _isGenerating ? null : _generateAndShare,
+          onPressed: _isGenerating ? null : _downloadExcel,
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.white,
             foregroundColor: const Color(0xFF2E8B7B),
@@ -171,7 +210,7 @@ class _LumasdangRecordsScreenState extends State<LumasdangRecordsScreen> {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : const Icon(Icons.table_chart_outlined, size: 22),
-          label: Text(_isGenerating ? 'Generating…' : 'Generate & Share Excel'),
+          label: Text(_isGenerating ? 'Downloading…' : 'Download Excel'),
         ),
       ),
     );

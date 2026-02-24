@@ -52,6 +52,9 @@ class _HomePageState extends State<HomePage>
   final TextEditingController heightForAgeController = TextEditingController();
   final TextEditingController bmiController = TextEditingController();
 
+  // ── Basic info (IP group) ──────────────────────────────────────────────────
+  bool? _belongsToIpGroup;
+
   // ── Health status ──────────────────────────────────────────────────────────
   bool _diarrhea = false;
   bool _fever = false;
@@ -217,6 +220,7 @@ class _HomePageState extends State<HomePage>
         'address': addressController.text.trim(),
         'placeOfBirth': placeOfBirthController.text.trim(),
         'dateOfBirth': dobController.text.trim(),
+        'belongsToIpGroup': _belongsToIpGroup,
         'mother': motherController.text.trim(),
         'motherContact': motherContactController.text.trim(),
         'father': fatherController.text.trim(),
@@ -422,6 +426,7 @@ class _HomePageState extends State<HomePage>
         _medications = false;
         _purelyBreastfed = null;
         _purelyBreastfedError = null;
+        _belongsToIpGroup = null;
         _oralData = null;
         _oralRiskError = null;
         _vaccinationData = null;
@@ -496,6 +501,7 @@ class _HomePageState extends State<HomePage>
         'address': addressController.text.trim(),
         'placeOfBirth': placeOfBirthController.text.trim(),
         'dateOfBirth': dobController.text.trim(),
+        'belongsToIpGroup': _belongsToIpGroup,
         'mother': motherController.text.trim(),
         'motherContact': motherContactController.text.trim(),
         'father': fatherController.text.trim(),
@@ -704,6 +710,7 @@ class _HomePageState extends State<HomePage>
         _medications = false;
         _purelyBreastfed = null;
         _purelyBreastfedError = null;
+        _belongsToIpGroup = null;
         _oralData = null;
         _oralRiskError = null;
         _vaccinationData = null;
@@ -921,6 +928,9 @@ class _HomePageState extends State<HomePage>
               motherContactController: motherContactController,
               fatherController: fatherController,
               fatherContactController: fatherContactController,
+              belongsToIpGroup: _belongsToIpGroup,
+              onBelongsToIpGroupChanged: (v) =>
+                  setState(() => _belongsToIpGroup = v),
             ),
             const SizedBox(height: 16),
             AnthropometricDataForm(

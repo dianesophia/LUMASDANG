@@ -13,6 +13,8 @@ class DemographicDataForm extends StatefulWidget {
   final TextEditingController motherContactController;
   final TextEditingController fatherController;
   final TextEditingController fatherContactController;
+  final bool? belongsToIpGroup;
+  final ValueChanged<bool?>? onBelongsToIpGroupChanged;
 
   const DemographicDataForm({
     super.key,
@@ -27,6 +29,8 @@ class DemographicDataForm extends StatefulWidget {
     required this.motherContactController,
     required this.fatherController,
     required this.fatherContactController,
+    this.belongsToIpGroup,
+    this.onBelongsToIpGroupChanged,
   });
 
   @override
@@ -34,6 +38,22 @@ class DemographicDataForm extends StatefulWidget {
 }
 
 class _DemographicDataFormState extends State<DemographicDataForm> {
+  bool? _belongsToIpGroup;
+
+  @override
+  void initState() {
+    super.initState();
+    _belongsToIpGroup = widget.belongsToIpGroup;
+  }
+
+  @override
+  void didUpdateWidget(DemographicDataForm oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.belongsToIpGroup != widget.belongsToIpGroup) {
+      _belongsToIpGroup = widget.belongsToIpGroup;
+    }
+  }
+
   // ── Phone number validation ─────────────────────────────────────────────
   // Accepts: 09XXXXXXXXX  (11 digits) OR +639XXXXXXXXX (13 chars)
   static final _phoneRegex = RegExp(r'^(09\d{9}|\+639\d{9})$');
@@ -91,6 +111,47 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
       final months = (now.year - picked.year) * 12 + (now.month - picked.month);
       widget.ageController.text = months.clamp(0, 60).toString();
     }
+  }
+
+  Widget _buildTogglePill(String label, bool selected, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected
+              ? const Color(0xFFF5A962)
+              : const Color(0xFFFAFAFA),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: selected
+                ? const Color(0xFFF5A962)
+                : const Color(0xFFEEEEEE),
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              selected ? Icons.check_circle : Icons.circle_outlined,
+              size: 15,
+              color: selected ? Colors.white : Colors.black38,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: selected ? Colors.white : const Color(0xFF1A1A1A),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   // ── Shared field builder ────────────────────────────────────────────────
@@ -330,6 +391,33 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                   }
                   return null;
                 },
+              ),
+
+              const SizedBox(height: 12),
+
+              // Belongs to IP group (Yes/No)
+              const Text(
+                'BELONGS TO IP GROUP?',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFFF5A962),
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  _buildTogglePill('Yes', _belongsToIpGroup == true, () {
+                    setState(() => _belongsToIpGroup = true);
+                    widget.onBelongsToIpGroupChanged?.call(true);
+                  }),
+                  const SizedBox(width: 10),
+                  _buildTogglePill('No', _belongsToIpGroup == false, () {
+                    setState(() => _belongsToIpGroup = false);
+                    widget.onBelongsToIpGroupChanged?.call(false);
+                  }),
+                ],
               ),
             ],
           ),

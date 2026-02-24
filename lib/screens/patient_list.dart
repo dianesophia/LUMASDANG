@@ -484,89 +484,97 @@ class _PatientListTabState extends State<PatientListTab> {
 
   // ── TOP ROW ────────────────────────────────────────────────────────────────
   Widget _buildTopRow() {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      alignment: WrapAlignment.spaceBetween,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Lumasdang Records button
-        ElevatedButton.icon(
-          onPressed: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const LumasdangRecordsScreen()),
-          ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.white,
-            foregroundColor: const Color(0xFF2E8B7B),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            elevation: 2,
-          ),
-          icon: const Icon(Icons.list_alt_rounded, size: 16),
-          label: const Text(
-            'Lumasdang Records',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-          ),
-        ),
-        // Archived (5+ yrs) button
-        ElevatedButton.icon(
-          onPressed: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const ArchivedPatientsScreen()),
-          ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.white,
-            foregroundColor: const Color(0xFF2E8B7B),
-            padding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12)),
-            elevation: 2,
-          ),
-          icon: const Icon(Icons.archive_outlined, size: 16),
-          label: const Text(
-            'Archived (5+ yrs)',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-          ),
-        ),
-        // Total count chip
-        const Spacer(),
-        // ── Select All button (only in selection mode) ──────────────────────
-        if (_selectionMode) ...[
-          GestureDetector(
-            onTap: _toggleSelectAll,
-            child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                    color: Colors.white.withOpacity(0.3), width: 1),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Lumasdang Records button
+              ElevatedButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const LumasdangRecordsScreen()),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: const Color(0xFF2E8B7B),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 2,
+                ),
+                icon: const Icon(Icons.list_alt_rounded, size: 16),
+                label: const Text(
+                  'Lumasdang Records',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                ),
               ),
-              child: Row(
-                children: [
-                  Icon(
-                    _filteredPatients.every(
-                            (p) => _selectedDocIds.contains(p.docId))
-                        ? Icons.check_box_rounded
-                        : Icons.check_box_outline_blank_rounded,
-                    color: Colors.white,
-                    size: 14,
-                  ),
-                  const SizedBox(width: 6),
-                  const Text(
-                    'Select All',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
+              const SizedBox(width: 8),
+              // Archived (5+ yrs) button
+              ElevatedButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ArchivedPatientsScreen()),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: const Color(0xFF2E8B7B),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  elevation: 2,
+                ),
+                icon: const Icon(Icons.archive_outlined, size: 16),
+                label: const Text(
+                  'Archived (5+ yrs)',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                ),
+              ),
+              if (_selectionMode) ...[
+                const SizedBox(width: 16),
+                GestureDetector(
+                  onTap: _toggleSelectAll,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                          color: Colors.white.withOpacity(0.3), width: 1),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _filteredPatients.every(
+                                  (p) => _selectedDocIds.contains(p.docId))
+                              ? Icons.check_box_rounded
+                              : Icons.check_box_outline_blank_rounded,
+                          color: Colors.white,
+                          size: 14,
+                        ),
+                        const SizedBox(width: 6),
+                        const Text(
+                          'Select All',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
-            ),
+                ),
+              ],
+            ],
           ),
-          const SizedBox(width: 8),
-        ],
+        ),
+        const SizedBox(height: 8),
+        // Patient count under the buttons
         Container(
           padding:
               const EdgeInsets.symmetric(horizontal: 12, vertical: 7),

@@ -88,6 +88,21 @@ class LumasdangRecordsService {
     return null;
   }
 
+  /// Merge anthropometric from assessment (preferred) with patient doc (initial form data). Assessment wins when present.
+  static Map<String, dynamic> _mergeAnthropometric(
+    Map<String, dynamic> fromAssessment,
+    Map<String, dynamic> fromPatient,
+  ) {
+    final merged = Map<String, dynamic>.from(fromPatient);
+    for (final e in fromAssessment.entries) {
+      final v = e.value;
+      if (v != null && v.toString().trim().isNotEmpty) {
+        merged[e.key] = v;
+      }
+    }
+    return merged;
+  }
+
   /// Generate filled Excel file and return its path.
   /// Deduplicates by child identity (lastName + firstName + dateOfBirth) and
   /// uses the patient record with the most recent assessment for each unique child.
@@ -150,9 +165,12 @@ class LumasdangRecordsService {
       final doc = uniqueRows[i].patient;
       final latestAssessment = uniqueRows[i].assessment;
       final demographic = (doc['demographic'] ?? {}) as Map<String, dynamic>;
-      final anthropometric = latestAssessment != null
+      // Use assessment anthropometric when present; else fall back to initial form data on patient doc (from home page save)
+      final assessmentAnthro = latestAssessment != null
           ? (latestAssessment['anthropometric'] ?? {}) as Map<String, dynamic>
           : <String, dynamic>{};
+      final patientAnthro = (doc['anthropometric'] ?? {}) as Map<String, dynamic>;
+      final anthropometric = _mergeAnthropometric(assessmentAnthro, patientAnthro);
 
       final lastName = (demographic['lastName'] ?? '').toString().trim();
       final firstName = (demographic['firstName'] ?? '').toString().trim();
@@ -166,22 +184,21 @@ class LumasdangRecordsService {
       final dobStr = (demographic['dateOfBirth'] ?? '').toString().trim();
       final dob = _parseDate(dobStr);
 
+      // Date measured: from merged anthropometric (assessment or initial form on patient), then assessment createdAt
       String dateMeasuredStr = '';
       DateTime? measurementDate;
-      if (latestAssessment != null) {
-        final dateOfMeas = anthropometric['dateOfMeasurement']?.toString();
-        if (dateOfMeas != null && dateOfMeas.trim().isNotEmpty) {
-          dateMeasuredStr = dateOfMeas.trim();
-          measurementDate = _parseDate(dateMeasuredStr);
-        }
-        if (measurementDate == null) {
-          final createdAt = latestAssessment['createdAt'];
-          if (createdAt != null) {
-            try {
-              measurementDate = (createdAt as dynamic).toDate();
-              dateMeasuredStr = _formatDate(measurementDate);
-            } catch (_) {}
-          }
+      final dateOfMeas = anthropometric['dateOfMeasurement']?.toString();
+      if (dateOfMeas != null && dateOfMeas.trim().isNotEmpty) {
+        dateMeasuredStr = dateOfMeas.trim();
+        measurementDate = _parseDate(dateMeasuredStr);
+      }
+      if (measurementDate == null && latestAssessment != null) {
+        final createdAt = latestAssessment['createdAt'];
+        if (createdAt != null) {
+          try {
+            measurementDate = (createdAt as dynamic).toDate();
+            dateMeasuredStr = _formatDate(measurementDate);
+          } catch (_) {}
         }
       }
 
@@ -223,11 +240,31 @@ class LumasdangRecordsService {
 
       final ageMonths = _ageInMonths(dob, measurementDate);
 
+      // IP group: from assessment (demographic.belongsToIpGroup or top-level) or patient demographic
+      final ipFromAssessment = latestAssessment != null
+          ? (latestAssessment['demographic'] is Map
+              ? (latestAssessment['demographic'] as Map<String, dynamic>)['belongsToIpGroup']
+              : latestAssessment['belongsToIpGroup'])
+          : null;
+      final ipFromPatient = (demographic['belongsToIpGroup']);
+      final ipValue = ipFromAssessment ?? ipFromPatient;
+      final String ipGroupStr;
+      if (ipValue == true) {
+        ipGroupStr = 'YES';
+      } else if (ipValue == false) {
+        ipGroupStr = 'NO';
+      } else if (ipValue is String) {
+        final v = (ipValue as String).trim().toUpperCase();
+        ipGroupStr = (v == 'YES' || v == 'Y') ? 'YES' : (v == 'NO' || v == 'N') ? 'NO' : (ipValue as String).trim();
+      } else {
+        ipGroupStr = '';
+      }
+
       updates['A$row'] = i + 1;
       updates['B$row'] = address;
       updates['C$row'] = mother;
       updates['D$row'] = childName;
-      updates['E$row'] = ''; // IP group – not in app
+      updates['E$row'] = ipGroupStr; // Belongs to IP group? (YES/NO) – from row 4
       updates['F$row'] = sex;
       updates['G$row'] = dobStr.isEmpty ? _formatDate(dob) : dobStr;
       updates['H$row'] = dateMeasuredStr;
@@ -255,12 +292,20 @@ class LumasdangRecordsService {
 
     final patched = _patchXlsxCellValues(bytes, updates);
     final dir = await getTemporaryDirectory();
-    final outPath = p.join(
-      dir.path,
-      'lumasdang_records_${DateTime.now().millisecondsSinceEpoch}.xlsx',
-    );
+    final safeName = _sanitizeFileName(barangayName.trim());
+    final fileName = safeName.isEmpty
+        ? 'lumasdang_records_${DateTime.now().millisecondsSinceEpoch}.xlsx'
+        : 'lumasdang_records_$safeName.xlsx';
+    final outPath = p.join(dir.path, fileName);
     await File(outPath).writeAsBytes(patched);
     return outPath;
+  }
+
+  /// Sanitize barangay name for use in filename: spaces -> underscore, remove invalid chars.
+  static String _sanitizeFileName(String name) {
+    if (name.isEmpty) return '';
+    final noSpaces = name.replaceAll(RegExp(r'\s+'), '_');
+    return noSpaces.replaceAll(RegExp(r'[^\w\-]'), '');
   }
 
   /// Patches the template xlsx by updating only cell values. Supports int, num, and String.
