@@ -12,7 +12,6 @@ In many healthcare settings, especially in rural or underserved areas, healthcar
 - ✅ Automatically calculate health metrics based on patient measurements
 - ✅ Securely store patient data locally on the phone
 - ✅ Sync data to the cloud when internet becomes available
-- ✅ Quickly log in using fingerprint authentication
 
 Lumasdang solves all of these problems in one easy-to-use app.
 
@@ -22,7 +21,6 @@ Lumasdang solves all of these problems in one easy-to-use app.
 
 ### 1. **User Authentication**
 - **Email/Password Login**: Traditional login system with account creation
-- **Fingerprint Login**: Quick and secure login using your phone's fingerprint or face recognition
 - **Offline Login**: Can sign in even without internet using cached credentials
 - **Secure Password Storage**: Passwords are encrypted and never stored in plain text
 
@@ -67,7 +65,6 @@ Lumasdang solves all of these problems in one easy-to-use app.
 - **Real-Time Updates**: See changes made by other team members
 
 ### 7. **Security Features**
-- **Biometric Authentication**: Use fingerprint or face recognition to log in
 - **Encrypted Storage**: All sensitive data is encrypted on the phone
 - **Secure Cloud Connection**: Data travels securely to cloud servers
 - **Password Protection**: Strong password requirements for accounts
@@ -144,13 +141,7 @@ Lumasdang solves all of these problems in one easy-to-use app.
 3. If correct, user is logged in and sees home screen
 4. App saves login session for next time
 
-**Option B - Using Fingerprint:**
-1. User taps "Login with Fingerprint" button
-2. Phone prompts for fingerprint scan
-3. If fingerprint matches stored data, user logs in instantly
-4. Fast and secure!
-
-**Option C - Offline Login:**
+**Option B - Offline Login:**
 1. If internet is down, user can still log in
 2. App uses saved credentials from last time
 3. Works seamlessly without internet
@@ -255,12 +246,6 @@ Users can:
 - Only authorized users can access their data
 - Passwords are required to access detailed records
 
-### **Biometric Security:**
-- Fingerprint/Face data **never leaves your phone**
-- It's compared locally on the phone
-- Even if someone gets the app, they can't use biometric login without YOUR fingerprint
-- If biometric fails, user must enter password instead
-
 ### **Data Privacy:**
 - App only collects essential patient health information
 - No tracking of user behavior
@@ -348,10 +333,6 @@ flutter build ios  # iPhone
 - Edit `ios/Runner/Info.plist`
 - Add Face ID permission (if supporting face unlock)
 
-### **Step 7: Enable Fingerprint on Phone**
-- Go to phone Settings
-- Add a fingerprint or face recognition
-- App will now offer biometric login
 
 ---
 
@@ -446,12 +427,6 @@ State management keeps track of:
 - Patient data being viewed
 - UI updates when data changes
 
-### **What is Biometric Authentication?**
-Biometric means:
-- Using fingerprint to verify identity
-- Using face recognition instead of password
-- Secure and fast login method
-- Replaces need to type password
 
 ### **What is WHO Growth Standards?**
 WHO (World Health Organization) standards:
@@ -470,7 +445,6 @@ WHO (World Health Organization) standards:
 | Add new patient | ✅ Yes | ❌ No | ✅ Yes |
 | Record assessment | ✅ Yes | ❌ No | ✅ Yes |
 | Login with password | ❌ No | ✅ Yes | N/A |
-| Login with fingerprint | ✅ Yes | ❌ No | N/A |
 | View cloud data | ❌ No | ✅ Yes | ✅ Yes |
 | Export to Excel | ✅ Yes | ❌ No | N/A |
 | Calculate WHO stats | ✅ Yes | ❌ No | N/A |
@@ -486,11 +460,6 @@ WHO (World Health Organization) standards:
 - Grant permissions for: Camera, Photos, Location (if needed)
 - Restart app
 
-### **Biometric Login Not Working**
-**Solution:**
-- Check phone has fingerprint/face recognition set up
-- Go to Settings → Biometrics and add fingerprint/face
-- Try logging in again
 
 ### **Data Not Syncing**
 **Solution:**
