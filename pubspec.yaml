@@ -1,5 +1,10 @@
 name: lumasdang
-description: "A new Flutter project."
+description: "Lumasdang is a mobile app that helps healthcare workers, nurses, and nutritionists track and monitor patients’ nutritional health, even in areas with unreliable internet."
+authors:
+  - "Fuentes, Diane Sophia G.  <dianesophiafuentes10@gmail.com>"
+  - "Languido, Paulo <languidopaulo@gmail.com>"
+
+
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev

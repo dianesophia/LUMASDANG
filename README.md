@@ -566,6 +566,13 @@ Special thanks to healthcare workers who tested and provided feedback!
 
 ---
 
+## Developers
+
+- Diane Sophia Fuentes
+- Paulo Languido
+
+---
+
 **Version**: 1.0.0  
 **Last Updated**: February 2026  
 **Supported Platforms**: Android 5.0+, iOS 11.0+
