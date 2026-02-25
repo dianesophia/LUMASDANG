@@ -655,6 +655,13 @@ class _PatientListTabState extends State<PatientListTab> {
             int.tryParse(demographic['age']?.toString() ?? '0') ??
             0;
 
+        // If auto-archive is enabled, do not surface 5+ year olds (60+ months)
+        // from homepageData into the active patient list. They should appear
+        // only in the Archived (5+ yrs) screen.
+        if (autoArchiveEnabled && ageMonths >= 60) {
+          continue;
+        }
+
         extraPatients.add(
           Patient(
             firstName: firstName,
@@ -711,7 +718,15 @@ class _PatientListTabState extends State<PatientListTab> {
     }).toList();
 
     filtered.sort((a, b) {
-      final cmp = a.lastName.compareTo(b.lastName);
+      // Case-insensitive A–Z by last name, then first name
+      final lastA = a.lastName.toLowerCase().trim();
+      final lastB = b.lastName.toLowerCase().trim();
+      var cmp = lastA.compareTo(lastB);
+      if (cmp == 0) {
+        final firstA = a.firstName.toLowerCase().trim();
+        final firstB = b.firstName.toLowerCase().trim();
+        cmp = firstA.compareTo(firstB);
+      }
       return _sortAscending ? cmp : -cmp;
     });
     return filtered;
