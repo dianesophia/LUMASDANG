@@ -122,6 +122,8 @@ class LumasdangRecordsService {
       final doc = p as Map<String, dynamic>;
       final id = doc['id'] as String?;
       if (id == null) continue;
+      // Skip archived children so the Excel matches the active Patients list.
+      if (doc['isArchived'] == true) continue;
       final k = _patientKey(doc);
       groups.putIfAbsent(k, () => []).add(doc);
     }

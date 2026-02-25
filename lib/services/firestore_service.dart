@@ -1487,6 +1487,19 @@ Future<Map<String, int>> getTodayStatusCounts() async {
     return double.tryParse(match.group(0)!);
   }
 
+  // Extract BMI z-score from strings like "18.2 | 0.10 (Normal)".
+  double? _extractBmiZScore(String? raw) {
+    if (raw == null || raw.isEmpty) return null;
+    final trimmed = raw.trim();
+    if (!trimmed.contains('|')) return null;
+    final parts = trimmed.split('|');
+    if (parts.length < 2) return null;
+    final afterPipe = parts[1].trim();
+    final match = RegExp(r'-?\d+(\.\d+)?').firstMatch(afterPipe);
+    if (match == null) return null;
+    return double.tryParse(match.group(0)!);
+  }
+
   /// Overall status counts for ALL non-deleted patients in the user's barangay.
   /// Uses WHO SD thresholds — same logic as _buildAssessmentRemarks.
  /* Future<Map<String, int>> getStatusCounts() async {
@@ -1592,85 +1605,174 @@ Future<Map<String, int>> getTodayStatusCounts() async {
     }
   }*/
   Future<Map<String, int>> getStatusCounts() async {
-  final user = _auth.currentUser;
-  if (user == null) return {};
+    final user = _auth.currentUser;
+    if (user == null) return {};
 
-  try {
-    final userDoc = await _firestore.collection('users').doc(user.uid).get();
-    final barangayId = userDoc.data()?['barangayId'] as String?;
-    if (barangayId == null || barangayId.isEmpty) return {};
+    try {
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+      final barangayId = userDoc.data()?['barangayId'] as String?;
+      if (barangayId == null || barangayId.isEmpty) return {};
 
-    debugPrint('📊 getStatusCounts() for barangayId: $barangayId');
+      debugPrint('📊 getStatusCounts() for barangayId: $barangayId');
 
-    final snapshot = await _firestore
-        .collection('barangays')
-        .doc(barangayId)
-        .collection('patients')
-        .where('isDeleted', isEqualTo: false)
-        .get();
+      final snapshot = await _firestore
+          .collection('barangays')
+          .doc(barangayId)
+          .collection('patients')
+          .where('isDeleted', isEqualTo: false)
+          .get();
 
-    final counts = {
-      'Underweight': 0,
-      'Overweight/Obese': 0,
-      'Stunted': 0,
-      'At Risk': 0,
-      'Normal': 0,
-    };
+      // Group barangay patients by first/last name (same as PatientListTab)
+      // and keep only the most recent record per child. Skip archived.
+      final Map<String, Map<String, dynamic>> latestByKey = {};
 
-    for (final doc in snapshot.docs) {
-      final anthropometric =
-          doc.data()['anthropometric'] as Map<String, dynamic>?;
-      if (anthropometric == null) continue;
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        if (data['isArchived'] == true) continue;
 
-      final double? wfa = _extractZScore(anthropometric['weightForAge']?.toString());
-      final double? hfa = _extractZScore(anthropometric['heightForAge']?.toString());
-      final double? wfh = _extractZScore(anthropometric['weightForHeight']?.toString());
-      final double? bmi = _extractZScore(anthropometric['bmi']?.toString());
+        final rawDemo = data['demographic'];
+        final Map<String, dynamic> demographic;
+        if (rawDemo is Map<String, dynamic>) {
+          demographic = rawDemo;
+        } else if (rawDemo is Map) {
+          demographic = Map<String, dynamic>.from(rawDemo);
+        } else {
+          demographic = <String, dynamic>{};
+        }
 
-      // Skip docs with no z-scores at all
-      if (wfa == null && hfa == null && wfh == null && bmi == null) continue;
+        final firstName = (demographic['firstName'] ?? '').toString();
+        final lastName = (demographic['lastName'] ?? '').toString();
+        final key =
+            '${firstName.toLowerCase().trim()}_${lastName.toLowerCase().trim()}';
+        if (key.isEmpty || key == '_') continue;
 
-      // One status per patient — same priority order as _buildAssessmentRemarks
-
-      // Priority 1: Underweight
-      if (wfa != null && wfa < -2) {
-        counts['Underweight'] = counts['Underweight']! + 1;
-        continue;
+        final createdAt = data['createdAt'] as Timestamp?;
+        final existing = latestByKey[key];
+        if (existing == null) {
+          latestByKey[key] = data;
+        } else {
+          final existingTs = existing['createdAt'] as Timestamp?;
+          final existingTime =
+              existingTs != null ? existingTs.toDate() : DateTime(1970);
+          final thisTime =
+              createdAt != null ? createdAt.toDate() : DateTime(1970);
+          if (thisTime.isAfter(existingTime)) {
+            latestByKey[key] = data;
+          }
+        }
       }
 
-      // Priority 2: Stunted
-      if (hfa != null && hfa < -2) {
-        counts['Stunted'] = counts['Stunted']! + 1;
-        continue;
+      final counts = {
+        'Underweight': 0,
+        'Overweight/Obese': 0,
+        'Stunted': 0,
+        'At Risk': 0,
+        'Normal': 0,
+      };
+
+      void _applyStatusFromData(Map<String, dynamic> data) {
+        final rawAnthro = data['anthropometric'];
+        Map<String, dynamic>? anthropometric;
+        if (rawAnthro is Map<String, dynamic>) {
+          anthropometric = rawAnthro;
+        } else if (rawAnthro is Map) {
+          anthropometric = Map<String, dynamic>.from(rawAnthro);
+        } else {
+          anthropometric = null;
+        }
+        if (anthropometric == null) return;
+
+        final double? wfa =
+            _extractZScore(anthropometric['weightForAge']?.toString());
+        final double? hfa =
+            _extractZScore(anthropometric['heightForAge']?.toString());
+        final double? wfh =
+            _extractZScore(anthropometric['weightForHeight']?.toString());
+        final double? bmi =
+            _extractBmiZScore(anthropometric['bmi']?.toString());
+
+        // Skip records with no usable z-scores.
+        if (wfa == null && hfa == null && wfh == null && bmi == null) return;
+
+        // Same priority as _buildAssessmentRemarks / PatientListTab.
+
+        // Priority 1: Underweight (Weight-for-Age < -2 SD)
+        if (wfa != null && wfa < -2) {
+          counts['Underweight'] = counts['Underweight']! + 1;
+          return;
+        }
+
+        // Priority 2: Stunted (Height-for-Age < -2 SD)
+        if (hfa != null && hfa < -2) {
+          counts['Stunted'] = counts['Stunted']! + 1;
+          return;
+        }
+
+        // Priority 3: Overweight/Obese (Weight-for-Height > +1 SD or BMI > +2 SD)
+        if ((wfh != null && wfh > 1) || (bmi != null && bmi > 2)) {
+          counts['Overweight/Obese'] =
+              counts['Overweight/Obese']! + 1;
+          return;
+        }
+
+        // Priority 4: At Risk (any indicator -2 to -1 SD)
+        final atRisk = (wfa != null && wfa >= -2 && wfa < -1) ||
+            (hfa != null && hfa >= -2 && hfa < -1) ||
+            (wfh != null && wfh >= -2 && wfh < -1) ||
+            (bmi != null && bmi >= -2 && bmi < -1);
+        if (atRisk) {
+          counts['At Risk'] = counts['At Risk']! + 1;
+          return;
+        }
+
+        // Priority 5: Normal
+        counts['Normal'] = counts['Normal']! + 1;
       }
 
-      // Priority 3: Overweight/Obese
-      if ((wfh != null && wfh > 1) || (bmi != null && bmi > 2)) {
-        counts['Overweight/Obese'] = counts['Overweight/Obese']! + 1;
-        continue;
+      // Apply status for each barangay child (grouped by name).
+      for (final data in latestByKey.values) {
+        _applyStatusFromData(data);
       }
 
-      // Priority 4: At Risk
-      final atRisk = (wfa != null && wfa >= -2 && wfa < -1) ||
-          (hfa != null && hfa >= -2 && hfa < -1) ||
-          (wfh != null && wfh >= -2 && wfh < -1) ||
-          (bmi != null && bmi >= -2 && bmi < -1);
-      if (atRisk) {
-        counts['At Risk'] = counts['At Risk']! + 1;
-        continue;
+      // Also include homepageData-only patients (same rule as PatientListTab).
+      final homeSnapshot = await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('homepageData')
+          .get();
+
+      final existingKeys = latestByKey.keys.toSet();
+
+      for (final doc in homeSnapshot.docs) {
+        final data = doc.data();
+        if (data['isDeleted'] == true) continue;
+
+        final rawDemo = data['demographic'];
+        final Map<String, dynamic> demographic;
+        if (rawDemo is Map<String, dynamic>) {
+          demographic = rawDemo;
+        } else if (rawDemo is Map) {
+          demographic = Map<String, dynamic>.from(rawDemo);
+        } else {
+          demographic = <String, dynamic>{};
+        }
+
+        final firstName = (demographic['firstName'] ?? '').toString();
+        final lastName = (demographic['lastName'] ?? '').toString();
+        final key =
+            '${firstName.toLowerCase().trim()}_${lastName.toLowerCase().trim()}';
+        if (key.isEmpty || key == '_' || existingKeys.contains(key)) continue;
+
+        _applyStatusFromData(data);
       }
 
-      // Priority 5: Normal
-      counts['Normal'] = counts['Normal']! + 1;
+      debugPrint('✅ Status counts: $counts');
+      return counts;
+    } catch (e) {
+      debugPrint('❌ Error getting status counts: $e');
+      return {};
     }
-
-    debugPrint('✅ Status counts: $counts');
-    return counts;
-  } catch (e) {
-    debugPrint('❌ Error getting status counts: $e');
-    return {};
   }
-}
 }
 
 

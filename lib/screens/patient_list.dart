@@ -193,6 +193,22 @@ class _PatientListTabState extends State<PatientListTab> {
     return double.tryParse(match.group(0)!);
   }
 
+  // Extracts BMI z-score from strings like "18.2 | 0.10 (Normal)".
+  // For BMI we only want the z-score part after the "|" separator.
+  double? _extractBmiZScore(String? raw) {
+    if (raw == null || raw.isEmpty) return null;
+    final trimmed = raw.trim();
+    if (!trimmed.contains('|')) {
+      // No "|" means we only have the raw BMI value, not a z-score.
+      return null;
+    }
+    final parts = trimmed.split('|');
+    if (parts.length < 2) return null;
+    final afterPipe = parts[1].trim();
+    final match = RegExp(r'-?\d+(\.\d+)?').firstMatch(afterPipe);
+    if (match == null) return null;
+    return double.tryParse(match.group(0)!);
+  }
   String _buildAssessmentRemarks(Map<String, dynamic> data, int assessmentCount) {
     if (assessmentCount == 0) return 'No assessments';
 
@@ -209,7 +225,7 @@ class _PatientListTabState extends State<PatientListTab> {
     final double? weightForAge    = _extractZScore(anthropometric['weightForAge']?.toString());
     final double? heightForAge    = _extractZScore(anthropometric['heightForAge']?.toString());
     final double? weightForHeight = _extractZScore(anthropometric['weightForHeight']?.toString());
-    final double? bmi             = _extractZScore(anthropometric['bmi']?.toString());
+    final double? bmi             = _extractBmiZScore(anthropometric['bmi']?.toString());
 
     if (weightForAge == null && heightForAge == null &&
         weightForHeight == null && bmi == null) {

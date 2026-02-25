@@ -47,35 +47,106 @@ class AssessmentTable extends StatelessWidget {
 
   // ─── Classification logic ───────────────────────────────────────────────────
 
+  // Extract leading numeric z-score from strings like "-2.5 (Stunted)" or "-2.5".
+  double? _extractZScore(String? raw) {
+    if (raw == null || raw.isEmpty) return null;
+    final match = RegExp(r'^-?\d+(\.\d+)?').firstMatch(raw.trim());
+    if (match == null) return null;
+    return double.tryParse(match.group(0)!);
+  }
+
+  // Extract BMI z-score from strings like "18.2 | 0.10 (Normal)".
+  double? _extractBmiZScore(String? raw) {
+    if (raw == null || raw.isEmpty) return null;
+    final trimmed = raw.trim();
+    if (!trimmed.contains('|')) return null;
+    final parts = trimmed.split('|');
+    if (parts.length < 2) return null;
+    final afterPipe = parts[1].trim();
+    final match = RegExp(r'-?\d+(\.\d+)?').firstMatch(afterPipe);
+    if (match == null) return null;
+    return double.tryParse(match.group(0)!);
+  }
+
   String _getClassification(Map<String, dynamic> a) {
-    final wfa = a['weightForAge']?.toString().toLowerCase() ?? '';
-    final hfa = a['heightForAge']?.toString().toLowerCase() ?? '';
-    final wfh = a['weightForHeight']?.toString().toLowerCase() ?? '';
-    if (wfa.contains('severely') || hfa.contains('severely') || wfh.contains('severely')) {
-      return 'Severely Underweight';
+    final double? weightForAge =
+        _extractZScore(a['weightForAge']?.toString());
+    final double? heightForAge =
+        _extractZScore(a['heightForAge']?.toString());
+    final double? weightForHeight =
+        _extractZScore(a['weightForHeight']?.toString());
+    final double? bmi = _extractBmiZScore(a['bmi']?.toString());
+
+    // Match patient list remarks: if no usable z-scores, treat as assessment done.
+    if (weightForAge == null &&
+        heightForAge == null &&
+        weightForHeight == null &&
+        bmi == null) {
+      return 'Assessment done';
     }
-    if (wfa.contains('underweight') || hfa.contains('stunted') || wfh.contains('wasted')) {
+
+    // Priority 1: Underweight (Weight-for-Age < -2 SD)
+    if (weightForAge != null && weightForAge < -2) {
+      return 'Underweight';
+    }
+
+    // Priority 2: Stunted (Height-for-Age < -2 SD)
+    if (heightForAge != null && heightForAge < -2) {
+      return 'Stunted';
+    }
+
+    // Priority 3: Overweight/Obese (Weight-for-Height > +1 SD or BMI > +2 SD)
+    if ((weightForHeight != null && weightForHeight > 1) ||
+        (bmi != null && bmi > 2)) {
+      return 'Overweight/Obese';
+    }
+
+    // Priority 4: At Risk (any indicator -2 to -1 SD)
+    final atRisk = (weightForAge != null &&
+            weightForAge >= -2 &&
+            weightForAge < -1) ||
+        (heightForAge != null &&
+            heightForAge >= -2 &&
+            heightForAge < -1) ||
+        (weightForHeight != null &&
+            weightForHeight >= -2 &&
+            weightForHeight < -1) ||
+        (bmi != null && bmi >= -2 && bmi < -1);
+    if (atRisk) {
       return 'At Risk';
     }
-    if (wfa.contains('overweight') || wfh.contains('overweight')) return 'Overweight';
+
+    // Priority 5: Normal
     return 'Normal';
   }
 
   Color _badgeFg(String c) {
-    switch (c.toLowerCase()) {
-      case 'severely underweight': return _red;
-      case 'at risk':              return _warning;
-      case 'overweight':           return _warning;
-      default:                     return _greenText;
+    switch (c) {
+      case 'Underweight':
+      case 'Stunted':
+        return _red;
+      case 'Overweight/Obese':
+      case 'At Risk':
+        return _warning;
+      case 'Normal':
+      case 'Assessment done':
+      default:
+        return _greenText;
     }
   }
 
   Color _badgeBg(String c) {
-    switch (c.toLowerCase()) {
-      case 'severely underweight': return _redBg;
-      case 'at risk':              return _warningBg;
-      case 'overweight':           return _warningBg;
-      default:                     return _greenBg;
+    switch (c) {
+      case 'Underweight':
+      case 'Stunted':
+        return _redBg;
+      case 'Overweight/Obese':
+      case 'At Risk':
+        return _warningBg;
+      case 'Normal':
+      case 'Assessment done':
+      default:
+        return _greenBg;
     }
   }
 
