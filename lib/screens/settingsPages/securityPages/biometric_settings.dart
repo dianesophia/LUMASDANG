@@ -40,6 +40,7 @@ class _BiometricSettingsPageState extends State<BiometricSettingsPage>
 
   @override
   void dispose() {
+    _pulseController.stop();
     _pulseController.dispose();
     super.dispose();
   }
@@ -77,6 +78,7 @@ class _BiometricSettingsPageState extends State<BiometricSettingsPage>
 
   Future<void> _enableBiometric() async {
     // First verify with biometrics that user is the device owner
+    // local_auth handles permissions internally
     final result = await _biometricService.authenticate(
       reason: 'Verify your identity to enable biometric login',
     );

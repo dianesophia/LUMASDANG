@@ -127,7 +127,7 @@ class MainSecurity extends StatelessWidget {
                               ),
                               // Both Face ID and Fingerprint now go to the same
                               // BiometricSettingsPage which handles both.
-                              _menuItem(
+                             /* _menuItem(
                                 context: context,
                                 title: "Face ID / Fingerprint",
                                 subtitle: "Manage biometric login",
@@ -136,7 +136,7 @@ class MainSecurity extends StatelessWidget {
                                 onTap: () => Navigator.of(context).push(
                                   _slideFadeRoute(const BiometricSettingsPage()),
                                 ),
-                              ),
+                              ),*/
                             ],
                           ),
                         ),
@@ -165,7 +165,7 @@ class MainSecurity extends StatelessWidget {
                             const SizedBox(width: 12),
                             Expanded(
                               child: Text(
-                                "Keep your account secure by using a strong password and enabling biometric authentication.",
+                                "Keep your account secure by using a strong password.",
                                 style: TextStyle(
                                   color: Colors.white.withOpacity(0.75),
                                   fontSize: 13,

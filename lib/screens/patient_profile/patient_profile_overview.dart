@@ -1339,7 +1339,7 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
 }*/
 
 
-void _showAddAssessmentSheet() {
+/*void _showAddAssessmentSheet() {
   final dateCtrl = TextEditingController();
   final weightCtrl = TextEditingController();
   final heightCtrl = TextEditingController();
@@ -1654,7 +1654,449 @@ void _showAddAssessmentSheet() {
       );
     },
   );
+}*/
+// ─────────────────────────────────────────────────────────────────────────────
+//  _showAddAssessmentSheet — consistent with VaccinationStatusSection style
+// ─────────────────────────────────────────────────────────────────────────────
+
+void _showAddAssessmentSheet() {
+  final dateCtrl   = TextEditingController();
+  final weightCtrl = TextEditingController();
+  final heightCtrl = TextEditingController();
+  final muacCtrl   = TextEditingController();
+
+  bool    saving       = false;
+  String? errorMessage;
+
+  // ── Design Tokens (matches VaccinationStatusSection) ──────────────────────
+  const kOrange       = Color(0xFFF08030);
+  const kOrangeLight  = Color(0xFFF5A962);
+  const kAmberBg      = Color(0xFFFFF6EE);
+  const kSurface      = Color(0xFFFFFFFF);
+  const kSurfaceDim   = Color(0xFFFAFAFA);
+  const kBorder       = Color(0xFFE8E8ED);
+  const kInk          = Color(0xFF1C1C1E);
+  const kInkMid       = Color(0xFF6C6C70);
+  const kRCard        = 18.0;
+  const kRInner       = 12.0;
+
+  // ── Shared field builder ───────────────────────────────────────────────────
+  Widget buildField({
+    required BuildContext ctx,
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    required IconData icon,
+    TextInputType keyboardType = TextInputType.text,
+    VoidCallback? onTap,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 2, bottom: 6),
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: kInkMid,
+              letterSpacing: 1.0,
+            ),
+          ),
+        ),
+        TextFormField(
+          controller: controller,
+          keyboardType: keyboardType,
+          readOnly: onTap != null,
+          onTap: onTap,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: kInk,
+          ),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w400,
+              color: kInkMid.withOpacity(0.55),
+            ),
+            prefixIcon: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+              child: Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: kOrange.withOpacity(0.10),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, size: 15, color: kOrange),
+              ),
+            ),
+            prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+            filled: true,
+            fillColor: kSurfaceDim,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(kRInner),
+              borderSide: const BorderSide(color: kBorder, width: 1),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(kRInner),
+              borderSide: const BorderSide(color: kBorder, width: 1),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(kRInner),
+              borderSide: const BorderSide(color: kOrange, width: 2),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) {
+      return StatefulBuilder(
+        builder: (ctx, setSheetState) {
+          return Container(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).viewInsets.bottom,
+            ),
+            decoration: BoxDecoration(
+              color: kSurface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(kRCard)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.07),
+                  blurRadius: 20,
+                  offset: const Offset(0, -6),
+                ),
+              ],
+            ),
+            clipBehavior: Clip.hardEdge,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+
+                // ── Orange accent bar (matches card top accent) ────────────
+                Container(
+                  height: 5,
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [kOrangeLight, kOrange],
+                    ),
+                  ),
+                ),
+
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+
+                      // ── Drag handle ────────────────────────────────────
+                      Center(
+                        child: Container(
+                          width: 36,
+                          height: 4,
+                          margin: const EdgeInsets.only(bottom: 20),
+                          decoration: BoxDecoration(
+                            color: kBorder,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+
+                      // ── Header row ─────────────────────────────────────
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: kOrange.withOpacity(0.10),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.add_chart_outlined,
+                              color: kOrange,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'New Assessment',
+                                  style: TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w700,
+                                    color: kInk,
+                                    letterSpacing: -0.3,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${widget.patient.firstName} ${widget.patient.lastName}',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: kInkMid,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          // SHARED badge — matches _sharedBadge() style
+                          if (widget.isSharedPatient)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                    colors: [kOrangeLight, kOrange]),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.people_rounded,
+                                      size: 12, color: Colors.white),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'Shared',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+
+                      // ── Divider ────────────────────────────────────────
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        child: Divider(height: 1, color: kBorder),
+                      ),
+
+                      // ── Error banner ───────────────────────────────────
+                      if (errorMessage != null) ...[
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 11),
+                          decoration: BoxDecoration(
+                            color: kAmberBg,
+                            borderRadius: BorderRadius.circular(kRInner),
+                            border: Border.all(
+                              color: kOrange.withOpacity(0.40),
+                              width: 1.5,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.warning_amber_rounded,
+                                  color: kOrange, size: 17),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  errorMessage!,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: kOrange,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                      ],
+
+                      // ── Section label ──────────────────────────────────
+                      const Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'MEASUREMENT DETAILS',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: kInkMid,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+
+                      // ── Date field ─────────────────────────────────────
+                      buildField(
+                        ctx: ctx,
+                        controller: dateCtrl,
+                        label: 'DATE OF MEASUREMENT',
+                        hint: 'MM / DD / YYYY',
+                        icon: Icons.calendar_today_outlined,
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: ctx,
+                            initialDate: DateTime.now(),
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime.now(),
+                            builder: (c, child) => Theme(
+                              data: Theme.of(c).copyWith(
+                                colorScheme: const ColorScheme.light(
+                                  primary: kOrange,
+                                  onPrimary: Colors.white,
+                                  surface: Colors.white,
+                                ),
+                              ),
+                              child: child!,
+                            ),
+                          );
+                          if (picked != null) {
+                            dateCtrl.text =
+                                '${picked.month.toString().padLeft(2, '0')}/${picked.day.toString().padLeft(2, '0')}/${picked.year}';
+                            if (errorMessage != null) {
+                              setSheetState(() => errorMessage = null);
+                            }
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 10),
+
+                      // ── Weight + Height side by side ───────────────────
+                      Row(
+                        children: [
+                          Expanded(
+                            child: buildField(
+                              ctx: ctx,
+                              controller: weightCtrl,
+                              label: 'WEIGHT (kg)',
+                              hint: 'e.g. 9.5',
+                              icon: Icons.monitor_weight_outlined,
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                      decimal: true),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: buildField(
+                              ctx: ctx,
+                              controller: heightCtrl,
+                              label: 'HEIGHT (cm)',
+                              hint: 'e.g. 80',
+                              icon: Icons.height,
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                      decimal: true),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+
+                      // ── MUAC ───────────────────────────────────────────
+                      buildField(
+                        ctx: ctx,
+                        controller: muacCtrl,
+                        label: 'MUAC (cm)',
+                        hint: 'e.g. 16.0',
+                        icon: Icons.straighten,
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                      ),
+
+                      const SizedBox(height: 22),
+
+                      // ── Save button — matches VaccinationStatusSection ─
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: saving
+                              ? null
+                              : () async {
+                                  if (dateCtrl.text.trim().isEmpty ||
+                                      weightCtrl.text.trim().isEmpty ||
+                                      heightCtrl.text.trim().isEmpty) {
+                                    setSheetState(() => errorMessage =
+                                        'Date, weight, and height are required.');
+                                    return;
+                                  }
+                                  setSheetState(() {
+                                    errorMessage = null;
+                                    saving = true;
+                                  });
+                                  await _saveNewAssessment(
+                                    date:   dateCtrl.text.trim(),
+                                    weight: weightCtrl.text.trim(),
+                                    height: heightCtrl.text.trim(),
+                                    muac:   muacCtrl.text.trim(),
+                                  );
+                                  if (ctx.mounted) Navigator.pop(ctx);
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor:
+                                saving ? kOrange.withOpacity(0.6) : kOrange,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: saving
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Text(
+                                  'Save Assessment',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                        ),
+                      ),
+
+                      // ── Cancel link ────────────────────────────────────
+                      const SizedBox(height: 4),
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        style: TextButton.styleFrom(foregroundColor: kInkMid),
+                        child: const Text(
+                          'Cancel',
+                          style: TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    },
+  );
 }
+
+
   Widget _buildSheetField({
     required BuildContext ctx,
     required TextEditingController controller,
