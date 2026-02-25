@@ -314,25 +314,59 @@ class _PatientListTabState extends State<PatientListTab> {
     setState(() => _deleting = true);
     try {
       final user = FirebaseAuth.instance.currentUser;
+      final firestore = FirebaseFirestore.instance;
       final deletedBy = user?.email ?? user?.uid ?? 'unknown';
-      final batch = FirebaseFirestore.instance.batch();
+      final batch = firestore.batch();
+      var hasWrites = false;
 
-      // ✅ FIX: iterate _patients (not _filteredPatients) so selected records
-      // that are currently filtered out are still soft-deleted.
+      // Iterate all patients so that even ones currently filtered out
+      // are still soft-deleted when selected.
       for (final patient in _patients) {
         if (!_selectedDocIds.contains(patient.docId)) continue;
-        final ref = FirebaseFirestore.instance
-            .collection('barangays')
-            .doc(patient.barangayId)
-            .collection('patients')
-            .doc(patient.docId);
-        batch.update(ref, {
-          'isDeleted': true,
-          'deletedAt': FieldValue.serverTimestamp(),
-          'deletedBy': deletedBy,
-        });
+
+        // First try barangay-shared patient document.
+        if (patient.barangayId.isNotEmpty) {
+          final barangayRef = firestore
+              .collection('barangays')
+              .doc(patient.barangayId)
+              .collection('patients')
+              .doc(patient.docId);
+
+          final barangaySnap = await barangayRef.get();
+          if (barangaySnap.exists) {
+            batch.update(barangayRef, {
+              'isDeleted': true,
+              'deletedAt': FieldValue.serverTimestamp(),
+              'deletedBy': deletedBy,
+            });
+            hasWrites = true;
+            continue;
+          }
+        }
+
+        // Fallback: if no barangay patient doc, try user's homepageData copy.
+        if (user != null) {
+          final homeRef = firestore
+              .collection('users')
+              .doc(user.uid)
+              .collection('homepageData')
+              .doc(patient.docId);
+
+          final homeSnap = await homeRef.get();
+          if (homeSnap.exists) {
+            batch.update(homeRef, {
+              'isDeleted': true,
+              'deletedAt': FieldValue.serverTimestamp(),
+              'deletedBy': deletedBy,
+            });
+            hasWrites = true;
+          }
+        }
       }
-      await batch.commit();
+
+      if (hasWrites) {
+        await batch.commit();
+      }
       if (mounted) {
         _exitSelectionMode();
         await _fetchPatients();

@@ -41,8 +41,9 @@ class MyApp extends StatelessWidget {
             title: 'Lumasdang',
             debugShowCheckedModeBanner: false,
             theme: ThemeData(
-              fontFamily: provider.selectedFont,
-              colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2E8B7B)),
+              textTheme: provider.textTheme,
+              colorScheme:
+                  ColorScheme.fromSeed(seedColor: const Color(0xFF2E8B7B)),
               useMaterial3: true,
             ),
             home: const LoadingScreen(),

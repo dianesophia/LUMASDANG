@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../providers/theme_provider.dart';
 
@@ -12,6 +13,42 @@ class CustomizeAppearance extends StatefulWidget {
 class _CustomizeAppearanceState extends State<CustomizeAppearance> {
   late String selectedFont;
   final List<String> fonts = ['Roboto', 'Poppins', 'Montserrat', 'Open Sans'];
+
+  TextStyle _previewStyleForFont(
+    String font, {
+    double fontSize = 14,
+    FontWeight fontWeight = FontWeight.w400,
+    Color? color,
+  }) {
+    final effectiveColor = color ?? Colors.white;
+    switch (font) {
+      case 'Poppins':
+        return GoogleFonts.poppins(
+          fontSize: fontSize,
+          fontWeight: fontWeight,
+          color: effectiveColor,
+        );
+      case 'Montserrat':
+        return GoogleFonts.montserrat(
+          fontSize: fontSize,
+          fontWeight: fontWeight,
+          color: effectiveColor,
+        );
+      case 'Open Sans':
+        return GoogleFonts.openSans(
+          fontSize: fontSize,
+          fontWeight: fontWeight,
+          color: effectiveColor,
+        );
+      case 'Roboto':
+      default:
+        return GoogleFonts.roboto(
+          fontSize: fontSize,
+          fontWeight: fontWeight,
+          color: effectiveColor,
+        );
+    }
+  }
 
   @override
   void initState() {
@@ -157,26 +194,26 @@ class _CustomizeAppearanceState extends State<CustomizeAppearance> {
                                               ),
                                               child: Center(
                                                 child: Text(
-                                                  "Aa",
-                                                  style: TextStyle(
-                                                    fontFamily: font,
-                                                    color: Colors.white,
-                                                    fontSize: 14,
-                                                    fontWeight: FontWeight.w700,
-                                                  ),
+                                                "Aa",
+                                                style: _previewStyleForFont(
+                                                  font,
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: Colors.white,
                                                 ),
+                                              ),
                                               ),
                                             ),
                                             const SizedBox(width: 14),
                                             Text(
                                               font,
-                                              style: TextStyle(
-                                                fontFamily: font,
-                                                color: Colors.white,
+                                              style: _previewStyleForFont(
+                                                font,
                                                 fontSize: 15,
                                                 fontWeight: isSelected
                                                     ? FontWeight.w700
                                                     : FontWeight.w400,
+                                                color: Colors.white,
                                               ),
                                             ),
                                             const Spacer(),
@@ -257,19 +294,20 @@ class _CustomizeAppearanceState extends State<CustomizeAppearance> {
                                   children: [
                                     Text(
                                       "Sample Name",
-                                      style: TextStyle(
-                                        fontFamily: selectedFont,
-                                        color: Colors.white,
+                                      style: _previewStyleForFont(
+                                        selectedFont,
                                         fontSize: 15,
                                         fontWeight: FontWeight.w700,
+                                        color: Colors.white,
                                       ),
                                     ),
                                     Text(
                                       "Sample subtitle text",
-                                      style: TextStyle(
-                                        fontFamily: selectedFont,
-                                        color: Colors.white.withOpacity(0.65),
+                                      style: _previewStyleForFont(
+                                        selectedFont,
                                         fontSize: 12,
+                                        color:
+                                            Colors.white.withOpacity(0.65),
                                       ),
                                     ),
                                   ],
@@ -279,12 +317,11 @@ class _CustomizeAppearanceState extends State<CustomizeAppearance> {
                             const SizedBox(height: 14),
                             Text(
                               "The quick brown fox jumps over the lazy dog.",
-                              style: TextStyle(
-                                fontFamily: selectedFont,
-                                color: Colors.white.withOpacity(0.8),
+                              style: _previewStyleForFont(
+                                selectedFont,
                                 fontSize: 13,
-                                height: 1.5,
-                              ),
+                                color: Colors.white.withOpacity(0.8),
+                              ).copyWith(height: 1.5),
                             ),
                           ],
                         ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ThemeProvider extends ChangeNotifier {
@@ -25,5 +26,23 @@ class ThemeProvider extends ChangeNotifier {
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_fontKey, font);
+  }
+
+  /// Returns a TextTheme that matches the currently selected font.
+  ///
+  /// This is used by the app's ThemeData so that changing the font
+  /// in the Appearance screen updates typography globally.
+  TextTheme get textTheme {
+    switch (_selectedFont) {
+      case 'Poppins':
+        return GoogleFonts.poppinsTextTheme();
+      case 'Montserrat':
+        return GoogleFonts.montserratTextTheme();
+      case 'Open Sans':
+        return GoogleFonts.openSansTextTheme();
+      case 'Roboto':
+      default:
+        return GoogleFonts.robotoTextTheme();
+    }
   }
 }
