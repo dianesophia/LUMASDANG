@@ -127,6 +127,23 @@ Lumasdang solves all of these problems in one easy-to-use app.
 
 ---
 
+## Formulas Used
+The app performs several common health calculations related to nutrition and growth:
+
+- **BMI (Body Mass Index):**  
+  BMI = weight (kg) ÷ [height (m) × height (m)]
+  - A number that shows if someone is underweight, normal, or overweight based on their size.
+
+- **WHO Growth Z-scores:**  
+  - These are standard measurements used by health professionals to compare a child’s measurements (weight, height, or weight-for-height) to a reference population.
+  - A Z-score of 0 means the child is exactly average; positive or negative values show how many standard deviations the child is above or below average.
+  - The app uses the WHO growth standards library to compute these scores automatically.
+
+- **Weight-for-Age, Height-for-Age, Weight-for-Height:**
+  - These are specific Z-score categories that indicate whether a child is underweight, stunted, or wasted/overweight.
+  - For example, weight-for-height compares a child’s weight to the expected weight for someone of the same height.
+  - No manual formula is shown to the user; the app handles the calculation behind the scenes using WHO data.
+
 ## 📊 How the App Works (Step-by-Step)
 
 ### **Step 1: Opening the App**
@@ -319,22 +336,6 @@ flutter build apk  # Android
 flutter build ios  # iPhone
 ```
 
-### **Step 6: Configure Biometrics (Optional)**
-
-**Android:**
-- Edit `android/app/src/main/AndroidManifest.xml`
-- Make sure these permissions are present:
-```xml
-<uses-permission android:name="android.permission.USE_BIOMETRIC"/>
-<uses-permission android:name="android.permission.USE_FINGERPRINT"/>
-```
-
-**iOS:**
-- Edit `ios/Runner/Info.plist`
-- Add Face ID permission (if supporting face unlock)
-
-
----
 
 ## 📂 Project Structure Explained
 
@@ -446,7 +447,7 @@ WHO (World Health Organization) standards:
 | Record assessment | ✅ Yes | ❌ No | ✅ Yes |
 | Login with password | ❌ No | ✅ Yes | N/A |
 | View cloud data | ❌ No | ✅ Yes | ✅ Yes |
-| Export to Excel | ✅ Yes | ❌ No | N/A |
+| Export to Excel | ✅ Yes | ✅ Yes | N/A |
 | Calculate WHO stats | ✅ Yes | ❌ No | N/A |
 | Sync data | ❌ No | ✅ Yes | ✅ Yes |
 
@@ -456,7 +457,6 @@ WHO (World Health Organization) standards:
 
 ### **"Permission Denied" Error**
 **Solution:**
-- Go to phone Settings → Apps → Lumasdang
 - Grant permissions for: Camera, Photos, Location (if needed)
 - Restart app
 
@@ -464,13 +464,12 @@ WHO (World Health Organization) standards:
 ### **Data Not Syncing**
 **Solution:**
 - Check internet connection
-- Go to Settings → About → Check Sync Status
 - Restart app
 - If problem persists, restart phone
 
 ### **App Crashes When Opening**
 **Solution:**
-- Clear app cache: Settings → Apps → Lumasdang → Storage → Clear Cache
+- Clear app cache: Settings → Clear Cache
 - Update app to latest version
 - If problem continues, reinstall app
 
@@ -490,11 +489,6 @@ WHO (World Health Organization) standards:
 - Use **offline mode** in clinics without internet
 - Export **reports** for supervisors
 
-### **For Clinic Managers**
-- Use **dashboard** to see overview of all patients
-- Monitor **staff activity** and assessments
-- Generate **analytics and statistics**
-- Manage **shared patient records**
 
 ### **For Developers**
 - Code is well-organized in services/screens structure
@@ -545,15 +539,6 @@ This project is for healthcare use and is proprietary. Please contact project ow
 
 ---
 
-## ✉️ Contact & Support
-
-For questions, bug reports, or feature requests:
-- **Email**: lumasdangapp@example.com
-- **Project Lead**: [Your Name]
-- **GitHub Issues**: Report bugs on GitHub repository
-
----
-
 ## 🎉 Acknowledgments
 
 This app was developed using:
@@ -568,8 +553,8 @@ Special thanks to healthcare workers who tested and provided feedback!
 
 ## Developers
 
-- Diane Sophia Fuentes
-- Paulo Languido
+- Fuentes, Diane Sophia <dianesophiafuentes10@gmail.com>
+- Languido, Paulo <languidopaulo@gmail.com>"
 
 ---
 
