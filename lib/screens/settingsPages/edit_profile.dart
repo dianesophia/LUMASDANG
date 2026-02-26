@@ -208,7 +208,7 @@ class _EditProfileState extends State<EditProfile> {
           _showResultDialog(
             title: "Profile Updated",
             message: "Your profile has been updated successfully.",
-            subtitle: "A verification email has been sent to your new address. Please verify and log in again.",
+            subtitle: "A verification email has been sent to your new address. Check spam folder and please verify and log in again.",
             onConfirm: () async {
               await _firestoreService.auth.signOut();
               if (mounted) {
@@ -406,7 +406,8 @@ class _EditProfileState extends State<EditProfile> {
                               const Expanded(
                                 child: Center(
                                   child: Text(
-                                    "Edit Profile",
+                                    //"Edit Profile",
+                                    "Change Email",
                                     style: TextStyle(
                                       fontSize: 22,
                                       fontWeight: FontWeight.w700,
@@ -543,7 +544,7 @@ class _EditProfileState extends State<EditProfile> {
                             // const SizedBox(height: 28),
 
                             /// ── Display Name ─────────────────────────────
-                            _sectionLabel("Display Name"),
+                           /* _sectionLabel("Display Name"),
                             const SizedBox(height: 8),
                             _inputField(
                               controller: _displayNameController,
@@ -552,6 +553,8 @@ class _EditProfileState extends State<EditProfile> {
                               maxLength: 20,
                               counter: '$_displayNameLength/20',
                             ),
+*/
+
 
                             const SizedBox(height: 20),
 

@@ -541,7 +541,7 @@ class _LoginPageState extends State<LoginPage>
                             Navigator.pop(context);
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: const Text('Reset link sent! Check your inbox.'),
+                                content: const Text('Reset link sent! Check your inbox and spam folder.'),
                                 backgroundColor: const Color(0xFF3A8C6E),
                                 behavior: SnackBarBehavior.floating,
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

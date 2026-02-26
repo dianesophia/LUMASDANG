@@ -140,7 +140,8 @@ class MainSettings extends StatelessWidget {
                         ),
                         _TileData(
                           icon: Icons.edit_outlined,
-                          text: "Edit Profile",
+                          //text: "Edit Profile",
+                          text: "Change Email",
                           option: SettingsOption.editProfile,
                         ),
                         _TileData(
