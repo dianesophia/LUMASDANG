@@ -4,10 +4,13 @@ import 'package:flutter/material.dart';
 /// Styled to match ProfileInfoCard — white surface, orange gradient accent.
 class DewormingStatusSection extends StatelessWidget {
   final List<Map<String, dynamic>> assessments;
+  /// When set, an Edit button is shown in the header; tap opens the edit flow.
+  final VoidCallback? onEditTap;
 
   const DewormingStatusSection({
     super.key,
     required this.assessments,
+    this.onEditTap,
   });
 
   // ─── Design Tokens (matches ProfileInfoCard) ────────────────────────────────
@@ -129,15 +132,25 @@ class DewormingStatusSection extends StatelessWidget {
           children: [
             _iconBox(Icons.medication_liquid_rounded),
             const SizedBox(width: 12),
-            const Text(
-              'Deworming Status',
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-                color: _ink,
-                letterSpacing: -0.3,
+            const Expanded(
+              child: Text(
+                'Deworming Status',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                  color: _ink,
+                  letterSpacing: -0.3,
+                ),
               ),
             ),
+            if (onEditTap != null)
+              IconButton(
+                onPressed: onEditTap,
+                icon: const Icon(Icons.edit_outlined, color: _orange, size: 22),
+                tooltip: 'Edit deworming status',
+                padding: const EdgeInsets.all(8),
+                constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+              ),
           ],
         ),
       );
@@ -177,8 +190,10 @@ class DewormingStatusSection extends StatelessWidget {
     final isNA        = deworming['isNA'] == true;
     final drugGiven   = deworming['drugGiven']?.toString() ?? '';
     final dateStr     = deworming['dateOfLastDeworming']?.toString() ?? '';
+    final nextDateStr = deworming['nextDewormingDate']?.toString() ?? '';
     final adverse     = deworming['adverseReactions']?.toString() ?? '';
     final dewormDate  = _parseDate(dateStr);
+    final nextDewormDate = _parseDate(nextDateStr);
     final recent      = _isRecent(dewormDate);
     final weightNote  = _weightOutcome();
 
@@ -187,9 +202,11 @@ class DewormingStatusSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Date pill
           _datePill('Last Deworming: ${_formatDate(dewormDate)}'),
-
+          if (nextDateStr.isNotEmpty || nextDewormDate != null) ...[
+            const SizedBox(height: 8),
+            _datePill('Next Deworming: ${_formatDate(nextDewormDate)}'),
+          ],
           const SizedBox(height: 14),
 
           if (!isNA) ...[

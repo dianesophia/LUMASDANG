@@ -215,6 +215,7 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
       'deworming': data['deworming'],
       'vaccination': data['vaccination'],
       'docId': docId,
+      'dewormingOnly': data['dewormingOnly'] == true,
     };
   }
 
@@ -464,11 +465,24 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
       }
 
       // 3) De‑duplicate and sort all sources together
+      // Same assessment can come from local (docId = patientId) and Firestore (docId = assessment id).
+      // Dedupe by date+weight+height so we keep one; prefer the Firestore copy (has real assessment docId).
+      final patientDocId = widget.patient.docId;
       final unique = <String, Map<String, dynamic>>{};
       for (var a in matched) {
-        final key =
-            '${a['docId']}-${(a['date'] as DateTime?)?.millisecondsSinceEpoch ?? 0}';
-        unique.putIfAbsent(key, () => a);
+        final dateMs = (a['date'] as DateTime?)?.millisecondsSinceEpoch ?? 0;
+        final contentKey =
+            '$dateMs-${a['weight']}-${a['height']}';
+        final existing = unique[contentKey];
+        if (existing == null) {
+          unique[contentKey] = a;
+        } else {
+          final existingIsFromFirestore = existing['docId'] != patientDocId;
+          final currentIsFromFirestore = a['docId'] != patientDocId;
+          if (currentIsFromFirestore && !existingIsFromFirestore) {
+            unique[contentKey] = a;
+          }
+        }
       }
       final finalList = unique.values.toList()
         ..sort((a, b) =>
@@ -513,7 +527,10 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
           const SizedBox(height: 20),
           AssessmentTable(
             patientId: widget.sharedPatientId ?? widget.patient.docId,
-            assessments: _assessments,
+            assessments: _assessments
+                .where((a) =>
+                    a['dewormingOnly'] != true)
+                .toList(),
             loading: _loading,
             onAddAssessment: _showAddAssessmentSheet,
             saveNewAssessment: null,
@@ -537,7 +554,10 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
                 : null,
           ),
           const SizedBox(height: 20),
-          DewormingStatusSection(assessments: _assessments),
+          DewormingStatusSection(
+            assessments: _assessments,
+            onEditTap: _showEditDewormingSheet,
+          ),
           const SizedBox(height: 24),
 
           // ── Return button ─────────────────────────────────────────────
@@ -762,573 +782,511 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
     );
   }
 
-  // ── Add assessment sheet ───────────────────────────────────────────────────
-  /*void _showAddAssessmentSheet() {
-    final dateCtrl = TextEditingController();
-    final weightCtrl = TextEditingController();
-    final heightCtrl = TextEditingController();
-    final muacCtrl = TextEditingController();
-    bool saving = false;
-    String? errorMessage;
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return StatefulBuilder(builder: (ctx, setSheetState) {
+void _showEditDewormingSheet() {
+  Map<String, dynamic>? latestWithDeworming;
+  for (var i = _assessments.length - 1; i >= 0; i--) {
+    if (_assessments[i]['deworming'] != null) {
+      latestWithDeworming = _assessments[i];
+      break;
+    }
+  }
+  final raw = latestWithDeworming?['deworming'];
+  final Map<String, dynamic> existing = raw is Map<String, dynamic>
+      ? raw
+      : (raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{});
+
+  final dateLastCtrl = TextEditingController(
+    text: (existing['dateOfLastDeworming'] ?? '').toString().trim(),
+  );
+  const List<String> _dewormingDrugs = ['Albendazole', 'Mebendazole'];
+  final existingDrug = (existing['drugGiven'] ?? '').toString().trim();
+  String? selectedDrug =
+      _dewormingDrugs.contains(existingDrug) ? existingDrug : null;
+  final adverseCtrl = TextEditingController(
+    text: (existing['adverseReactions'] ?? '').toString().trim(),
+  );
+  final nextDateCtrl = TextEditingController(
+    text: (existing['nextDewormingDate'] ?? '').toString().trim(),
+  );
+  bool isNA = existing['isNA'] == true;
+  bool saving = false;
+  String? errorMessage;
+
+  const kOrange = Color(0xFFF08030);
+  const kSurface = Color(0xFFFFFFFF);
+  const kSurfaceDim = Color(0xFFFAFAFA);
+  const kBorder = Color(0xFFE8E8ED);
+  const kInk = Color(0xFF1C1C1E);
+  const kInkMid = Color(0xFF6C6C70);
+  const kRCard = 18.0;
+  const kRInner = 12.0;
+
+  Widget buildField({
+    required BuildContext ctx,
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    required IconData icon,
+    TextInputType keyboardType = TextInputType.text,
+    VoidCallback? onTap,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 2, bottom: 6),
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: kInkMid,
+              letterSpacing: 1.0,
+            ),
+          ),
+        ),
+        TextFormField(
+          controller: controller,
+          keyboardType: keyboardType,
+          readOnly: onTap != null,
+          onTap: onTap,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: kInk,
+          ),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w400,
+              color: kInkMid.withOpacity(0.55),
+            ),
+            prefixIcon: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+              child: Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: kOrange.withOpacity(0.10),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, size: 15, color: kOrange),
+              ),
+            ),
+            prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+            filled: true,
+            fillColor: kSurfaceDim,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(kRInner),
+              borderSide: const BorderSide(color: kBorder, width: 1),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(kRInner),
+              borderSide: const BorderSide(color: kBorder, width: 1),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(kRInner),
+              borderSide: const BorderSide(color: kOrange, width: 2),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) {
+      return StatefulBuilder(
+        builder: (ctx, setSheetState) {
           return Container(
             padding: EdgeInsets.only(
-                bottom: MediaQuery.of(ctx).viewInsets.bottom),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color(0xFF2E8B7B), Color(0xFF5CAA7F)],
-              ),
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(24),
-                topRight: Radius.circular(24),
-              ),
-              border:
-                  Border.all(color: Colors.white.withOpacity(0.28), width: 1),
+              bottom: MediaQuery.of(ctx).viewInsets.bottom,
             ),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 40, height: 4,
-                    margin: const EdgeInsets.only(bottom: 16),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.4),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                              color: Colors.white.withOpacity(0.35), width: 1),
-                        ),
-                        child: const Icon(Icons.add_chart_outlined,
-                            color: Colors.white, size: 18),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('New Assessment',
-                                style: TextStyle(
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.white,
-                                    letterSpacing: 0.3)),
-                            Text(
-                                '${widget.patient.firstName} ${widget.patient.lastName}',
-                                style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.white.withOpacity(0.7))),
-                          ],
-                        ),
-                      ),
-                      if (widget.isSharedPatient)
+            decoration: BoxDecoration(
+              color: kSurface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(kRCard)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.07),
+                  blurRadius: 20,
+                  offset: const Offset(0, -6),
+                ),
+              ],
+            ),
+            clipBehavior: Clip.hardEdge,
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
+                            color: kOrange.withOpacity(0.10),
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                                color: Colors.white.withOpacity(0.35),
-                                width: 1),
                           ),
-                          child: const Text('SHARED',
-                              style: TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
-                                  letterSpacing: 0.8)),
+                          child: const Icon(Icons.medication_liquid_rounded, color: kOrange, size: 22),
                         ),
-                    ],
-                  ),
-                  Container(
-                    height: 1,
-                    margin: const EdgeInsets.symmetric(vertical: 16),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(colors: [
-                        Colors.transparent,
-                        Colors.white.withOpacity(0.35),
-                        Colors.transparent,
-                      ]),
+                        const SizedBox(width: 12),
+                        const Text(
+                          'Edit Deworming Status',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: kInk,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  if (errorMessage != null) ...[
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFDC2626).withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                            color: const Color(0xFFDC2626).withOpacity(0.5),
-                            width: 1.5),
+                    const SizedBox(height: 20),
+                    CheckboxListTile(
+                      value: isNA,
+                      onChanged: (v) => setSheetState(() => isNA = v ?? false),
+                      title: const Text(
+                        'Not applicable',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: kInk,
+                        ),
                       ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.error_outline,
-                              color: Colors.white, size: 18),
-                          const SizedBox(width: 10),
-                          Expanded(
-                              child: Text(errorMessage!,
-                                  style: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w500,
-                                      color: Colors.white))),
-                        ],
-                      ),
+                      activeColor: kOrange,
+                      contentPadding: EdgeInsets.zero,
+                      controlAffinity: ListTileControlAffinity.leading,
                     ),
-                    const SizedBox(height: 14),
-                  ],
-                  _buildSheetField(
-                    ctx: ctx,
-                    controller: dateCtrl,
-                    label: 'Date of Measurement',
-                    hint: 'MM/DD/YYYY',
-                    icon: Icons.calendar_today_outlined,
-                    onTap: () async {
-                      final picked = await showDatePicker(
-                        context: ctx,
-                        initialDate: DateTime.now(),
-                        firstDate: DateTime(2020),
-                        lastDate: DateTime.now(),
-                      );
-                      if (picked != null) {
-                        dateCtrl.text =
-                            '${picked.month.toString().padLeft(2, '0')}/${picked.day.toString().padLeft(2, '0')}/${picked.year}';
-                        if (errorMessage != null) {
-                          setSheetState(() => errorMessage = null);
+                    const SizedBox(height: 12),
+                    buildField(
+                      ctx: ctx,
+                      controller: dateLastCtrl,
+                      label: 'DATE OF LAST DEWORMING',
+                      hint: 'MM / DD / YYYY',
+                      icon: Icons.calendar_today_outlined,
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: ctx,
+                          initialDate: DateTime.now(),
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime.now(),
+                          builder: (c, child) => Theme(
+                            data: Theme.of(c).copyWith(
+                              colorScheme: const ColorScheme.light(
+                                primary: kOrange,
+                                onPrimary: Colors.white,
+                                surface: Colors.white,
+                              ),
+                            ),
+                            child: child!,
+                          ),
+                        );
+                        if (picked != null) {
+                          dateLastCtrl.text =
+                              '${picked.month.toString().padLeft(2, '0')}/${picked.day.toString().padLeft(2, '0')}/${picked.year}';
+                          setSheetState(() {});
                         }
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 10),
-                  _buildSheetField(
-                    ctx: ctx,
-                    controller: weightCtrl,
-                    label: 'Weight (kg)',
-                    hint: 'e.g. 9.5',
-                    icon: Icons.monitor_weight_outlined,
-                    keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true),
-                  ),
-                  const SizedBox(height: 10),
-                  _buildSheetField(
-                    ctx: ctx,
-                    controller: heightCtrl,
-                    label: 'Height (cm)',
-                    hint: 'e.g. 80',
-                    icon: Icons.height,
-                    keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true),
-                  ),
-                  const SizedBox(height: 10),
-                  _buildSheetField(
-                    ctx: ctx,
-                    controller: muacCtrl,
-                    label: 'MUAC (cm)',
-                    hint: 'e.g. 16',
-                    icon: Icons.straighten,
-                    keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true),
-                  ),
-                  const SizedBox(height: 20),
-                  GestureDetector(
-                    onTap: saving
-                        ? null
-                        : () async {
-                            if (dateCtrl.text.trim().isEmpty ||
-                                weightCtrl.text.trim().isEmpty ||
-                                heightCtrl.text.trim().isEmpty) {
-                              setSheetState(() => errorMessage =
-                                  'Please fill in date, weight, and height.');
-                              return;
-                            }
-                            setSheetState(
-                                () { errorMessage = null; saving = true; });
-                            await _saveNewAssessment(
-                              date: dateCtrl.text.trim(),
-                              weight: weightCtrl.text.trim(),
-                              height: heightCtrl.text.trim(),
-                              muac: muacCtrl.text.trim(),
-                            );
-                            if (ctx.mounted) Navigator.pop(ctx);
-                          },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                      decoration: BoxDecoration(
-                        color: saving
-                            ? const Color(0xFF1B2A3B).withOpacity(0.5)
-                            : const Color(0xFF1B2A3B),
-                        borderRadius: BorderRadius.circular(14),
-                        boxShadow: saving
-                            ? []
-                            : [
-                                BoxShadow(
-                                    color: Colors.black.withOpacity(0.25),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 4)),
-                              ],
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(left: 2, bottom: 6),
+                          child: Text(
+                            'MEDICATION GIVEN',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: kInkMid,
+                              letterSpacing: 1.0,
+                            ),
+                          ),
+                        ),
+                        DropdownButtonFormField<String?>(
+                          value: selectedDrug,
+                          decoration: InputDecoration(
+                            prefixIcon: Padding(
+                              padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+                              child: Container(
+                                padding: const EdgeInsets.all(7),
+                                decoration: BoxDecoration(
+                                  color: kOrange.withOpacity(0.10),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(Icons.vaccines_rounded, size: 15, color: kOrange),
+                              ),
+                            ),
+                            prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+                            filled: true,
+                            fillColor: kSurfaceDim,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(kRInner),
+                              borderSide: const BorderSide(color: kBorder, width: 1),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(kRInner),
+                              borderSide: const BorderSide(color: kBorder, width: 1),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(kRInner),
+                              borderSide: const BorderSide(color: kOrange, width: 2),
+                            ),
+                          ),
+                          hint: const Text(
+                            'Select medication',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: kInkMid,
+                            ),
+                          ),
+                          items: _dewormingDrugs
+                              .map((String drug) => DropdownMenuItem<String?>(
+                                    value: drug,
+                                    child: Text(
+                                      drug,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: kInk,
+                                      ),
+                                    ),
+                                  ))
+                              .toList(),
+                          onChanged: (String? value) =>
+                              setSheetState(() => selectedDrug = value),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    buildField(
+                      ctx: ctx,
+                      controller: adverseCtrl,
+                      label: 'ADVERSE REACTIONS (if any)',
+                      hint: 'Leave blank if none',
+                      icon: Icons.warning_amber_rounded,
+                    ),
+                    const SizedBox(height: 10),
+                    buildField(
+                      ctx: ctx,
+                      controller: nextDateCtrl,
+                      label: 'NEXT DEWORMING DATE',
+                      hint: 'MM / DD / YYYY',
+                      icon: Icons.event_rounded,
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: ctx,
+                          initialDate: DateTime.now(),
+                          firstDate: DateTime.now(),
+                          lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
+                          builder: (c, child) => Theme(
+                            data: Theme.of(c).copyWith(
+                              colorScheme: const ColorScheme.light(
+                                primary: kOrange,
+                                onPrimary: Colors.white,
+                                surface: Colors.white,
+                              ),
+                            ),
+                            child: child!,
+                          ),
+                        );
+                        if (picked != null) {
+                          nextDateCtrl.text =
+                              '${picked.month.toString().padLeft(2, '0')}/${picked.day.toString().padLeft(2, '0')}/${picked.year}';
+                          setSheetState(() {});
+                        }
+                      },
+                    ),
+                    if (errorMessage != null) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        errorMessage!,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Colors.red,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
-                      child: Center(
+                    ],
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: saving
+                            ? null
+                            : () async {
+                                setSheetState(() => errorMessage = null);
+                                final deworming = {
+                                  'dateOfLastDeworming': dateLastCtrl.text.trim(),
+                                  'isNA': isNA,
+                                  'drugGiven': selectedDrug ?? '',
+                                  'adverseReactions': adverseCtrl.text.trim(),
+                                  'nextDewormingDate': nextDateCtrl.text.trim(),
+                                };
+                                setSheetState(() => saving = true);
+                                try {
+                                  final patient = widget.patient;
+                                  final firestore = FirestoreService();
+
+                                  Future<void> createNewAssessmentWithDeworming() async {
+                                    final now = DateTime.now();
+                                    final dateStr =
+                                        '${now.month.toString().padLeft(2, '0')}/${now.day.toString().padLeft(2, '0')}/${now.year}';
+                                    final data = {
+                                      'demographic': {
+                                        'firstName': patient.firstName,
+                                        'lastName': patient.lastName,
+                                        'age': patient.age.toString(),
+                                        'sex': patient.sex,
+                                        'address': patient.address,
+                                        'dateOfBirth': patient.dateOfBirth,
+                                        'mother': patient.motherName,
+                                        'motherContact': patient.motherContact,
+                                        'father': patient.fatherName,
+                                        'fatherContact': patient.fatherContact,
+                                      },
+                                      'anthropometric': {
+                                        'dateOfMeasurement': dateStr,
+                                        'weight': '',
+                                        'height': '',
+                                        'muac': '',
+                                        'weightForAge': '',
+                                        'weightForHeight': '',
+                                        'heightForAge': '',
+                                        'bmi': '',
+                                      },
+                                      'healthStatus': {
+                                        'diarrhea': false,
+                                        'fever': false,
+                                        'cough': false,
+                                        'other': false,
+                                        'medications': false,
+                                      },
+                                      'dietary': {
+                                        'purelyBreastfed': null,
+                                        'cfAge': '',
+                                        'cfFrequency': '',
+                                        'cfFoods': '',
+                                        'mealFrequency': '',
+                                      },
+                                      'deworming': deworming,
+                                      'oral': {'overallRisk': null},
+                                      'dewormingOnly': true,
+                                    };
+                                    await firestore.saveAssessmentToBarangayPatient(
+                                      patientId: patient.docId,
+                                      assessmentData: data,
+                                    );
+                                  }
+
+                                  Map<String, dynamic>? latestAssessment;
+                                  for (var i = _assessments.length - 1; i >= 0; i--) {
+                                    if (_assessments[i]['docId'] != null) {
+                                      latestAssessment = _assessments[i];
+                                      break;
+                                    }
+                                  }
+                                  final assessmentId = latestAssessment?['docId'] as String?;
+                                  final canUpdate = assessmentId != null &&
+                                      assessmentId.isNotEmpty &&
+                                      assessmentId != patient.docId;
+
+                                  bool saved = false;
+                                  if (canUpdate) {
+                                    try {
+                                      await firestore.updateAssessmentInBarangayPatient(
+                                        patientId: patient.docId,
+                                        assessmentId: assessmentId,
+                                        updatedData: {'deworming': deworming},
+                                      );
+                                      saved = true;
+                                    } catch (e) {
+                                      if (e.toString().contains('not-found') ||
+                                          e.toString().contains('NOT_FOUND')) {
+                                        await createNewAssessmentWithDeworming();
+                                        saved = true;
+                                      } else {
+                                        rethrow;
+                                      }
+                                    }
+                                  }
+                                  if (!saved) {
+                                    await createNewAssessmentWithDeworming();
+                                  }
+
+                                  if (mounted) {
+                                    setState(() => _loading = true);
+                                    await _fetchAssessments();
+                                  }
+                                  if (ctx.mounted) Navigator.pop(ctx);
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Deworming status updated.'),
+                                        backgroundColor: Color(0xFF2E8B7B),
+                                      ),
+                                    );
+                                  }
+                                } catch (e) {
+                                  debugPrint('Error saving deworming: $e');
+                                  setSheetState(() {
+                                    saving = false;
+                                    errorMessage = 'Failed to save. Try again.';
+                                  });
+                                }
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: saving ? kOrange.withOpacity(0.6) : kOrange,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                          elevation: 0,
+                        ),
                         child: saving
                             ? const SizedBox(
-                                width: 20,
-                                height: 20,
+                                width: 22,
+                                height: 22,
                                 child: CircularProgressIndicator(
-                                    strokeWidth: 2.5, color: Colors.white))
-                            : const Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.save_outlined,
-                                      color: Colors.white, size: 18),
-                                  SizedBox(width: 8),
-                                  Text('Save Assessmentdd',
-                                      style: TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 15,
-                                          letterSpacing: 0.4)),
-                                ],
-                              ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        });
-      },
-    );
-  }*/
-
-  /*void _showAddAssessmentSheet() {
-  final dateCtrl = TextEditingController();
-  final weightCtrl = TextEditingController();
-  final heightCtrl = TextEditingController();
-  final muacCtrl = TextEditingController();
-
-  bool saving = false;
-  String? errorMessage;
-
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (ctx) {
-      return StatefulBuilder(
-        builder: (ctx, setSheetState) {
-          return Container(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(ctx).viewInsets.bottom,
-            ),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color.fromARGB(255, 245, 246, 246),
-                  Color.fromARGB(255, 251, 253, 252),
-                ],
-              ),
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(24),
-                topRight: Radius.circular(24),
-              ),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.28),
-                width: 1,
-              ),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Drag handle
-                  Container(
-                    width: 40,
-                    height: 4,
-                    margin: const EdgeInsets.only(bottom: 16),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.4),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-
-                  // Header
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.35),
-                            width: 1,
-                          ),
-                        ),
-                        child: const Icon(
-                          Icons.add_chart_outlined,
-                          color: Color.fromARGB(255, 228, 119, 9),
-                          size: 18,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'New Assessment',
-                              style: TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w700,
-                                color: Color.fromARGB(255, 233, 42, 9),
-                                letterSpacing: 0.3,
-                              ),
-                            ),
-                            Text(
-                              '${widget.patient.firstName} ${widget.patient.lastName}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.white.withOpacity(0.7),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (widget.isSharedPatient)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.35),
-                              width: 1,
-                            ),
-                          ),
-                          child: const Text(
-                            'SHARED',
-                            style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                              letterSpacing: 0.8,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-
-                  // Divider
-                  Container(
-                    height: 1,
-                    margin: const EdgeInsets.symmetric(vertical: 16),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Colors.transparent,
-                          Colors.white.withOpacity(0.35),
-                          Colors.transparent,
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  // Error message
-                  if (errorMessage != null) ...[
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFDC2626).withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: const Color(0xFFDC2626).withOpacity(0.5),
-                          width: 1.5,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.error_outline,
-                            color: Colors.white,
-                            size: 18,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              errorMessage!,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                  ],
-
-                  // Fields
-                  _buildSheetField(
-                    ctx: ctx,
-                    controller: dateCtrl,
-                    label: 'Date of Measurement',
-                    hint: 'MM/DD/YYYY',
-                    icon: Icons.calendar_today_outlined,
-                    onTap: () async {
-                      final picked = await showDatePicker(
-                        context: ctx,
-                        initialDate: DateTime.now(),
-                        firstDate: DateTime(2020),
-                        lastDate: DateTime.now(),
-                      );
-                      if (picked != null) {
-                        dateCtrl.text =
-                            '${picked.month.toString().padLeft(2, '0')}/${picked.day.toString().padLeft(2, '0')}/${picked.year}';
-                        if (errorMessage != null) {
-                          setSheetState(() => errorMessage = null);
-                        }
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 10),
-
-                  _buildSheetField(
-                    ctx: ctx,
-                    controller: weightCtrl,
-                    label: 'Weight (kg)',
-                    hint: 'e.g. 9.5',
-                    icon: Icons.monitor_weight_outlined,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                  ),
-                  const SizedBox(height: 10),
-
-                  _buildSheetField(
-                    ctx: ctx,
-                    controller: heightCtrl,
-                    label: 'Height (cm)',
-                    hint: 'e.g. 80',
-                    icon: Icons.height,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                  ),
-                  const SizedBox(height: 10),
-
-                  _buildSheetField(
-                    ctx: ctx,
-                    controller: muacCtrl,
-                    label: 'MUAC (cm)',
-                    hint: 'e.g. 16',
-                    icon: Icons.straighten,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                  ),
-
-                  const SizedBox(height: 22),
-
-                  // ✅ ElevatedButton
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: saving
-                          ? null
-                          : () async {
-                              if (dateCtrl.text.trim().isEmpty ||
-                                  weightCtrl.text.trim().isEmpty ||
-                                  heightCtrl.text.trim().isEmpty) {
-                                setSheetState(() => errorMessage =
-                                    'Please fill in date, weight, and height.');
-                                return;
-                              }
-
-                              setSheetState(() {
-                                errorMessage = null;
-                                saving = true;
-                              });
-
-                              await _saveNewAssessment(
-                                date: dateCtrl.text.trim(),
-                                weight: weightCtrl.text.trim(),
-                                height: heightCtrl.text.trim(),
-                                muac: muacCtrl.text.trim(),
-                              );
-
-                              if (ctx.mounted) Navigator.pop(ctx);
-                            },
-                      style: ElevatedButton.styleFrom(
-                       // backgroundColor:
-                           // saving ? _orange.withOpacity(0.6) : _orange,
-                            backgroundColor: saving
-                              ? const Color(0xFFF59E0B).withOpacity(0.6)
-                              : const Color(0xFFF59E0B),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(30),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: saving
-                          ? const SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.save_outlined, size: 18),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Save Assessment',
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: 0.4,
-                                  ),
+                                  strokeWidth: 2.5,
+                                  color: Colors.white,
                                 ),
-                              ],
-                            ),
+                              )
+                            : const Text(
+                                'Save',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      style: TextButton.styleFrom(foregroundColor: kInkMid),
+                      child: const Text(
+                        'Cancel',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           );
@@ -1336,325 +1294,8 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
       );
     },
   );
-}*/
+}
 
-
-/*void _showAddAssessmentSheet() {
-  final dateCtrl = TextEditingController();
-  final weightCtrl = TextEditingController();
-  final heightCtrl = TextEditingController();
-  final muacCtrl = TextEditingController();
-
-  bool saving = false;
-  String? errorMessage;
-
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (ctx) {
-      return StatefulBuilder(
-        builder: (ctx, setSheetState) {
-          return Container(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(ctx).viewInsets.bottom,
-            ),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color.fromARGB(255, 255, 255, 255),
-                  Color(0xFF5CAA7F),
-                ],
-              ),
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(24),
-                topRight: Radius.circular(24),
-              ),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.28),
-                width: 1,
-              ),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Drag handle
-                  Container(
-                    width: 40,
-                    height: 4,
-                    margin: const EdgeInsets.only(bottom: 16),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.4),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-
-                  // Header
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.35),
-                            width: 1,
-                          ),
-                        ),
-                        child: const Icon(
-                          Icons.add_chart_outlined,
-                          color: Colors.white,
-                          size: 18,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'New Assessment',
-                              style: TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                                letterSpacing: 0.3,
-                              ),
-                            ),
-                            Text(
-                              '${widget.patient.firstName} ${widget.patient.lastName}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.white.withOpacity(0.7),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (widget.isSharedPatient)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.35),
-                              width: 1,
-                            ),
-                          ),
-                          child: const Text(
-                            'SHARED',
-                            style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                              letterSpacing: 0.8,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-
-                  // Divider
-                  Container(
-                    height: 1,
-                    margin: const EdgeInsets.symmetric(vertical: 16),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Colors.transparent,
-                          Colors.white.withOpacity(0.35),
-                          Colors.transparent,
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  // Error message
-                  if (errorMessage != null) ...[
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFDC2626).withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: const Color(0xFFDC2626).withOpacity(0.5),
-                          width: 1.5,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.error_outline,
-                            color: Colors.white,
-                            size: 18,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              errorMessage!,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                  ],
-
-                  // Fields
-                  _buildSheetField(
-                    ctx: ctx,
-                    controller: dateCtrl,
-                    label: 'Date of Measurement',
-                    hint: 'MM/DD/YYYY',
-                    icon: Icons.calendar_today_outlined,
-                    onTap: () async {
-                      final picked = await showDatePicker(
-                        context: ctx,
-                        initialDate: DateTime.now(),
-                        firstDate: DateTime(2020),
-                        lastDate: DateTime.now(),
-                      );
-                      if (picked != null) {
-                        dateCtrl.text =
-                            '${picked.month.toString().padLeft(2, '0')}/${picked.day.toString().padLeft(2, '0')}/${picked.year}';
-                        if (errorMessage != null) {
-                          setSheetState(() => errorMessage = null);
-                        }
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 10),
-
-                  _buildSheetField(
-                    ctx: ctx,
-                    controller: weightCtrl,
-                    label: 'Weight (kg)',
-                    hint: 'e.g. 9.5',
-                    icon: Icons.monitor_weight_outlined,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                  ),
-                  const SizedBox(height: 10),
-
-                  _buildSheetField(
-                    ctx: ctx,
-                    controller: heightCtrl,
-                    label: 'Height (cm)',
-                    hint: 'e.g. 80',
-                    icon: Icons.height,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                  ),
-                  const SizedBox(height: 10),
-
-                  _buildSheetField(
-                    ctx: ctx,
-                    controller: muacCtrl,
-                    label: 'MUAC (cm)',
-                    hint: 'e.g. 16',
-                    icon: Icons.straighten,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                  ),
-
-                  const SizedBox(height: 22),
-
-                  // ✅ WHITE BUTTON WITH ORANGE CONTENT
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: saving
-                          ? null
-                          : () async {
-                              if (dateCtrl.text.trim().isEmpty ||
-                                  weightCtrl.text.trim().isEmpty ||
-                                  heightCtrl.text.trim().isEmpty) {
-                                setSheetState(() => errorMessage =
-                                    'Please fill in date, weight, and height.');
-                                return;
-                              }
-
-                              setSheetState(() {
-                                errorMessage = null;
-                                saving = true;
-                              });
-
-                              await _saveNewAssessment(
-                                date: dateCtrl.text.trim(),
-                                weight: weightCtrl.text.trim(),
-                                height: heightCtrl.text.trim(),
-                                muac: muacCtrl.text.trim(),
-                              );
-
-                              if (ctx.mounted) Navigator.pop(ctx);
-                            },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: saving
-                            ? Colors.white.withOpacity(0.7)
-                            : Colors.white,
-                        foregroundColor:
-                            const Color(0xFFF59E0B), // ORANGE
-                        padding:
-                            const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(30),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: saving
-                          ? const SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                color: Color(0xFFF59E0B),
-                              ),
-                            )
-                          : const Row(
-                              mainAxisAlignment:
-                                  MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.save_outlined, size: 18),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Save Assessment',
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: 0.4,
-                                  ),
-                                ),
-                              ],
-                            ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      );
-    },
-  );
-}*/
 // ─────────────────────────────────────────────────────────────────────────────
 //  _showAddAssessmentSheet — consistent with VaccinationStatusSection style
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2024,17 +1665,20 @@ void _showAddAssessmentSheet() {
                           onPressed: saving
                               ? null
                               : () async {
-                                  if (dateCtrl.text.trim().isEmpty ||
-                                      weightCtrl.text.trim().isEmpty ||
-                                      heightCtrl.text.trim().isEmpty) {
-                                    setSheetState(() => errorMessage =
-                                        'Date, weight, and height are required.');
-                                    return;
-                                  }
                                   setSheetState(() {
                                     errorMessage = null;
                                     saving = true;
                                   });
+                                  if (dateCtrl.text.trim().isEmpty ||
+                                      weightCtrl.text.trim().isEmpty ||
+                                      heightCtrl.text.trim().isEmpty) {
+                                    setSheetState(() {
+                                      errorMessage =
+                                          'Date, weight, and height are required.';
+                                      saving = false;
+                                    });
+                                    return;
+                                  }
                                   await _saveNewAssessment(
                                     date:   dateCtrl.text.trim(),
                                     weight: weightCtrl.text.trim(),
@@ -2266,6 +1910,8 @@ Future<void> _saveNewAssessment({
         .saveLocalRecord(data, synced: true, firestoreId: patient.docId);
     
     if (mounted) {
+      setState(() => _loading = true);
+      await _fetchAssessments();
       final String saveMessage = wflSaved
           ? '✅ Complete assessment saved to shared patient record!'
           : '✅ Assessment saved. Weight for Length/Height was not calculated (age/height may be outside WHO range: 0–2y length 45–110 cm, 2–5y height 65–120 cm). See console for details.';

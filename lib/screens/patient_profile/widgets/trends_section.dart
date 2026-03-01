@@ -68,6 +68,22 @@ class TrendsSection extends StatelessWidget {
       }
     }
 
+    // Sort by date ascending so first point = oldest (e.g. Feb), last = newest (Mar, Mar)
+    validAssessments.sort((a, b) {
+      final da = a['date'] as DateTime? ?? DateTime(1970);
+      final db = b['date'] as DateTime? ?? DateTime(1970);
+      return da.compareTo(db);
+    });
+    // Rebuild score lists in the same order as sorted validAssessments
+    final sortedHeight = <double?>[];
+    final sortedWeight = <double?>[];
+    final sortedWfh = <double?>[];
+    for (final a in validAssessments) {
+      sortedHeight.add(_extractZScore(a['heightForAge']?.toString()));
+      sortedWeight.add(_extractZScore(a['weightForAge']?.toString()));
+      sortedWfh.add(_extractZScore(a['weightForHeight']?.toString()));
+    }
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -93,7 +109,7 @@ class TrendsSection extends StatelessWidget {
           if (validAssessments.length < 2)
             _buildInsufficient()
           else
-            _buildCharts(validAssessments, heightScores, weightScores, wfhScores),
+            _buildCharts(validAssessments, sortedHeight, sortedWeight, sortedWfh),
         ],
       ),
     );
@@ -166,7 +182,7 @@ class TrendsSection extends StatelessWidget {
               data: height.map((s) => s ?? 0.0).toList(),
               dates: dates,
               color: _colorHeight,
-              showXAxis: false,
+              showXAxis: true,
             ),
             const SizedBox(height: 10),
           ],
@@ -176,7 +192,7 @@ class TrendsSection extends StatelessWidget {
               data: weight.map((s) => s ?? 0.0).toList(),
               dates: dates,
               color: _colorWeight,
-              showXAxis: false,
+              showXAxis: true,
             ),
             const SizedBox(height: 10),
           ],
@@ -237,12 +253,15 @@ class _TrendChart extends StatelessWidget {
     final maxVal = data.reduce((a, b) => a > b ? a : b);
     final minVal = data.reduce((a, b) => a < b ? a : b);
 
+    // Faint grid color (light gray) to match reference chart style
+    const gridColor = Color(0xFFE8E8ED);
+
     return Container(
-      height: 82,
+      height: 100,
       decoration: BoxDecoration(
         color: color.withOpacity(0.06),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.18), width: 1),
+        border: Border.all(color: color.withOpacity(0.22), width: 1),
       ),
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
       child: Row(
@@ -274,35 +293,84 @@ class _TrendChart extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Expanded(
-            child: Column(
-              children: [
-                Expanded(
-                  child: CustomPaint(
-                    painter: TrendLinePainter(
-                      data: data,
-                      color: color,
-                      minValue: minVal,
-                      maxValue: maxVal,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                // Use finite width (inside SingleChildScrollView maxWidth can be infinite, so x positions break)
+                final rawW = constraints.maxWidth;
+                final chartWidth = rawW.isFinite && rawW > 0
+                    ? rawW
+                    : MediaQuery.sizeOf(context).width - 32;
+                final n = dates.length;
+                return Column(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        width: chartWidth,
+                        child: CustomPaint(
+                          painter: TrendLinePainter(
+                            data: data,
+                            color: color,
+                            minValue: minVal,
+                            maxValue: maxVal,
+                            gridLineColor: gridColor,
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-                if (showXAxis) ...[
-                  const SizedBox(height: 4),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: dates
-                        .map((d) => Text(
-                              d,
-                              style: const TextStyle(
-                                fontSize: 9.5,
-                                color: Color(0xFF6C6C70),
-                                fontWeight: FontWeight.w500,
+                    if (showXAxis && n >= 2) ...[
+                      const SizedBox(height: 4),
+                      SizedBox(
+                        height: 14,
+                        width: chartWidth,
+                        child: Stack(
+                          children: [
+                            for (int i = 0; i < n; i++)
+                              Positioned(
+                                left: i == 0
+                                    ? 0
+                                    : i == n - 1
+                                        ? chartWidth - 36
+                                        : (i * (chartWidth / (n - 1))) - 18,
+                                width: 36,
+                                child: i == 0
+                                    ? Text(
+                                        dates[i],
+                                        style: const TextStyle(
+                                          fontSize: 9.5,
+                                          color: Color(0xFF6C6C70),
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      )
+                                    : i == n - 1
+                                        ? Align(
+                                            alignment: Alignment.centerRight,
+                                            child: Text(
+                                              dates[i],
+                                              style: const TextStyle(
+                                                fontSize: 9.5,
+                                                color: Color(0xFF6C6C70),
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          )
+                                        : Center(
+                                            child: Text(
+                                              dates[i],
+                                              style: const TextStyle(
+                                                fontSize: 9.5,
+                                                color: Color(0xFF6C6C70),
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ),
                               ),
-                            ))
-                        .toList(),
-                  ),
-                ],
-              ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                );
+              },
             ),
           ),
         ],
