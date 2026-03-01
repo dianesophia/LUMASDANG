@@ -1138,11 +1138,14 @@ void _showEditDewormingSheet() {
                                   final patient = widget.patient;
                                   final firestore = FirestoreService();
 
-                                  Future<void> createNewAssessmentWithDeworming() async {
+                                  // ── Helper: builds a full deworming-only assessment payload ──
+                                  // ✅ FIX: added 'isDeleted': false — required by Firestore rules
+                                  Map<String, dynamic> buildDewormingPayload(
+                                      Map<String, dynamic> dewormingData) {
                                     final now = DateTime.now();
                                     final dateStr =
                                         '${now.month.toString().padLeft(2, '0')}/${now.day.toString().padLeft(2, '0')}/${now.year}';
-                                    final data = {
+                                    return {
                                       'demographic': {
                                         'firstName': patient.firstName,
                                         'lastName': patient.lastName,
@@ -1179,49 +1182,64 @@ void _showEditDewormingSheet() {
                                         'cfFoods': '',
                                         'mealFrequency': '',
                                       },
-                                      'deworming': deworming,
+                                      'deworming': dewormingData,
                                       'oral': {'overallRisk': null},
                                       'dewormingOnly': true,
+                                      'isDeleted': false, // ✅ FIX: required by Firestore rules
                                     };
-                                    await firestore.saveAssessmentToBarangayPatient(
-                                      patientId: patient.docId,
-                                      assessmentData: data,
-                                    );
                                   }
 
-                                  Map<String, dynamic>? latestAssessment;
-                                  for (var i = _assessments.length - 1; i >= 0; i--) {
-                                    if (_assessments[i]['docId'] != null) {
-                                      latestAssessment = _assessments[i];
-                                      break;
+                                  // ✅ FIX: fetch the real Firestore assessment ID directly
+                                  // instead of relying on locally-cached _assessments which may
+                                  // have patient.docId as a placeholder — causing canUpdate to
+                                  // always be false and a new doc to be created every time.
+                                  String? assessmentId;
+                                  try {
+                                    final freshAssessments = await firestore
+                                        .getAssessmentsForBarangayPatient(patient.docId);
+                                    if (freshAssessments.isNotEmpty) {
+                                      assessmentId =
+                                          freshAssessments.last['id'] as String?;
                                     }
+                                  } catch (e) {
+                                    debugPrint(
+                                        '[Deworming] Could not fetch fresh assessments: $e');
                                   }
-                                  final assessmentId = latestAssessment?['docId'] as String?;
+
                                   final canUpdate = assessmentId != null &&
-                                      assessmentId.isNotEmpty &&
-                                      assessmentId != patient.docId;
+                                      assessmentId.isNotEmpty;
 
                                   bool saved = false;
                                   if (canUpdate) {
                                     try {
                                       await firestore.updateAssessmentInBarangayPatient(
                                         patientId: patient.docId,
-                                        assessmentId: assessmentId,
+                                        assessmentId: assessmentId!,
                                         updatedData: {'deworming': deworming},
                                       );
                                       saved = true;
+                                      debugPrint(
+                                          '[Deworming] ✅ Updated existing assessment: $assessmentId');
                                     } catch (e) {
+                                      debugPrint(
+                                          '[Deworming] Update failed ($e), will create new assessment.');
                                       if (e.toString().contains('not-found') ||
                                           e.toString().contains('NOT_FOUND')) {
-                                        await createNewAssessmentWithDeworming();
-                                        saved = true;
+                                        // Doc was deleted on Firestore — fall through to create
                                       } else {
                                         rethrow;
                                       }
                                     }
                                   }
+
                                   if (!saved) {
-                                    await createNewAssessmentWithDeworming();
+                                    // No existing Firestore assessment, or update failed — create new
+                                    await firestore.saveAssessmentToBarangayPatient(
+                                      patientId: patient.docId,
+                                      assessmentData: buildDewormingPayload(deworming),
+                                    );
+                                    debugPrint(
+                                        '[Deworming] ✅ Created new deworming-only assessment.');
                                   }
 
                                   if (mounted) {
@@ -1935,4 +1953,4 @@ Future<void> _saveNewAssessment({
     }
   }
 }
-}
+    }
