@@ -350,7 +350,6 @@ lumasdang/
 │   │   └── theme_provider.dart   # Handles theme and font settings
 │   │
 │   ├── services/                 # Core functionality
-│   │   ├── BiometricAuthService.dart    # Fingerprint login
 │   │   ├── local_db_service.dart        # Local phone database (Hive)
 │   │   ├── firestore_service.dart       # Cloud database operations
 │   │   ├── connectivity_service.dart    # Internet detection & syncing
