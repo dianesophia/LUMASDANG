@@ -9,6 +9,7 @@ import '../../services/local_db_service.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../services/BiometricAuthService.dart';
 import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -143,7 +144,8 @@ class _LoginPageState extends State<LoginPage>
     setState(() => _isLoading = true);
 
     // Attempt offline login if no network available.
-    final online = await ConnectivityService.instance.checkOnline();
+    //final online = await ConnectivityService.instance.checkOnline();
+    final online = kIsWeb ? true : await ConnectivityService.instance.checkOnline();
     if (!online) {
       // Resolve input to an email if user typed username previously saved locally
       String emailToUse = input;

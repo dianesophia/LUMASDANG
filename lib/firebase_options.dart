@@ -85,4 +85,5 @@ class DefaultFirebaseOptions {
     storageBucket: 'lumasdang.firebasestorage.app',
     measurementId: 'G-7MH216414L',
   );
+
 }

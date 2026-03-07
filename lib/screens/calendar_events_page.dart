@@ -5,6 +5,7 @@ import 'package:lumasdang/services/firestore_service.dart';
 import 'package:lumasdang/screens/shared/app_buttom_navbar.dart'; // ← adjust path if needed
 import 'package:lumasdang/services/local_calendar_service.dart';
 import 'package:lumasdang/services/connectivity_service.dart';
+import 'package:flutter/foundation.dart';
 
 // ─── Model ────────────────────────────────────────────────────────────────────
 class CalEvent {
@@ -64,7 +65,8 @@ class CalendarService {
       .collection('calendarEvents');
 
   Stream<List<CalEvent>> eventsStream() async* {
-    final online = await ConnectivityService.instance.checkOnline();
+    //final online = await ConnectivityService.instance.checkOnline();
+    final online = kIsWeb ? true : await ConnectivityService.instance.checkOnline();
     String? barangayId;
 
     if (online) {
@@ -105,7 +107,8 @@ class CalendarService {
   }
 
   Future<void> addEvent(CalEvent event) async {
-    final online = await ConnectivityService.instance.checkOnline();
+    //final online = await ConnectivityService.instance.checkOnline();
+    final online = kIsWeb ? true : await ConnectivityService.instance.checkOnline();
     final user = _auth.currentUser;
     if (user == null && online) return;
 
@@ -148,7 +151,8 @@ class CalendarService {
   }
 
   Future<void> updateEvent(CalEvent event) async {
-    final online = await ConnectivityService.instance.checkOnline();
+    //final online = await ConnectivityService.instance.checkOnline();
+    final online = kIsWeb ? true : await ConnectivityService.instance.checkOnline();
     String? barangayId;
     if (online) {
       barangayId = await _getBarangayId();
@@ -169,7 +173,8 @@ class CalendarService {
   }
 
   Future<void> deleteEvent(String eventId) async {
-    final online = await ConnectivityService.instance.checkOnline();
+    //final online = await ConnectivityService.instance.checkOnline();
+    final online = kIsWeb ? true : await ConnectivityService.instance.checkOnline();
     String? barangayId;
     if (online) {
       barangayId = await _getBarangayId();

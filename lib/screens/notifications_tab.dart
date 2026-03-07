@@ -5,6 +5,7 @@ import '../services/local_db_service.dart';
 import '../services/connectivity_service.dart';
 import '../screens/calendar_events_page.dart';
 import '../screens/patient_list.dart';
+import 'package:flutter/foundation.dart';
 
 class NotificationsTab extends StatefulWidget {
   final VoidCallback? onNavigateToPatients;
@@ -28,7 +29,8 @@ class _NotificationsTabState extends State<NotificationsTab> {
   }
 
   Future<void> _checkConnectivity() async {
-    final online = await ConnectivityService.instance.checkOnline();
+    //final online = await ConnectivityService.instance.checkOnline();
+    final online = kIsWeb ? true : await ConnectivityService.instance.checkOnline();
     if (mounted) setState(() => _isOnline = online);
     if (!online) _loadOffline();
     ConnectivityService.instance.startMonitoring((online) {

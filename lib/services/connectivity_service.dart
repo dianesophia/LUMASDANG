@@ -1,7 +1,8 @@
 import 'dart:async';
-import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:http/http.dart' as http;
 import 'local_db_service.dart';
 import 'firestore_service.dart';
 
@@ -10,19 +11,28 @@ class ConnectivityService {
   static final ConnectivityService instance = ConnectivityService._private();
 
   final Connectivity _connectivity = Connectivity();
-  StreamSubscription<ConnectivityResult>? _sub;
+  StreamSubscription? _sub;
 
-  /// Returns a best-effort online status by checking connectivity result
-  /// and doing a quick DNS lookup to confirm internet access.
   Future<bool> checkOnline() async {
     try {
-      final result = await _connectivity.checkConnectivity();
-      if (result == ConnectivityResult.none) return false;
+      final results = await _connectivity.checkConnectivity();
 
-      // Confirm by doing a lightweight DNS lookup.
-      final lookup = await InternetAddress.lookup('example.com');
-      return lookup.isNotEmpty && lookup.first.rawAddress.isNotEmpty;
+      // connectivity_plus v5+ returns List<ConnectivityResult>
+      final hasConnection = results is List
+          ? !(results as List).every((r) => r == ConnectivityResult.none)
+          : results != ConnectivityResult.none;
+
+      if (!hasConnection) return false;
+
+      // On web, dart:io is unavailable — use http.get instead
+      // On mobile, also use http.get for a real internet confirmation
+      final response = await http
+          .get(Uri.parse('https://www.google.com'))
+          .timeout(const Duration(seconds: 4));
+
+      return response.statusCode == 200;
     } catch (e) {
+      print('ConnectivityService.checkOnline: error=$e');
       return false;
     }
   }
@@ -36,8 +46,6 @@ class ConnectivityService {
     });
   }
 
-  /// Convenience helper to automatically sync pending local records when
-  /// connection is restored. Will use provided FirestoreService or create one.
   void startAutoSync({FirestoreService? firestoreService}) {
     print('ConnectivityService: startAutoSync called');
     startMonitoring((online) async {
@@ -46,12 +54,10 @@ class ConnectivityService {
         try {
           final fs = firestoreService ?? FirestoreService();
           await LocalDbService.instance.init();
-          print('ConnectivityService.startAutoSync: running LocalDbService.syncPending');
           final synced = await LocalDbService.instance.syncPending(fs);
           print('ConnectivityService.startAutoSync: syncPending result=$synced');
         } catch (e) {
           print('ConnectivityService.startAutoSync: error during sync $e');
-          // swallow; will retry on next connection change
         }
       }
     });

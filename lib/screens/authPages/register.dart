@@ -6,6 +6,7 @@ import 'package:lumasdang/screens/home/home_page.dart';
 import '../../services/connectivity_service.dart';
 import '../../services/local_db_service.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter/foundation.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -217,7 +218,8 @@ class _RegisterPageState extends State<RegisterPage> with TickerProviderStateMix
     setState(() => _isLoading = true);
 
     // Registration requires an internet connection (Firebase account + Firestore docs).
-    final online = await ConnectivityService.instance.checkOnline();
+    //final online = await ConnectivityService.instance.checkOnline();
+    final online = kIsWeb ? true : await ConnectivityService.instance.checkOnline();
     if (!online) {
       _showSnack('Internet connection is required to create a new account. You can log in offline only after a successful online sign-in.');
       setState(() => _isLoading = false);

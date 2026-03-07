@@ -63,7 +63,7 @@ dependencies:
   uuid: ^3.0.7
   provider: ^6.0.0
   google_fonts: ^6.2.1
-
+  http: ^1.2.0
 
 dev_dependencies:
   flutter_test:
@@ -109,9 +109,14 @@ flutter:
   # The project currently does not include bundled font files, so
   # custom font entries were removed to avoid referencing missing assets.
 
-flutter_icons:
+flutter_launcher_icons:
   android: true
   ios: true
+  web:
+    generate: true
+    image_path: "assets/logo/app_logo.jpg"
   image_path: "assets/logo/app_logo.jpg"
   remove_alpha_ios: true
 
+dependency_overrides:
+  dart_numerics: any

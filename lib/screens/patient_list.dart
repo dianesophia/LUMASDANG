@@ -11,6 +11,7 @@ import '../services/auto_archive_preferences.dart';
 import '../services/connectivity_service.dart';
 import '../services/local_db_service.dart';
 import 'shared/status_color.dart';
+import 'package:flutter/foundation.dart';
 
 // ==================== APP BOTTOM NAV BAR ====================
 
@@ -420,7 +421,8 @@ class _PatientListTabState extends State<PatientListTab> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       await LocalDbService.instance.init();
-      final online = await ConnectivityService.instance.checkOnline();
+      //final online = await ConnectivityService.instance.
+      final online = kIsWeb ? true : await ConnectivityService.instance.checkOnline();
 
       // Offline or offline-authenticated session: build patient list from local homepageData
       if (!online || LocalDbService.instance.offlineAuthenticated || user == null) {

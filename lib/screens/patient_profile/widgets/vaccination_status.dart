@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../../services/connectivity_service.dart';
+import 'package:flutter/foundation.dart';
 
 /// National Immunization Program vaccines (Philippines)
 class _Vaccine {
@@ -88,7 +89,8 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
 
   Future<void> _init() async {
     // If we have local statuses and we're offline, prefer them and skip Firestore.
-    final online = await ConnectivityService.instance.checkOnline();
+    //final online = await ConnectivityService.instance.checkOnline();
+    final online = kIsWeb ? true : await ConnectivityService.instance.checkOnline();
     if (!online && widget.localStatuses != null && widget.localStatuses!.isNotEmpty) {
       setState(() {
         _statuses = Map<String, String>.from(widget.localStatuses!);
@@ -112,7 +114,8 @@ class _VaccinationStatusSectionState extends State<VaccinationStatusSection> {
   }
 
   Future<void> _applyLocalIfOffline() async {
-    final online = await ConnectivityService.instance.checkOnline();
+    //final online = await ConnectivityService.instance.checkOnline();
+    final online = kIsWeb ? true : await ConnectivityService.instance.checkOnline();
     if (!online && widget.localStatuses != null && widget.localStatuses!.isNotEmpty) {
       setState(() {
         _statuses = Map<String, String>.from(widget.localStatuses!);

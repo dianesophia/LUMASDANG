@@ -16,6 +16,7 @@ import 'widgets/dietary_assessment_form.dart';
 import 'widgets/oral_assessment_form.dart';
 import 'widgets/vaccination_form.dart';
 import 'widgets/deworming_form.dart';
+import 'package:flutter/foundation.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -109,7 +110,8 @@ class _HomePageState extends State<HomePage>
     _tabController = TabController(length: 3, vsync: this);
 
     LocalDbService.instance.init().then((_) async {
-      final online = await ConnectivityService.instance.checkOnline();
+      //final online = await ConnectivityService.instance.checkOnline();
+      final online = kIsWeb ? true : await ConnectivityService.instance.checkOnline();
       if (online) {
         final synced =
             await LocalDbService.instance.syncPending(FirestoreService());
@@ -256,7 +258,8 @@ class _HomePageState extends State<HomePage>
     };
 
     final firestore = FirestoreService();
-    final online = await ConnectivityService.instance.checkOnline();
+    //final online = await ConnectivityService.instance.checkOnline();
+    final online = kIsWeb ? true : await ConnectivityService.instance.checkOnline();
     String? barangayPatientId;
 
     if (online) {

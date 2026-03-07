@@ -15,6 +15,7 @@ import 'widgets/vaccination_status.dart';
 import 'widgets/deworming_status.dart';
 import 'widgets/parent_contact_tab.dart';
 import 'package:lumasdang/screens/shared/app_buttom_navbar.dart'; // ← adjust path if needed
+import 'package:flutter/foundation.dart';
 
 class PatientProfileOverview extends StatefulWidget {
   final Patient patient;
@@ -79,7 +80,8 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
       final user = FirebaseAuth.instance.currentUser;
       if (user == null || widget.patient.docId.isEmpty) return;
 
-      final online = await ConnectivityService.instance.checkOnline();
+      //final online = await ConnectivityService.instance.checkOnline();
+      final online = kIsWeb ? true : await ConnectivityService.instance.checkOnline();
       if (!online || LocalDbService.instance.offlineAuthenticated) {
         // Try to load from local DB
         await LocalDbService.instance.init();
@@ -146,7 +148,8 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
       final user = FirebaseAuth.instance.currentUser;
       if (user == null || widget.patient.docId.isEmpty) return;
 
-      final online = await ConnectivityService.instance.checkOnline();
+      //final online = await ConnectivityService.instance.checkOnline();
+      final online = kIsWeb ? true : await ConnectivityService.instance.checkOnline();
       if (!online || LocalDbService.instance.offlineAuthenticated) {
         await LocalDbService.instance.init();
         // Update local record if exists, otherwise create a minimal record
@@ -399,7 +402,8 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
       }
 
       // 2) When online, enrich with Firestore data
-      final online = await ConnectivityService.instance.checkOnline();
+      //final online = await ConnectivityService.instance.checkOnline();
+      final online = kIsWeb ? true : await ConnectivityService.instance.checkOnline();
       if (online) {
         if (widget.isSharedPatient && widget.sharedPatientId != null) {
           final assessments = await firestoreService

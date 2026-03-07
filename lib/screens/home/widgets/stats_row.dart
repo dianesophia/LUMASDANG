@@ -3,6 +3,7 @@ import '../../../services/firestore_service.dart';
 import '../../../services/local_db_service.dart';
 import '../../../services/connectivity_service.dart';
 import '../../shared/status_color.dart';
+import 'package:flutter/foundation.dart';
 
 class StatsRow extends StatefulWidget {
   final VoidCallback? onTap;
@@ -25,14 +26,16 @@ class _StatsRowState extends State<StatsRow> {
 
   Future<int> _loadTodayCount() async {
     await LocalDbService.instance.init();
-    final online = await ConnectivityService.instance.checkOnline();
+    //final online = await ConnectivityService.instance.checkOnline();
+    final online = kIsWeb ? true : await ConnectivityService.instance.checkOnline();
     if (online) return FirestoreService().getTodayScreenedCountFromBarangay();
     return LocalDbService.instance.getTodayScreenedCount();
   }
 
   Future<Map<String, int>> _loadStatusCounts() async {
     await LocalDbService.instance.init();
-    final online = await ConnectivityService.instance.checkOnline();
+    //final online = await ConnectivityService.instance.checkOnline();
+    final online = kIsWeb ? true : await ConnectivityService.instance.checkOnline();
     if (online) return FirestoreService().getStatusCounts();
 
     // Offline: compute rough status counts from locally cached homepageData

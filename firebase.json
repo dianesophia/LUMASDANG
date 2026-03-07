@@ -1,1 +1,46 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"lumasdang","appId":"1:999323139941:android:e464d8a3a41eb780a92b8c","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"lumasdang","configurations":{"android":"1:999323139941:android:e464d8a3a41eb780a92b8c","ios":"1:999323139941:ios:89333ff78d05257ba92b8c","macos":"1:999323139941:ios:89333ff78d05257ba92b8c","web":"1:999323139941:web:efb80e07d97d97afa92b8c","windows":"1:999323139941:web:3e46a3c40f3329a5a92b8c"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "lumasdang",
+          "appId": "1:999323139941:android:e464d8a3a41eb780a92b8c",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "lumasdang",
+          "configurations": {
+            "android": "1:999323139941:android:e464d8a3a41eb780a92b8c",
+            "ios": "1:999323139941:ios:89333ff78d05257ba92b8c",
+            "macos": "1:999323139941:ios:89333ff78d05257ba92b8c",
+            "web": "1:999323139941:web:efb80e07d97d97afa92b8c",
+            "windows": "1:999323139941:web:3e46a3c40f3329a5a92b8c"
+          }
+        }
+      }
+    }
+  },
+  "firestore": {
+    "database": "(default)",
+    "location": "asia-southeast1",
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "hosting": {
+    "site": "lumasdang-8d90d",
+    "public": "build/web",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
+}

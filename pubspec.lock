@@ -154,7 +154,7 @@ packages:
     source: hosted
     version: "1.0.8"
   dart_numerics:
-    dependency: transitive
+    dependency: "direct overridden"
     description:
       name: dart_numerics
       sha256: "47408d4890551636204851325e5649bf1a1616ebc325184c36722a1716cbaba4"
@@ -513,7 +513,7 @@ packages:
     source: hosted
     version: "1.0.1"
   http:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: http
       sha256: "87721a4a50b19c7f1d49001e51409bddc46303966ce89a65af4f4e6004896412"
