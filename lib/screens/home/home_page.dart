@@ -16,6 +16,8 @@ import 'widgets/dietary_assessment_form.dart';
 import 'widgets/oral_assessment_form.dart';
 import 'widgets/vaccination_form.dart';
 import 'widgets/deworming_form.dart';
+import 'widgets/family_planning_form.dart';
+import 'widgets/nutrition_environment_form.dart';
 import 'package:flutter/foundation.dart';
 
 class HomePage extends StatefulWidget {
@@ -31,49 +33,79 @@ class _HomePageState extends State<HomePage>
 
   // ── Form controllers ───────────────────────────────────────────────────────
   final TextEditingController firstNameController = TextEditingController();
+  final TextEditingController middleNameController = TextEditingController();
   final TextEditingController lastNameController = TextEditingController();
   final TextEditingController ageController = TextEditingController();
+  final TextEditingController ageDaysController = TextEditingController();
+  final TextEditingController ageYearsController = TextEditingController();
   final TextEditingController sexController = TextEditingController();
   final TextEditingController addressController = TextEditingController();
   final TextEditingController placeOfBirthController = TextEditingController();
   final TextEditingController dobController = TextEditingController();
+  final TextEditingController religionController = TextEditingController();
+  final TextEditingController birthWeightController = TextEditingController();
+  final TextEditingController birthOrderController = TextEditingController();
+  final TextEditingController residenceStatusController = TextEditingController();
+  final TextEditingController lengthOfStayController = TextEditingController();
+
+  // Mother
   final TextEditingController motherController = TextEditingController();
   final TextEditingController motherContactController = TextEditingController();
+  final TextEditingController motherAgeController = TextEditingController();
+  final TextEditingController motherOccupationController = TextEditingController();
+
+  // Father
   final TextEditingController fatherController = TextEditingController();
   final TextEditingController fatherContactController = TextEditingController();
+  final TextEditingController fatherAgeController = TextEditingController();
+  final TextEditingController fatherOccupationController = TextEditingController();
 
-  final TextEditingController measurementDateController =
-      TextEditingController();
+  // Caregiver
+  final TextEditingController caregiverNameController = TextEditingController();
+  final TextEditingController caregiverAgeController = TextEditingController();
+  final TextEditingController caregiverEthnicityController = TextEditingController();
+  final TextEditingController caregiverRelationshipController = TextEditingController();
+  final TextEditingController caregiverReligionController = TextEditingController();
+
+  // Household
+  final TextEditingController fourPsHouseholdIdController = TextEditingController();
+  final TextEditingController disabilityController = TextEditingController();
+
+  // Anthropometric
+  final TextEditingController measurementDateController = TextEditingController();
   final TextEditingController weightController = TextEditingController();
   final TextEditingController heightController = TextEditingController();
   final TextEditingController muacController = TextEditingController();
   final TextEditingController weightForAgeController = TextEditingController();
-  final TextEditingController weightForHeightController =
-      TextEditingController();
+  final TextEditingController weightForHeightController = TextEditingController();
   final TextEditingController heightForAgeController = TextEditingController();
   final TextEditingController bmiController = TextEditingController();
 
-  // ── Basic info (IP group) ──────────────────────────────────────────────────
-  bool? _belongsToIpGroup;
+  // Dietary
+  final TextEditingController cfAgeController = TextEditingController();
+  final TextEditingController cfFreqController = TextEditingController();
+  final TextEditingController cfFoodController = TextEditingController();
+  final TextEditingController mealFreqController = TextEditingController();
 
-  // ── Health status ──────────────────────────────────────────────────────────
+  // ── State variables ────────────────────────────────────────────────────────
+  bool? _belongsToIpGroup;
+  String? _ipEthnicity;
+  bool? _isFourPsMember;
+  bool? _hasDisability;
+
   bool _diarrhea = false;
   bool _fever = false;
   bool _cough = false;
   bool _other = false;
   bool _medications = false;
 
-  // ── Dietary ───────────────────────────────────────────────────────────────
   bool? _purelyBreastfed;
-  final TextEditingController cfAgeController = TextEditingController();
-  final TextEditingController cfFreqController = TextEditingController();
-  final TextEditingController cfFoodController = TextEditingController();
-  final TextEditingController mealFreqController = TextEditingController();
 
-  // ── Other form data ────────────────────────────────────────────────────────
   Map<String, dynamic>? _dewormingData;
   Map<String, dynamic>? _oralData;
   Map<String, dynamic>? _vaccinationData;
+  Map<String, dynamic>? _familyPlanningData;
+  Map<String, dynamic>? _nutritionEnvData;
 
   // ── Refresh / reset keys ───────────────────────────────────────────────────
   int _statsRefreshKey = 0;
@@ -84,6 +116,8 @@ class _HomePageState extends State<HomePage>
   int _dewormingFormKey = 0;
   int _oralFormKey = 0;
   int _vaccinationFormKey = 0;
+  int _familyPlanningFormKey = 0;
+  int _nutritionEnvFormKey = 0;
 
   // ── Validation ─────────────────────────────────────────────────────────────
   final _formKey = GlobalKey<FormState>();
@@ -110,7 +144,6 @@ class _HomePageState extends State<HomePage>
     _tabController = TabController(length: 3, vsync: this);
 
     LocalDbService.instance.init().then((_) async {
-      //final online = await ConnectivityService.instance.checkOnline();
       final online = kIsWeb ? true : await ConnectivityService.instance.checkOnline();
       if (online) {
         final synced =
@@ -136,17 +169,46 @@ class _HomePageState extends State<HomePage>
   void dispose() {
     _patientListRefreshTrigger.dispose();
     _tabController.dispose();
+
+    // Patient
     firstNameController.dispose();
+    middleNameController.dispose();
     lastNameController.dispose();
     ageController.dispose();
+    ageDaysController.dispose();
+    ageYearsController.dispose();
     sexController.dispose();
     addressController.dispose();
     placeOfBirthController.dispose();
     dobController.dispose();
+    religionController.dispose();
+    birthWeightController.dispose();
+    birthOrderController.dispose();
+    residenceStatusController.dispose();
+    lengthOfStayController.dispose();
+
+    // Parents
     motherController.dispose();
     motherContactController.dispose();
+    motherAgeController.dispose();
+    motherOccupationController.dispose();
     fatherController.dispose();
     fatherContactController.dispose();
+    fatherAgeController.dispose();
+    fatherOccupationController.dispose();
+
+    // Caregiver
+    caregiverNameController.dispose();
+    caregiverAgeController.dispose();
+    caregiverEthnicityController.dispose();
+    caregiverRelationshipController.dispose();
+    caregiverReligionController.dispose();
+
+    // Household
+    fourPsHouseholdIdController.dispose();
+    disabilityController.dispose();
+
+    // Anthropometric
     measurementDateController.dispose();
     weightController.dispose();
     heightController.dispose();
@@ -155,14 +217,17 @@ class _HomePageState extends State<HomePage>
     weightForHeightController.dispose();
     heightForAgeController.dispose();
     bmiController.dispose();
+
+    // Dietary
     cfAgeController.dispose();
     cfFreqController.dispose();
     cfFoodController.dispose();
     mealFreqController.dispose();
+
     super.dispose();
   }
 
-
+  // ── Save ───────────────────────────────────────────────────────────────────
   Future<void> _saveAllData() async {
     final isFormValid = _formKey.currentState?.validate() ?? false;
     bool hasNonTextErrors = false;
@@ -175,26 +240,20 @@ class _HomePageState extends State<HomePage>
     }
 
     if (_oralData == null || _oralData!['overallRisk'] == null) {
-      setState(
-          () => _oralRiskError = 'Please select an overall risk level');
+      setState(() => _oralRiskError = 'Please select an overall risk level');
       hasNonTextErrors = true;
     } else {
       setState(() => _oralRiskError = null);
     }
 
     if (_dewormingData == null) {
-      setState(
-          () => _dewormingError = 'Please fill in deworming information');
+      setState(() => _dewormingError = 'Please fill in deworming information');
       hasNonTextErrors = true;
     } else {
       final isNA = _dewormingData!['isNA'] == true;
       if (!isNA) {
-        if ((_dewormingData!['dateOfLastDeworming'] ?? '')
-            .toString()
-            .trim()
-            .isEmpty) {
-          setState(
-              () => _dewormingError = 'Please enter a date or select N/A');
+        if ((_dewormingData!['dateOfLastDeworming'] ?? '').toString().trim().isEmpty) {
+          setState(() => _dewormingError = 'Please enter a date or select N/A');
           hasNonTextErrors = true;
         } else if (_dewormingData!['drugGiven'] == null) {
           setState(() => _dewormingError = 'Please select a drug given');
@@ -216,17 +275,39 @@ class _HomePageState extends State<HomePage>
     final data = {
       'demographic': {
         'firstName': firstNameController.text.trim(),
+        'middleName': middleNameController.text.trim(),
         'lastName': lastNameController.text.trim(),
         'age': ageController.text.trim(),
+        'ageDays': ageDaysController.text.trim(),
+        'ageYears': ageYearsController.text.trim(),
         'sex': sexController.text.trim(),
         'address': addressController.text.trim(),
         'placeOfBirth': placeOfBirthController.text.trim(),
         'dateOfBirth': dobController.text.trim(),
         'belongsToIpGroup': _belongsToIpGroup,
+        'ipEthnicity': _ipEthnicity,
+        'religion': religionController.text.trim(),
+        'birthWeight': birthWeightController.text.trim(),
+        'birthOrder': birthOrderController.text.trim(),
+        'residenceStatus': residenceStatusController.text.trim(),
+        'lengthOfStay': lengthOfStayController.text.trim(),
+        'hasDisability': _hasDisability,
+        'disability': disabilityController.text.trim(),
         'mother': motherController.text.trim(),
         'motherContact': motherContactController.text.trim(),
+        'motherAge': motherAgeController.text.trim(),
+        'motherOccupation': motherOccupationController.text.trim(),
         'father': fatherController.text.trim(),
         'fatherContact': fatherContactController.text.trim(),
+        'fatherAge': fatherAgeController.text.trim(),
+        'fatherOccupation': fatherOccupationController.text.trim(),
+        'caregiverName': caregiverNameController.text.trim(),
+        'caregiverAge': caregiverAgeController.text.trim(),
+        'caregiverEthnicity': caregiverEthnicityController.text.trim(),
+        'caregiverRelationship': caregiverRelationshipController.text.trim(),
+        'caregiverReligion': caregiverReligionController.text.trim(),
+        'isFourPsMember': _isFourPsMember,
+        'fourPsHouseholdId': fourPsHouseholdIdController.text.trim(),
       },
       'anthropometric': {
         'dateOfMeasurement': measurementDateController.text.trim(),
@@ -245,6 +326,7 @@ class _HomePageState extends State<HomePage>
         'other': _other,
         'medications': _medications,
       },
+      'familyPlanning': _familyPlanningData,
       'dietary': {
         'purelyBreastfed': _purelyBreastfed,
         'cfAge': cfAgeController.text.trim(),
@@ -252,13 +334,13 @@ class _HomePageState extends State<HomePage>
         'cfFoods': cfFoodController.text.trim(),
         'mealFrequency': mealFreqController.text.trim(),
       },
+      'nutritionEnvironment': _nutritionEnvData,
       'deworming': _dewormingData,
       'oral': _oralData,
       'vaccination': _vaccinationData,
     };
 
     final firestore = FirestoreService();
-    //final online = await ConnectivityService.instance.checkOnline();
     final online = kIsWeb ? true : await ConnectivityService.instance.checkOnline();
     String? barangayPatientId;
 
@@ -266,7 +348,7 @@ class _HomePageState extends State<HomePage>
       try {
         final docId = await firestore.saveHomePageData(data);
         try {
-          barangayPatientId = await firestore.savePatientToBarangay(data); // ← only call here
+          barangayPatientId = await firestore.savePatientToBarangay(data);
         } catch (eBarangay) {
           debugPrint('Barangay patient save: $eBarangay');
           if (mounted) {
@@ -284,7 +366,8 @@ class _HomePageState extends State<HomePage>
       } catch (e) {
         await LocalDbService.instance.saveLocalRecord(data, synced: false);
         if (!mounted) return;
-        _showSnackBar('Saved locally (will sync later). Error: ${e.toString()}',
+        _showSnackBar(
+            'Saved locally (will sync later). Error: ${e.toString()}',
             color: Colors.orange);
       }
     } else {
@@ -298,8 +381,7 @@ class _HomePageState extends State<HomePage>
     if (_vaccinationData != null && online) {
       try {
         int highestDoseNumber(String vaccine) {
-          final doses =
-              _vaccinationData![vaccine] as Map<String, dynamic>?;
+          final doses = _vaccinationData![vaccine] as Map<String, dynamic>?;
           if (doses == null) return 0;
           const birth = 'BIRTH';
           const m1_5 = '1½';
@@ -342,12 +424,18 @@ class _HomePageState extends State<HomePage>
         String doseLabelForNumber(int number) {
           if (number <= 0) return 'Pending';
           switch (number) {
-            case 1: return '1st dose';
-            case 2: return '2nd dose';
-            case 3: return '3rd dose';
-            case 4: return '4th dose';
-            case 5: return '5th dose';
-            default: return 'Booster';
+            case 1:
+              return '1st dose';
+            case 2:
+              return '2nd dose';
+            case 3:
+              return '3rd dose';
+            case 4:
+              return '4th dose';
+            case 5:
+              return '5th dose';
+            default:
+              return 'Booster';
           }
         }
 
@@ -371,25 +459,23 @@ class _HomePageState extends State<HomePage>
         final fs = FirestoreService();
         await fs.saveVaccinationStatus(
           firstName: firstNameController.text.trim(),
+          middleName: middleNameController.text.trim(),
           lastName: lastNameController.text.trim(),
           statuses: statuses,
         );
 
-        // Reuse barangayPatientId from above — no second savePatientToBarangay call
         if (barangayPatientId != null) {
           try {
             final barangayId = await firestore.getCurrentUserBarangayId();
             if (barangayId != null && barangayId.isNotEmpty) {
-              // Save vaccination status into the barangay/shared patient record
               await firestore.saveVaccinationStatusToBarangayPatient(
                 barangayId: barangayId,
                 patientId: barangayPatientId,
                 firstName: firstNameController.text.trim(),
                 lastName: lastNameController.text.trim(),
+                middleName: middleNameController.text.trim(),
                 statuses: statuses,
               );
-
-              // Create notification as before
               await firestore.createPatientNotification(
                 barangayId: barangayId,
                 patientId: barangayPatientId,
@@ -412,14 +498,22 @@ class _HomePageState extends State<HomePage>
     }
 
     if (mounted) {
+      // Clear all controllers
       for (final c in [
-        firstNameController, lastNameController, ageController,
+        firstNameController, middleNameController, lastNameController,
+        ageController, ageDaysController, ageYearsController,
         sexController, addressController, placeOfBirthController,
-        dobController, motherController, motherContactController,
-        fatherController, fatherContactController,
-        measurementDateController, weightController, heightController,
-        muacController, weightForAgeController, weightForHeightController,
-        heightForAgeController, bmiController,
+        dobController, religionController, birthWeightController,
+        birthOrderController, residenceStatusController, lengthOfStayController,
+        motherController, motherContactController, motherAgeController,
+        motherOccupationController, fatherController, fatherContactController,
+        fatherAgeController, fatherOccupationController,
+        caregiverNameController, caregiverAgeController,
+        caregiverEthnicityController, caregiverRelationshipController,
+        caregiverReligionController, fourPsHouseholdIdController,
+        disabilityController, measurementDateController, weightController,
+        heightController, muacController, weightForAgeController,
+        weightForHeightController, heightForAgeController, bmiController,
         cfAgeController, cfFreqController, cfFoodController, mealFreqController,
       ]) {
         c.clear();
@@ -433,6 +527,8 @@ class _HomePageState extends State<HomePage>
         _dewormingFormKey++;
         _oralFormKey++;
         _vaccinationFormKey++;
+        _familyPlanningFormKey++;
+        _nutritionEnvFormKey++;
         _diarrhea = false;
         _fever = false;
         _cough = false;
@@ -441,11 +537,16 @@ class _HomePageState extends State<HomePage>
         _purelyBreastfed = null;
         _purelyBreastfedError = null;
         _belongsToIpGroup = null;
+        _ipEthnicity = null;
+        _isFourPsMember = null;
+        _hasDisability = null;
         _oralData = null;
         _oralRiskError = null;
         _vaccinationData = null;
         _dewormingData = null;
         _dewormingError = null;
+        _familyPlanningData = null;
+        _nutritionEnvData = null;
       });
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -455,290 +556,6 @@ class _HomePageState extends State<HomePage>
       setState(() => _statsRefreshKey++);
     }
   }
-  // ── Save ───────────────────────────────────────────────────────────────────
-  /*Future<void> _saveAllData() async {
-    final isFormValid = _formKey.currentState?.validate() ?? false;
-    bool hasNonTextErrors = false;
-
-    if (_purelyBreastfed == null) {
-      setState(() => _purelyBreastfedError = 'Please select Yes or No');
-      hasNonTextErrors = true;
-    } else {
-      setState(() => _purelyBreastfedError = null);
-    }
-
-    if (_oralData == null || _oralData!['overallRisk'] == null) {
-      setState(
-          () => _oralRiskError = 'Please select an overall risk level');
-      hasNonTextErrors = true;
-    } else {
-      setState(() => _oralRiskError = null);
-    }
-
-    if (_dewormingData == null) {
-      setState(
-          () => _dewormingError = 'Please fill in deworming information');
-      hasNonTextErrors = true;
-    } else {
-      final isNA = _dewormingData!['isNA'] == true;
-      if (!isNA) {
-        if ((_dewormingData!['dateOfLastDeworming'] ?? '')
-            .toString()
-            .trim()
-            .isEmpty) {
-          setState(
-              () => _dewormingError = 'Please enter a date or select N/A');
-          hasNonTextErrors = true;
-        } else if (_dewormingData!['drugGiven'] == null) {
-          setState(() => _dewormingError = 'Please select a drug given');
-          hasNonTextErrors = true;
-        } else {
-          setState(() => _dewormingError = null);
-        }
-      } else {
-        setState(() => _dewormingError = null);
-      }
-    }
-
-    if (!isFormValid || hasNonTextErrors) {
-      _showSnackBar('Please fill in all required fields.',
-          color: const Color(0xFFEF4444));
-      return;
-    }
-
-    final data = {
-      'demographic': {
-        'firstName': firstNameController.text.trim(),
-        'lastName': lastNameController.text.trim(),
-        'age': ageController.text.trim(),
-        'sex': sexController.text.trim(),
-        'address': addressController.text.trim(),
-        'placeOfBirth': placeOfBirthController.text.trim(),
-        'dateOfBirth': dobController.text.trim(),
-        'belongsToIpGroup': _belongsToIpGroup,
-        'mother': motherController.text.trim(),
-        'motherContact': motherContactController.text.trim(),
-        'father': fatherController.text.trim(),
-        'fatherContact': fatherContactController.text.trim(),
-      },
-      'anthropometric': {
-        'dateOfMeasurement': measurementDateController.text.trim(),
-        'weight': weightController.text.trim(),
-        'height': heightController.text.trim(),
-        'muac': muacController.text.trim(),
-        'weightForAge': weightForAgeController.text.trim(),
-        'weightForHeight': weightForHeightController.text.trim(),
-        'heightForAge': heightForAgeController.text.trim(),
-        'bmi': bmiController.text.trim(),
-      },
-      'healthStatus': {
-        'diarrhea': _diarrhea,
-        'fever': _fever,
-        'cough': _cough,
-        'other': _other,
-        'medications': _medications,
-      },
-      'dietary': {
-        'purelyBreastfed': _purelyBreastfed,
-        'cfAge': cfAgeController.text.trim(),
-        'cfFrequency': cfFreqController.text.trim(),
-        'cfFoods': cfFoodController.text.trim(),
-        'mealFrequency': mealFreqController.text.trim(),
-      },
-      'deworming': _dewormingData,
-      'oral': _oralData,
-      'vaccination': _vaccinationData,
-    };
-
-    final firestore = FirestoreService();
-    final online = await ConnectivityService.instance.checkOnline();
-    String? barangayPatientId;
-
-    if (online) {
-      try {
-        final docId = await firestore.saveHomePageData(data);
-        try {
-          //barangayPatientId = await firestore.savePatientToBarangay(data);
-        } catch (eBarangay) {
-          debugPrint('Barangay patient save: $eBarangay');
-          if (mounted) {
-            _showSnackBar(
-              'Saved to server but could not add to Patient List.',
-              color: Colors.orange,
-            );
-          }
-        }
-        await LocalDbService.instance
-            .saveLocalRecord(data, synced: true, firestoreId: docId);
-        if (!mounted) return;
-        _patientListRefreshTrigger.value++;
-        _showSnackBar('Assessment saved to server and locally.');
-      } catch (e) {
-        await LocalDbService.instance.saveLocalRecord(data, synced: false);
-        if (!mounted) return;
-        _showSnackBar('Saved locally (will sync later). Error: ${e.toString()}',
-            color: Colors.orange);
-      }
-    } else {
-      await LocalDbService.instance.saveLocalRecord(data, synced: false);
-      if (!mounted) return;
-      _showSnackBar('No internet: saved locally, will sync when online.',
-          color: Colors.orange);
-    }
-
-    // Sync vaccination status
-    if (_vaccinationData != null && online) {
-      try {
-        int highestDoseNumber(String vaccine) {
-          final doses =
-              _vaccinationData![vaccine] as Map<String, dynamic>?;
-          if (doses == null) return 0;
-          const birth = 'BIRTH';
-          const m1_5 = '1½';
-          const m2_5 = '2½';
-          const m3_5 = '3½';
-          const m9 = '9';
-          const y1 = '1 YR';
-          List<String> relevantHeaders;
-          switch (vaccine) {
-            case 'BCG':
-              relevantHeaders = [birth];
-              break;
-            case 'HEP B':
-              relevantHeaders = [birth, m1_5, m2_5];
-              break;
-            case 'PENTAVALENT':
-              relevantHeaders = [m1_5, m2_5, m3_5, y1];
-              break;
-            case 'OPV':
-              relevantHeaders = [birth, m2_5, m9];
-              break;
-            case 'IPV':
-              relevantHeaders = [m1_5, m2_5, m3_5, y1];
-              break;
-            case 'PCV':
-              relevantHeaders = [m1_5, m2_5, m3_5, y1];
-              break;
-            case 'MMR':
-              relevantHeaders = [m9, y1];
-              break;
-            default:
-              relevantHeaders = [birth, m1_5, m2_5, m3_5, m9, y1];
-          }
-          for (int i = relevantHeaders.length - 1; i >= 0; i--) {
-            if (doses[relevantHeaders[i]] == true) return i + 1;
-          }
-          return 0;
-        }
-
-        String doseLabelForNumber(int number) {
-          if (number <= 0) return 'Pending';
-          switch (number) {
-            case 1: return '1st dose';
-            case 2: return '2nd dose';
-            case 3: return '3rd dose';
-            case 4: return '4th dose';
-            case 5: return '5th dose';
-            default: return 'Booster';
-          }
-        }
-
-        String vaccineStatus(String name) =>
-            doseLabelForNumber(highestDoseNumber(name));
-        final opvNumber = highestDoseNumber('OPV');
-        final ipvNumber = highestDoseNumber('IPV');
-
-        final statuses = <String, String>{
-          'bcg': vaccineStatus('BCG'),
-          'hepatitisB': vaccineStatus('HEP B'),
-          'dptPentavalent': vaccineStatus('PENTAVALENT'),
-          'opv': vaccineStatus('OPV'),
-          'ipv': vaccineStatus('IPV'),
-          'opvIpv': doseLabelForNumber(
-              opvNumber > ipvNumber ? opvNumber : ipvNumber),
-          'measlesMmr': vaccineStatus('MMR'),
-          'pcv': vaccineStatus('PCV'),
-        };
-
-        await FirestoreService().saveVaccinationStatus(
-          firstName: firstNameController.text.trim(),
-          lastName: lastNameController.text.trim(),
-          statuses: statuses,
-        );
-
-        if (barangayPatientId != null) {
-          try {
-            barangayPatientId = await firestore.savePatientToBarangay(data);
-            if (barangayPatientId != null) {
-              final barangayId =
-                  await firestore.getCurrentUserBarangayId();
-              if (barangayId != null && barangayId.isNotEmpty) {
-                await firestore.createPatientNotification(
-                  barangayId: barangayId,
-                  patientId: barangayPatientId,
-                  patientData: data,
-                );
-              }
-            }
-          } catch (eBarangay) {
-            debugPrint('Barangay patient save: $eBarangay');
-            if (mounted) {
-              _showSnackBar(
-                  'Saved to server but could not add to Patient List.',
-                  color: Colors.orange);
-            }
-          }
-        }
-      } catch (e) {
-        debugPrint('Error syncing vaccination status: $e');
-      }
-    }
-
-    if (mounted) {
-      // Clear controllers
-      for (final c in [
-        firstNameController, lastNameController, ageController,
-        sexController, addressController, placeOfBirthController,
-        dobController, motherController, motherContactController,
-        fatherController, fatherContactController,
-        measurementDateController, weightController, heightController,
-        muacController, weightForAgeController, weightForHeightController,
-        heightForAgeController, bmiController,
-        cfAgeController, cfFreqController, cfFoodController, mealFreqController,
-      ]) {
-        c.clear();
-      }
-
-      setState(() {
-        _statsRefreshKey++;
-        _demographicFormKey++;
-        _anthropometricFormKey++;
-        _dietaryFormKey++;
-        _dewormingFormKey++;
-        _oralFormKey++;
-        _vaccinationFormKey++;
-        _diarrhea = false;
-        _fever = false;
-        _cough = false;
-        _other = false;
-        _medications = false;
-        _purelyBreastfed = null;
-        _purelyBreastfedError = null;
-        _belongsToIpGroup = null;
-        _oralData = null;
-        _oralRiskError = null;
-        _vaccinationData = null;
-        _dewormingData = null;
-        _dewormingError = null;
-      });
-
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _formKey.currentState?.reset();
-      });
-
-      setState(() => _statsRefreshKey++);
-    }
-  }*/
 
   // ── Build ──────────────────────────────────────────────────────────────────
   @override
@@ -775,7 +592,6 @@ class _HomePageState extends State<HomePage>
           ),
         ),
       ),
-
     );
   }
 
@@ -784,7 +600,6 @@ class _HomePageState extends State<HomePage>
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: Column(
         children: [
-          // ── Title row ──────────────────────────────────────────────────
           Row(
             children: [
               Container(
@@ -797,8 +612,8 @@ class _HomePageState extends State<HomePage>
                     width: 1.2,
                   ),
                 ),
-                    child: const Icon(Icons.eco_rounded,
-                      color: Colors.white, size: 18),
+                child: const Icon(Icons.eco_rounded,
+                    color: Colors.white, size: 18),
               ),
               const SizedBox(width: 12),
               const Text(
@@ -837,7 +652,6 @@ class _HomePageState extends State<HomePage>
             ],
           ),
           const SizedBox(height: 14),
-          // ── Gradient divider ───────────────────────────────────────────
           Container(
             height: 1,
             width: double.infinity,
@@ -881,16 +695,20 @@ class _HomePageState extends State<HomePage>
             borderRadius: BorderRadius.circular(12),
           ),
           indicatorSize: TabBarIndicatorSize.tab,
-          indicatorPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          indicatorPadding:
+              const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           dividerColor: Colors.transparent,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white.withOpacity(0.55),
-          labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+          labelStyle:
+              const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
           unselectedLabelStyle: const TextStyle(fontSize: 12),
           tabs: const [
             Tab(icon: Icon(Icons.home_outlined, size: 22), text: 'Home'),
             Tab(icon: Icon(Icons.people_outline, size: 22), text: 'Patients'),
-            Tab(icon: Icon(Icons.notifications_outlined, size: 22), text: 'Alerts'),
+            Tab(
+                icon: Icon(Icons.notifications_outlined, size: 22),
+                text: 'Alerts'),
           ],
         ),
       ),
@@ -913,7 +731,7 @@ class _HomePageState extends State<HomePage>
             const UpcomingEvents(),
             const SizedBox(height: 20),
 
-            // ── Section label (mirrors Settings _sectionLabel) ───────────
+            // Section label
             Padding(
               padding: const EdgeInsets.only(left: 4),
               child: Text(
@@ -926,27 +744,57 @@ class _HomePageState extends State<HomePage>
                 ),
               ),
             ),
-
             const SizedBox(height: 12),
 
+            // ── 1. Demographic ─────────────────────────────────────────
             DemographicDataForm(
               key: ValueKey('demographic_form_$_demographicFormKey'),
               firstNameController: firstNameController,
+              middleNameController: middleNameController,
               lastNameController: lastNameController,
               ageController: ageController,
+              ageDaysController: ageDaysController,
+              ageYearsController: ageYearsController,
               sexController: sexController,
               addressController: addressController,
               placeOfBirthController: placeOfBirthController,
               dobController: dobController,
               motherController: motherController,
               motherContactController: motherContactController,
+              motherAgeController: motherAgeController,
+              motherOccupationController: motherOccupationController,
               fatherController: fatherController,
               fatherContactController: fatherContactController,
+              fatherAgeController: fatherAgeController,
+              fatherOccupationController: fatherOccupationController,
+              religionController: religionController,
+              residenceStatusController: residenceStatusController,
+              lengthOfStayController: lengthOfStayController,
+              birthWeightController: birthWeightController,
+              birthOrderController: birthOrderController,
+              caregiverNameController: caregiverNameController,
+              caregiverAgeController: caregiverAgeController,
+              caregiverEthnicityController: caregiverEthnicityController,
+              caregiverRelationshipController: caregiverRelationshipController,
+              caregiverReligionController: caregiverReligionController,
+              fourPsHouseholdIdController: fourPsHouseholdIdController,
+              disabilityController: disabilityController,
               belongsToIpGroup: _belongsToIpGroup,
+              ipEthnicity: _ipEthnicity,
+              isFourPsMember: _isFourPsMember,
+              hasDisability: _hasDisability,
               onBelongsToIpGroupChanged: (v) =>
                   setState(() => _belongsToIpGroup = v),
+              onIpEthnicityChanged: (v) =>
+                  setState(() => _ipEthnicity = v),
+              onIsFourPsMemberChanged: (v) =>
+                  setState(() => _isFourPsMember = v),
+              onHasDisabilityChanged: (v) =>
+                  setState(() => _hasDisability = v),
             ),
             const SizedBox(height: 16),
+
+            // ── 2. Anthropometric ──────────────────────────────────────
             AnthropometricDataForm(
               key: ValueKey('anthropometric_form_$_anthropometricFormKey'),
               dateController: measurementDateController,
@@ -962,6 +810,8 @@ class _HomePageState extends State<HomePage>
               dobController: dobController,
             ),
             const SizedBox(height: 16),
+
+            // ── 3. Health Status ───────────────────────────────────────
             HealthStatusForm(
               diarrhea: _diarrhea,
               onDiarrheaChanged: (v) => setState(() => _diarrhea = v),
@@ -975,6 +825,16 @@ class _HomePageState extends State<HomePage>
               onMedicationsChanged: (v) => setState(() => _medications = v),
             ),
             const SizedBox(height: 16),
+
+            // ── 4. Family Planning ─────────────────────────────────────
+            FamilyPlanningForm(
+              key: ValueKey('fp_form_$_familyPlanningFormKey'),
+              onDataChanged: (data) =>
+                  setState(() => _familyPlanningData = data),
+            ),
+            const SizedBox(height: 16),
+
+            // ── 5. Dietary Assessment ──────────────────────────────────
             DietaryAssessmentForm(
               key: ValueKey('dietary_form_$_dietaryFormKey'),
               purelyBreastfed: _purelyBreastfed,
@@ -991,6 +851,16 @@ class _HomePageState extends State<HomePage>
               purelyBreastfedError: _purelyBreastfedError,
             ),
             const SizedBox(height: 16),
+
+            // ── 6. Nutrition Environment ───────────────────────────────
+            NutritionEnvironmentForm(
+              key: ValueKey('nutrition_env_form_$_nutritionEnvFormKey'),
+              onDataChanged: (data) =>
+                  setState(() => _nutritionEnvData = data),
+            ),
+            const SizedBox(height: 16),
+
+            // ── 7. Oral Assessment ─────────────────────────────────────
             OralAssessmentForm(
               key: ValueKey('oral_form_$_oralFormKey'),
               onDataChanged: (data) {
@@ -1000,11 +870,15 @@ class _HomePageState extends State<HomePage>
               overallRiskError: _oralRiskError,
             ),
             const SizedBox(height: 16),
+
+            // ── 8. Vaccination ─────────────────────────────────────────
             VaccinationForm(
               key: ValueKey('vaccination_form_$_vaccinationFormKey'),
               onDataChanged: (data) => _vaccinationData = data,
             ),
             const SizedBox(height: 16),
+
+            // ── 9. Deworming ───────────────────────────────────────────
             DewormingForm(
               key: ValueKey('deworming_form_$_dewormingFormKey'),
               onSave: (map) {
@@ -1018,45 +892,45 @@ class _HomePageState extends State<HomePage>
 
             const SizedBox(height: 24),
 
-            // ── Save button ───────────────────────────────────────────────
+            // ── Save button ────────────────────────────────────────────
             GestureDetector(
-            onTap: _saveAllData,
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 15),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFF5A962), Color(0xFFF08030)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFFF5A962).withValues(alpha: 0.35),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
+              onTap: _saveAllData,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 15),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFF5A962), Color(0xFFF08030)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                ],
-              ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.save_outlined, color: Colors.white, size: 20),
-                  SizedBox(width: 8),
-                  Text(
-                    'Save Assessment',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 15,
-                      letterSpacing: 0.4,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFF5A962).withValues(alpha: 0.35),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
                     ),
-                  ),
-                ],
+                  ],
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.save_outlined, color: Colors.white, size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'Save Assessment',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        letterSpacing: 0.4,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
             const SizedBox(height: 30),
           ],
         ),
@@ -1068,13 +942,9 @@ class _HomePageState extends State<HomePage>
     return PatientListTab(refreshTrigger: _patientListRefreshTrigger);
   }
 
- /* Widget _buildNotificationsTab() {
-    return const NotificationsTab();
-  }*/
-  
   Widget _buildNotificationsTab() {
-  return NotificationsTab(
-    onNavigateToPatients: () => _tabController.animateTo(1),
-  );
-}
+    return NotificationsTab(
+      onNavigateToPatients: () => _tabController.animateTo(1),
+    );
+  }
 }

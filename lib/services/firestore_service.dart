@@ -86,12 +86,13 @@ class FirestoreService {
   /// Saves vaccination status for Profile Overview (keyed by child name).
   Future<void> saveVaccinationStatus({
     required String firstName,
+    required String middleName,
     required String lastName,
     required Map<String, String> statuses,
   }) async {
     final user = _auth.currentUser;
     if (user == null) return;
-    final key = '${firstName.trim()}_${lastName.trim()}'.toLowerCase();
+    final key = '${firstName.trim()}_${middleName.trim()}_${lastName.trim()}'.toLowerCase();
     if (key == '_') return;
     await _firestore
         .collection('users')
@@ -100,6 +101,7 @@ class FirestoreService {
         .doc(key)
         .set({
       'firstName': firstName.trim(),
+      'middleName': middleName.trim(),
       'lastName': lastName.trim(),
       'statuses': statuses,
       'updatedAt': FieldValue.serverTimestamp(),
@@ -135,6 +137,7 @@ class FirestoreService {
     required String barangayId,
     required String patientId,
     required String firstName,
+    required String middleName,
     required String lastName,
     required Map<String, String> statuses,
   }) async {
@@ -170,6 +173,7 @@ class FirestoreService {
 
     await ref.set({
       'firstName': firstName.trim(),
+      'middleName': middleName.trim(),
       'lastName': lastName.trim(),
       'lastReviewDate': FieldValue.serverTimestamp(),
       'lastModifiedBy': user.uid,
@@ -1061,6 +1065,7 @@ Future<List<Map<String, dynamic>>> getRecentAssessments({int limit = 50}) async 
       return {
         'id': doc.id,
         'firstName': data['demographic']?['firstName'] ?? '',
+        'middleName': data['demographic']?['middleName'] ?? '',
         'lastName': data['demographic']?['lastName'] ?? '',
         'age': data['demographic']?['age'] ?? '',
         'sex': data['demographic']?['sex'] ?? '',
@@ -1103,7 +1108,7 @@ Future<void> createPatientNotification({
         .add({
       'type': 'new_patient',
       'patientId': patientId,
-      'patientName': '${patientData['demographic']?['firstName'] ?? ''} ${patientData['demographic']?['lastName'] ?? ''}',
+      'patientName': '${patientData['demographic']?['firstName'] ?? ''} ${patientData['demographic']?['middleName'] ?? ''} ${patientData['demographic']?['lastName'] ?? ''}',
       'patientAge': patientData['demographic']?['age'] ?? '',
       'patientSex': patientData['demographic']?['sex'] ?? '',
       'createdBy': user.uid,
@@ -1641,9 +1646,10 @@ Future<Map<String, int>> getTodayStatusCounts() async {
         }
 
         final firstName = (demographic['firstName'] ?? '').toString();
+        final middleName = (demographic['middleName'] ?? '').toString();
         final lastName = (demographic['lastName'] ?? '').toString();
         final key =
-            '${firstName.toLowerCase().trim()}_${lastName.toLowerCase().trim()}';
+            '${firstName.toLowerCase().trim()}_${middleName.toLowerCase().trim()}_${lastName.toLowerCase().trim()}';
         if (key.isEmpty || key == '_') continue;
 
         final createdAt = data['createdAt'] as Timestamp?;
@@ -1758,9 +1764,10 @@ Future<Map<String, int>> getTodayStatusCounts() async {
         }
 
         final firstName = (demographic['firstName'] ?? '').toString();
+        final middleName = (demographic['middleName'] ?? '').toString();
         final lastName = (demographic['lastName'] ?? '').toString();
         final key =
-            '${firstName.toLowerCase().trim()}_${lastName.toLowerCase().trim()}';
+            '${firstName.toLowerCase().trim()}_${middleName.toLowerCase().trim()}_${lastName.toLowerCase().trim()}';
         if (key.isEmpty || key == '_' || existingKeys.contains(key)) continue;
 
         _applyStatusFromData(data);
