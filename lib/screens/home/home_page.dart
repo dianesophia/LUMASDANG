@@ -45,39 +45,48 @@ class _HomePageState extends State<HomePage>
   final TextEditingController religionController = TextEditingController();
   final TextEditingController birthWeightController = TextEditingController();
   final TextEditingController birthOrderController = TextEditingController();
-  final TextEditingController residenceStatusController = TextEditingController();
+  final TextEditingController residenceStatusController =
+      TextEditingController();
   final TextEditingController lengthOfStayController = TextEditingController();
 
   // Mother
   final TextEditingController motherController = TextEditingController();
   final TextEditingController motherContactController = TextEditingController();
   final TextEditingController motherAgeController = TextEditingController();
-  final TextEditingController motherOccupationController = TextEditingController();
+  final TextEditingController motherOccupationController =
+      TextEditingController();
 
   // Father
   final TextEditingController fatherController = TextEditingController();
   final TextEditingController fatherContactController = TextEditingController();
   final TextEditingController fatherAgeController = TextEditingController();
-  final TextEditingController fatherOccupationController = TextEditingController();
+  final TextEditingController fatherOccupationController =
+      TextEditingController();
 
   // Caregiver
   final TextEditingController caregiverNameController = TextEditingController();
   final TextEditingController caregiverAgeController = TextEditingController();
-  final TextEditingController caregiverEthnicityController = TextEditingController();
-  final TextEditingController caregiverRelationshipController = TextEditingController();
-  final TextEditingController caregiverReligionController = TextEditingController();
+  final TextEditingController caregiverEthnicityController =
+      TextEditingController();
+  final TextEditingController caregiverRelationshipController =
+      TextEditingController();
+  final TextEditingController caregiverReligionController =
+      TextEditingController();
 
   // Household
-  final TextEditingController fourPsHouseholdIdController = TextEditingController();
+  final TextEditingController fourPsHouseholdIdController =
+      TextEditingController();
   final TextEditingController disabilityController = TextEditingController();
 
   // Anthropometric
-  final TextEditingController measurementDateController = TextEditingController();
+  final TextEditingController measurementDateController =
+      TextEditingController();
   final TextEditingController weightController = TextEditingController();
   final TextEditingController heightController = TextEditingController();
   final TextEditingController muacController = TextEditingController();
   final TextEditingController weightForAgeController = TextEditingController();
-  final TextEditingController weightForHeightController = TextEditingController();
+  final TextEditingController weightForHeightController =
+      TextEditingController();
   final TextEditingController heightForAgeController = TextEditingController();
   final TextEditingController bmiController = TextEditingController();
 
@@ -107,6 +116,10 @@ class _HomePageState extends State<HomePage>
   Map<String, dynamic>? _familyPlanningData;
   Map<String, dynamic>? _nutritionEnvData;
 
+  /// When true, only the basic required fields (patient name, parent names &
+  /// contacts) are enforced; all other form validators are skipped.
+  bool _isDraft = false;
+
   // ── Refresh / reset keys ───────────────────────────────────────────────────
   int _statsRefreshKey = 0;
   final ValueNotifier<int> _patientListRefreshTrigger = ValueNotifier<int>(0);
@@ -132,7 +145,8 @@ class _HomePageState extends State<HomePage>
         content: Text(message, style: const TextStyle(fontSize: 13)),
         backgroundColor: color ?? const Color(0xFF2E8B7B),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         margin: const EdgeInsets.all(16),
       ),
     );
@@ -144,7 +158,8 @@ class _HomePageState extends State<HomePage>
     _tabController = TabController(length: 3, vsync: this);
 
     LocalDbService.instance.init().then((_) async {
-      final online = kIsWeb ? true : await ConnectivityService.instance.checkOnline();
+      final online =
+          kIsWeb ? true : await ConnectivityService.instance.checkOnline();
       if (online) {
         final synced =
             await LocalDbService.instance.syncPending(FirestoreService());
@@ -227,52 +242,86 @@ class _HomePageState extends State<HomePage>
     super.dispose();
   }
 
-  // ── Save ───────────────────────────────────────────────────────────────────
+  // ── Save Draft ─────────────────────────────────────────────────────────────
+  /// Sets draft mode then runs _saveAllData. In draft mode only the basic
+  /// required fields (patient name, parent names & contacts) are validated.
+  /// All other section validators (oral, deworming, purelyBreastfed, etc.)
+  /// are skipped so the record can be saved incomplete.
+  Future<void> _saveDraft() async {
+    setState(() => _isDraft = true);
+    await _saveAllData();
+  }
+
+  // ── Save All Data ──────────────────────────────────────────────────────────
   Future<void> _saveAllData() async {
+    // Run form validators — in draft mode, only the always-required fields
+    // (first/last name, parent names + contacts) will fire.
     final isFormValid = _formKey.currentState?.validate() ?? false;
     bool hasNonTextErrors = false;
 
-    if (_purelyBreastfed == null) {
-      setState(() => _purelyBreastfedError = 'Please select Yes or No');
-      hasNonTextErrors = true;
+    if (_isDraft) {
+      // Draft: clear all non-text section errors, skip those checks
+      setState(() {
+        _purelyBreastfedError = null;
+        _oralRiskError = null;
+        _dewormingError = null;
+      });
     } else {
-      setState(() => _purelyBreastfedError = null);
-    }
+      // Full submit: enforce all section validators
+      if (_purelyBreastfed == null) {
+        setState(() => _purelyBreastfedError = 'Please select Yes or No');
+        hasNonTextErrors = true;
+      } else {
+        setState(() => _purelyBreastfedError = null);
+      }
 
-    if (_oralData == null || _oralData!['overallRisk'] == null) {
-      setState(() => _oralRiskError = 'Please select an overall risk level');
-      hasNonTextErrors = true;
-    } else {
-      setState(() => _oralRiskError = null);
-    }
+      if (_oralData == null || _oralData!['overallRisk'] == null) {
+        setState(
+            () => _oralRiskError = 'Please select an overall risk level');
+        hasNonTextErrors = true;
+      } else {
+        setState(() => _oralRiskError = null);
+      }
 
-    if (_dewormingData == null) {
-      setState(() => _dewormingError = 'Please fill in deworming information');
-      hasNonTextErrors = true;
-    } else {
-      final isNA = _dewormingData!['isNA'] == true;
-      if (!isNA) {
-        if ((_dewormingData!['dateOfLastDeworming'] ?? '').toString().trim().isEmpty) {
-          setState(() => _dewormingError = 'Please enter a date or select N/A');
-          hasNonTextErrors = true;
-        } else if (_dewormingData!['drugGiven'] == null) {
-          setState(() => _dewormingError = 'Please select a drug given');
-          hasNonTextErrors = true;
+      if (_dewormingData == null) {
+        setState(() =>
+            _dewormingError = 'Please fill in deworming information');
+        hasNonTextErrors = true;
+      } else {
+        final isNA = _dewormingData!['isNA'] == true;
+        if (!isNA) {
+          if ((_dewormingData!['dateOfLastDeworming'] ?? '')
+              .toString()
+              .trim()
+              .isEmpty) {
+            setState(
+                () => _dewormingError = 'Please enter a date or select N/A');
+            hasNonTextErrors = true;
+          } else if (_dewormingData!['drugGiven'] == null) {
+            setState(() => _dewormingError = 'Please select a drug given');
+            hasNonTextErrors = true;
+          } else {
+            setState(() => _dewormingError = null);
+          }
         } else {
           setState(() => _dewormingError = null);
         }
-      } else {
-        setState(() => _dewormingError = null);
       }
     }
 
     if (!isFormValid || hasNonTextErrors) {
-      _showSnackBar('Please fill in all required fields.',
-          color: const Color(0xFFEF4444));
+      _showSnackBar(
+        _isDraft
+            ? 'Please fill in patient name and parent contacts.'
+            : 'Please fill in all required fields.',
+        color: const Color(0xFFEF4444),
+      );
+      setState(() => _isDraft = false);
       return;
     }
 
     final data = {
+      'isDraft': _isDraft,
       'demographic': {
         'firstName': firstNameController.text.trim(),
         'middleName': middleNameController.text.trim(),
@@ -341,7 +390,8 @@ class _HomePageState extends State<HomePage>
     };
 
     final firestore = FirestoreService();
-    final online = kIsWeb ? true : await ConnectivityService.instance.checkOnline();
+    final online =
+        kIsWeb ? true : await ConnectivityService.instance.checkOnline();
     String? barangayPatientId;
 
     if (online) {
@@ -362,7 +412,10 @@ class _HomePageState extends State<HomePage>
             .saveLocalRecord(data, synced: true, firestoreId: docId);
         if (!mounted) return;
         _patientListRefreshTrigger.value++;
-        _showSnackBar('Assessment saved to server and locally.');
+        _showSnackBar(
+          _isDraft ? 'Draft saved.' : 'Assessment saved to server and locally.',
+          color: _isDraft ? const Color(0xFFF5A962) : const Color(0xFF2E8B7B),
+        );
       } catch (e) {
         await LocalDbService.instance.saveLocalRecord(data, synced: false);
         if (!mounted) return;
@@ -373,12 +426,16 @@ class _HomePageState extends State<HomePage>
     } else {
       await LocalDbService.instance.saveLocalRecord(data, synced: false);
       if (!mounted) return;
-      _showSnackBar('No internet: saved locally, will sync when online.',
-          color: Colors.orange);
+      _showSnackBar(
+        _isDraft
+            ? 'Draft saved locally, will sync when online.'
+            : 'No internet: saved locally, will sync when online.',
+        color: Colors.orange,
+      );
     }
 
-    // Sync vaccination status
-    if (_vaccinationData != null && online) {
+    // Sync vaccination status (skip for drafts)
+    if (_vaccinationData != null && online && !_isDraft) {
       try {
         int highestDoseNumber(String vaccine) {
           final doses = _vaccinationData![vaccine] as Map<String, dynamic>?;
@@ -500,21 +557,48 @@ class _HomePageState extends State<HomePage>
     if (mounted) {
       // Clear all controllers
       for (final c in [
-        firstNameController, middleNameController, lastNameController,
-        ageController, ageDaysController, ageYearsController,
-        sexController, addressController, placeOfBirthController,
-        dobController, religionController, birthWeightController,
-        birthOrderController, residenceStatusController, lengthOfStayController,
-        motherController, motherContactController, motherAgeController,
-        motherOccupationController, fatherController, fatherContactController,
-        fatherAgeController, fatherOccupationController,
-        caregiverNameController, caregiverAgeController,
-        caregiverEthnicityController, caregiverRelationshipController,
-        caregiverReligionController, fourPsHouseholdIdController,
-        disabilityController, measurementDateController, weightController,
-        heightController, muacController, weightForAgeController,
-        weightForHeightController, heightForAgeController, bmiController,
-        cfAgeController, cfFreqController, cfFoodController, mealFreqController,
+        firstNameController,
+        middleNameController,
+        lastNameController,
+        ageController,
+        ageDaysController,
+        ageYearsController,
+        sexController,
+        addressController,
+        placeOfBirthController,
+        dobController,
+        religionController,
+        birthWeightController,
+        birthOrderController,
+        residenceStatusController,
+        lengthOfStayController,
+        motherController,
+        motherContactController,
+        motherAgeController,
+        motherOccupationController,
+        fatherController,
+        fatherContactController,
+        fatherAgeController,
+        fatherOccupationController,
+        caregiverNameController,
+        caregiverAgeController,
+        caregiverEthnicityController,
+        caregiverRelationshipController,
+        caregiverReligionController,
+        fourPsHouseholdIdController,
+        disabilityController,
+        measurementDateController,
+        weightController,
+        heightController,
+        muacController,
+        weightForAgeController,
+        weightForHeightController,
+        heightForAgeController,
+        bmiController,
+        cfAgeController,
+        cfFreqController,
+        cfFoodController,
+        mealFreqController,
       ]) {
         c.clear();
       }
@@ -547,6 +631,7 @@ class _HomePageState extends State<HomePage>
         _dewormingError = null;
         _familyPlanningData = null;
         _nutritionEnvData = null;
+        _isDraft = false;
       });
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -705,7 +790,9 @@ class _HomePageState extends State<HomePage>
           unselectedLabelStyle: const TextStyle(fontSize: 12),
           tabs: const [
             Tab(icon: Icon(Icons.home_outlined, size: 22), text: 'Home'),
-            Tab(icon: Icon(Icons.people_outline, size: 22), text: 'Patients'),
+            Tab(
+                icon: Icon(Icons.people_outline, size: 22),
+                text: 'Patients'),
             Tab(
                 icon: Icon(Icons.notifications_outlined, size: 22),
                 text: 'Alerts'),
@@ -785,12 +872,12 @@ class _HomePageState extends State<HomePage>
               hasDisability: _hasDisability,
               onBelongsToIpGroupChanged: (v) =>
                   setState(() => _belongsToIpGroup = v),
-              onIpEthnicityChanged: (v) =>
-                  setState(() => _ipEthnicity = v),
+              onIpEthnicityChanged: (v) => setState(() => _ipEthnicity = v),
               onIsFourPsMemberChanged: (v) =>
                   setState(() => _isFourPsMember = v),
               onHasDisabilityChanged: (v) =>
                   setState(() => _hasDisability = v),
+              isDraft: _isDraft,
             ),
             const SizedBox(height: 16),
 
@@ -892,44 +979,88 @@ class _HomePageState extends State<HomePage>
 
             const SizedBox(height: 24),
 
-            // ── Save button ────────────────────────────────────────────
-            GestureDetector(
-              onTap: _saveAllData,
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 15),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFF5A962), Color(0xFFF08030)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFF5A962).withValues(alpha: 0.35),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.save_outlined, color: Colors.white, size: 20),
-                    SizedBox(width: 8),
-                    Text(
-                      'Save Assessment',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15,
-                        letterSpacing: 0.4,
+            // ── Save Draft + Save Assessment ───────────────────────────
+            Row(
+              children: [
+                // Save Draft — ghost/outline style
+                Expanded(
+                  child: GestureDetector(
+                    onTap: _saveDraft,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.7),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.save_outlined,
+                              color: Colors.white, size: 18),
+                          SizedBox(width: 6),
+                          Text(
+                            'Save Draft',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
+                  ),
                 ),
-              ),
+                const SizedBox(width: 12),
+                // Save Assessment — orange gradient
+                Expanded(
+                  flex: 2,
+                  child: GestureDetector(
+                    onTap: _saveAllData,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFF5A962), Color(0xFFF08030)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFF5A962)
+                                .withValues(alpha: 0.35),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.check_circle_outline,
+                              color: Colors.white, size: 18),
+                          SizedBox(width: 8),
+                          Text(
+                            'Save Assessment',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 30),
           ],

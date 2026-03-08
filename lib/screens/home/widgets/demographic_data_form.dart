@@ -37,8 +37,7 @@ class DemographicDataForm extends StatefulWidget {
   final TextEditingController disabilityController;
 
   final bool? belongsToIpGroup;
-  final String? ipEthnicity;          // 'Ibaloi' | 'Kankanaey' | 'Other' | null
-  final String? ipRemarksOther;       // free text when 'Other'
+  final String? ipEthnicity;
   final bool? isFourPsMember;
   final bool? hasDisability;
   final ValueChanged<bool?>? onBelongsToIpGroupChanged;
@@ -46,8 +45,9 @@ class DemographicDataForm extends StatefulWidget {
   final ValueChanged<bool?>? onIsFourPsMemberChanged;
   final ValueChanged<bool?>? onHasDisabilityChanged;
 
-  final VoidCallback? onSaveDraft;
-  final VoidCallback? onSubmit;
+  /// When true, only basic required fields are validated (name + parent contacts).
+  /// All other fields are optional.
+  final bool isDraft;
 
   const DemographicDataForm({
     super.key,
@@ -83,15 +83,13 @@ class DemographicDataForm extends StatefulWidget {
     required this.disabilityController,
     this.belongsToIpGroup,
     this.ipEthnicity,
-    this.ipRemarksOther,
     this.isFourPsMember,
     this.hasDisability,
     this.onBelongsToIpGroupChanged,
     this.onIpEthnicityChanged,
     this.onIsFourPsMemberChanged,
     this.onHasDisabilityChanged,
-    this.onSaveDraft,
-    this.onSubmit,
+    this.isDraft = false,
   });
 
   @override
@@ -99,17 +97,15 @@ class DemographicDataForm extends StatefulWidget {
 }
 
 class _DemographicDataFormState extends State<DemographicDataForm> {
-  final _formKey = GlobalKey<FormState>();
-
   bool? _belongsToIpGroup;
   String? _ipEthnicity;
   bool _middleNameNA = false;
-  bool _isDraft = false;
   bool? _isFourPsMember;
   bool? _hasDisability;
+  String? _disabilityType; // selected chip value
 
-  // Residence status options
-  String? _residenceStatus; // 'Tenant' | 'Permanent'
+  // Residence status: 'Tenant' | 'Permanent'
+  String? _residenceStatus;
 
   @override
   void initState() {
@@ -134,11 +130,25 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
     }
   }
 
-  // ── Phone validation ────────────────────────────────────────────────────
+  // ── Validators ──────────────────────────────────────────────────────────────
   static final _phoneRegex = RegExp(r'^(09\d{9}|\+639\d{9})$');
 
-  String? _validatePhone(String? v) {
-    if (_isDraft) return null;
+  /// Always required — even in draft mode (basic patient identity).
+  String? _alwaysRequired(String? v, String message) {
+    if (v == null || v.trim().isEmpty) return message;
+    if (v.trim().length < 2) return 'Min. 2 chars';
+    return null;
+  }
+
+  /// Required on full submit only; optional for draft.
+  String? _requiredOnSubmit(String? v, String message) {
+    if (widget.isDraft) return null;
+    if (v == null || v.trim().isEmpty) return message;
+    return null;
+  }
+
+  /// Mother's contact is always required (basic contact info).
+  String? _validateMotherPhone(String? v) {
     if (v == null || v.trim().isEmpty) return 'Contact number is required';
     if (!_phoneRegex.hasMatch(v.trim())) {
       return 'Enter a valid PH number (09XXXXXXXXX or +639XXXXXXXXX)';
@@ -146,48 +156,20 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
     return null;
   }
 
-  // ── Required only on submit ─────────────────────────────────────────────
-  String? _requiredOnSubmit(String? v, String message) {
-    if (_isDraft) return null;
-    if (v == null || v.trim().isEmpty) return message;
+  /// Father's contact is required on full submit; format-checked if filled in draft.
+  String? _validateFatherPhone(String? v) {
+    if (widget.isDraft) {
+      if (v == null || v.trim().isEmpty) return null; // optional in draft
+      if (!_phoneRegex.hasMatch(v.trim())) return 'Invalid PH number';
+      return null;
+    }
+    // Full submit: optional but validate format if provided
+    if (v == null || v.trim().isEmpty) return null;
+    if (!_phoneRegex.hasMatch(v.trim())) return 'Invalid PH number';
     return null;
   }
 
-  // ── Draft save ──────────────────────────────────────────────────────────
-  void _handleSaveDraft() {
-    setState(() => _isDraft = true);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _formKey.currentState?.save();
-      widget.onSaveDraft?.call();
-      setState(() => _isDraft = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Row(children: [
-            Icon(Icons.save_outlined, color: Colors.white, size: 18),
-            SizedBox(width: 8),
-            Text('Draft saved successfully'),
-          ]),
-          backgroundColor: const Color(0xFFF5A962),
-          behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          margin: const EdgeInsets.all(12),
-        ),
-      );
-    });
-  }
-
-  void _handleSubmit() {
-    setState(() => _isDraft = false);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_formKey.currentState?.validate() ?? false) {
-        _formKey.currentState?.save();
-        widget.onSubmit?.call();
-      }
-    });
-  }
-
-  // ── Auto-compute age from DOB ───────────────────────────────────────────
+  // ── Date picker ────────────────────────────────────────────────────────────
   Future<void> _pickDate(BuildContext context) async {
     DateTime initialDate = DateTime.now();
     final existing = widget.dobController.text.trim();
@@ -243,7 +225,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
     }
   }
 
-  // ── Reusable widgets ────────────────────────────────────────────────────
+  // ── Reusable widgets ────────────────────────────────────────────────────────
   Widget _buildTogglePill(String label, bool selected, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
@@ -275,8 +257,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color:
-                    selected ? Colors.white : const Color(0xFF1A1A1A),
+                color: selected ? Colors.white : const Color(0xFF1A1A1A),
               ),
             ),
           ],
@@ -369,7 +350,10 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
     );
   }
 
-  Widget _buildCard({required String? headerTitle, IconData? headerIcon, required Widget child}) {
+  Widget _buildCard(
+      {required String? headerTitle,
+      IconData? headerIcon,
+      required Widget child}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       decoration: BoxDecoration(
@@ -486,579 +470,570 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
 
   @override
   Widget build(BuildContext context) {
-    return Form(
-      key: _formKey,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ── Card 1: Patient Basic Info ──────────────────────────────
-          _buildCard(
-            headerTitle: 'PATIENT INFORMATION',
-            headerIcon: Icons.person_outline,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // First + Last Name (required)
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildField(
-                        label: 'FIRST NAME *',
-                        controller: widget.firstNameController,
-                        icon: Icons.badge_outlined,
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) return 'Required';
-                          if (v.trim().length < 2) return 'Min. 2 chars';
-                          return null;
-                        },
-                      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── Card 1: Patient Basic Info ──────────────────────────────
+        _buildCard(
+          headerTitle: 'PATIENT INFORMATION',
+          headerIcon: Icons.person_outline,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // First + Last Name — always required (even in draft)
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildField(
+                      label: 'FIRST NAME *',
+                      controller: widget.firstNameController,
+                      icon: Icons.badge_outlined,
+                      validator: (v) =>
+                          _alwaysRequired(v, 'First name is required'),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _buildField(
-                        label: 'LAST NAME *',
-                        controller: widget.lastNameController,
-                        icon: Icons.badge_outlined,
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) return 'Required';
-                          if (v.trim().length < 2) return 'Min. 2 chars';
-                          return null;
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                // Middle Name + N/A checkbox
-                _buildField(
-                  label: 'MIDDLE NAME',
-                  controller: widget.middleNameController,
-                  icon: Icons.badge_outlined,
-                  enabled: !_middleNameNA,
-                  validator: (v) {
-                    if (_isDraft || _middleNameNA) return null;
-                    if (v == null || v.trim().isEmpty) return 'Required';
-                    if (v.trim().length < 2) return 'Min. 2 chars';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    SizedBox(
-                      height: 24,
-                      width: 24,
-                      child: Checkbox(
-                        value: _middleNameNA,
-                        activeColor: const Color(0xFFF5A962),
-                        materialTapTargetSize:
-                            MaterialTapTargetSize.shrinkWrap,
-                        onChanged: (val) {
-                          setState(() {
-                            _middleNameNA = val ?? false;
-                            if (_middleNameNA) {
-                              widget.middleNameController.clear();
-                            }
-                          });
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    const Text('N/A (no middle name)',
-                        style: TextStyle(
-                            fontSize: 12, color: Color(0xFF888888))),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                // Date of Birth → auto-computes all age fields
-                _buildField(
-                  label: 'DATE OF BIRTH',
-                  controller: widget.dobController,
-                  hint: 'Tap to select date',
-                  icon: Icons.calendar_today_outlined,
-                  readOnly: true,
-                  onTap: () => _pickDate(context),
-                  validator: (v) =>
-                      _requiredOnSubmit(v, 'Date of birth is required'),
-                ),
-                const SizedBox(height: 12),
-
-                // Age: Days / Months / Years (read-only, auto-filled)
-                _buildSubHeader('AUTO-COMPUTED AGE'),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildField(
-                        label: 'DAYS',
-                        controller: widget.ageDaysController,
-                        icon: Icons.today_outlined,
-                        readOnly: true,
-                        hint: 'Auto',
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _buildField(
-                        label: 'MONTHS',
-                        controller: widget.ageController,
-                        icon: Icons.date_range_outlined,
-                        readOnly: true,
-                        hint: 'Auto',
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _buildField(
-                        label: 'YEARS',
-                        controller: widget.ageYearsController,
-                        icon: Icons.cake_outlined,
-                        readOnly: true,
-                        hint: 'Auto',
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                // Sex
-                _buildField(
-                  label: 'SEX',
-                  controller: widget.sexController,
-                  hint: 'M or F',
-                  icon: Icons.wc_outlined,
-                  validator: (v) {
-                    if (_isDraft) return null;
-                    if (v == null || v.trim().isEmpty) return 'Required';
-                    final s = v.trim().toUpperCase();
-                    if (s != 'M' &&
-                        s != 'F' &&
-                        s != 'MALE' &&
-                        s != 'FEMALE') return 'Enter M or F';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-
-                // Birth Weight + Birth Order
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildField(
-                        label: 'BIRTH WEIGHT (kg)',
-                        controller: widget.birthWeightController,
-                        keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
-                        icon: Icons.monitor_weight_outlined,
-                        hint: 'e.g. 3.2',
-                        validator: (v) {
-                          if (_isDraft || (v == null || v.trim().isEmpty))
-                            return null;
-                          final w = double.tryParse(v.trim());
-                          if (w == null || w <= 0) return 'Invalid weight';
-                          return null;
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _buildField(
-                        label: 'BIRTH ORDER',
-                        controller: widget.birthOrderController,
-                        keyboardType: TextInputType.number,
-                        icon: Icons.sort_outlined,
-                        hint: 'e.g. 1st, 2nd…',
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                // Religion
-                _buildField(
-                  label: 'RELIGION',
-                  controller: widget.religionController,
-                  icon: Icons.church_outlined,
-                  hint: 'e.g. Catholic, Islam…',
-                ),
-                const SizedBox(height: 12),
-
-                // IP Group
-                _buildLabelRow('BELONGS TO IP GROUP?'),
-                Row(
-                  children: [
-                    _buildTogglePill(
-                        'Yes', _belongsToIpGroup == true, () {
-                      setState(() => _belongsToIpGroup = true);
-                      widget.onBelongsToIpGroupChanged?.call(true);
-                    }),
-                    const SizedBox(width: 8),
-                    _buildTogglePill(
-                        'No', _belongsToIpGroup == false, () {
-                      setState(() => _belongsToIpGroup = false);
-                      widget.onIpEthnicityChanged?.call(null);
-                      widget.onBelongsToIpGroupChanged?.call(false);
-                    }),
-                  ],
-                ),
-
-                // IP Ethnicity options (shown only when IP = Yes)
-                if (_belongsToIpGroup == true) ...[
-                  const SizedBox(height: 10),
-                  _buildLabelRow('ETHNICITY'),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final eth in [
-                        'Ibaloi',
-                        'Kankanaey',
-                        'Kalanguya',
-                        'Applai',
-                        'Other'
-                      ])
-                        _buildTogglePill(eth, _ipEthnicity == eth, () {
-                          setState(() => _ipEthnicity = eth);
-                          widget.onIpEthnicityChanged?.call(eth);
-                        }),
-                    ],
                   ),
-                  if (_ipEthnicity == 'Other') ...[
-                    const SizedBox(height: 10),
-                    _buildField(
-                      label: 'SPECIFY ETHNICITY',
-                      controller: widget.caregiverEthnicityController,
-                      icon: Icons.edit_outlined,
-                      hint: 'Enter ethnicity',
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _buildField(
+                      label: 'LAST NAME *',
+                      controller: widget.lastNameController,
+                      icon: Icons.badge_outlined,
+                      validator: (v) =>
+                          _alwaysRequired(v, 'Last name is required'),
                     ),
-                  ],
+                  ),
                 ],
-                const SizedBox(height: 12),
+              ),
+              const SizedBox(height: 12),
 
-                // Disability
-                _buildYesNoRow(
-                  label: 'HAS DISABILITY?',
-                  value: _hasDisability,
-                  onChanged: (v) {
-                    setState(() => _hasDisability = v);
-                    widget.onHasDisabilityChanged?.call(v);
-                  },
+              // Middle Name + N/A checkbox
+              _buildField(
+                label: 'MIDDLE NAME',
+                controller: widget.middleNameController,
+                icon: Icons.badge_outlined,
+                enabled: !_middleNameNA,
+                validator: (v) {
+                  if (widget.isDraft || _middleNameNA) return null;
+                  if (v == null || v.trim().isEmpty) return 'Required';
+                  if (v.trim().length < 2) return 'Min. 2 chars';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  SizedBox(
+                    height: 24,
+                    width: 24,
+                    child: Checkbox(
+                      value: _middleNameNA,
+                      activeColor: const Color(0xFFF5A962),
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      onChanged: (val) {
+                        setState(() {
+                          _middleNameNA = val ?? false;
+                          if (_middleNameNA) {
+                            widget.middleNameController.clear();
+                          }
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  const Text('N/A (no middle name)',
+                      style:
+                          TextStyle(fontSize: 12, color: Color(0xFF888888))),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // Date of Birth → auto-computes all age fields
+              _buildField(
+                label: 'DATE OF BIRTH',
+                controller: widget.dobController,
+                hint: 'Tap to select date',
+                icon: Icons.calendar_today_outlined,
+                readOnly: true,
+                onTap: () => _pickDate(context),
+                validator: (v) =>
+                    _requiredOnSubmit(v, 'Date of birth is required'),
+              ),
+              const SizedBox(height: 12),
+
+              // Age: Days / Months / Years (read-only, auto-filled)
+              _buildSubHeader('AUTO-COMPUTED AGE'),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildField(
+                      label: 'DAYS',
+                      controller: widget.ageDaysController,
+                      icon: Icons.today_outlined,
+                      readOnly: true,
+                      hint: 'Auto',
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildField(
+                      label: 'MONTHS',
+                      controller: widget.ageController,
+                      icon: Icons.date_range_outlined,
+                      readOnly: true,
+                      hint: 'Auto',
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildField(
+                      label: 'YEARS',
+                      controller: widget.ageYearsController,
+                      icon: Icons.cake_outlined,
+                      readOnly: true,
+                      hint: 'Auto',
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // Sex
+              _buildField(
+                label: 'SEX',
+                controller: widget.sexController,
+                hint: 'M or F',
+                icon: Icons.wc_outlined,
+                validator: (v) {
+                  if (widget.isDraft) return null;
+                  if (v == null || v.trim().isEmpty) return 'Required';
+                  final s = v.trim().toUpperCase();
+                  if (s != 'M' &&
+                      s != 'F' &&
+                      s != 'MALE' &&
+                      s != 'FEMALE') return 'Enter M or F';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+
+              // Birth Weight + Birth Order
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildField(
+                      label: 'BIRTH WEIGHT (kg)',
+                      controller: widget.birthWeightController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true),
+                      icon: Icons.monitor_weight_outlined,
+                      hint: 'e.g. 3.2',
+                      validator: (v) {
+                        if (widget.isDraft ||
+                            (v == null || v.trim().isEmpty)) return null;
+                        final w = double.tryParse(v.trim());
+                        if (w == null || w <= 0) return 'Invalid weight';
+                        return null;
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _buildField(
+                      label: 'BIRTH ORDER',
+                      controller: widget.birthOrderController,
+                      keyboardType: TextInputType.number,
+                      icon: Icons.sort_outlined,
+                      hint: 'e.g. 1st, 2nd…',
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // Religion — patient's religion
+              _buildField(
+                label: 'RELIGION',
+                controller: widget.religionController,
+                icon: Icons.church_outlined,
+                hint: 'e.g. Catholic, Islam…',
+              ),
+              const SizedBox(height: 12),
+
+              // ── IP Group — Yes/No → chips → free text if Other ──────
+              _buildLabelRow('BELONGS TO IP GROUP?'),
+              Row(
+                children: [
+                  _buildTogglePill('Yes', _belongsToIpGroup == true, () {
+                    setState(() => _belongsToIpGroup = true);
+                    widget.onBelongsToIpGroupChanged?.call(true);
+                  }),
+                  const SizedBox(width: 8),
+                  _buildTogglePill('No', _belongsToIpGroup == false, () {
+                    setState(() {
+                      _belongsToIpGroup = false;
+                      _ipEthnicity = null;
+                    });
+                    widget.onIpEthnicityChanged?.call(null);
+                    widget.onBelongsToIpGroupChanged?.call(false);
+                  }),
+                ],
+              ),
+
+              // IP Ethnicity chips (shown only when IP = Yes)
+              if (_belongsToIpGroup == true) ...[
+                const SizedBox(height: 10),
+                _buildLabelRow('ETHNICITY'),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final eth in [
+                      'Ibaloi',
+                      'Kankanaey',
+                      'Kalanguya',
+                      'Applai',
+                      'Other'
+                    ])
+                      _buildTogglePill(eth, _ipEthnicity == eth, () {
+                        setState(() => _ipEthnicity = eth);
+                        widget.onIpEthnicityChanged?.call(eth);
+                      }),
+                  ],
                 ),
-                if (_hasDisability == true) ...[
+                if (_ipEthnicity == 'Other') ...[
                   const SizedBox(height: 10),
                   _buildField(
-                    label: 'DISABILITY / SPECIFY',
+                    label: 'SPECIFY ETHNICITY',
+                    controller: widget.caregiverEthnicityController,
+                    icon: Icons.edit_outlined,
+                    hint: 'Enter ethnicity',
+                  ),
+                ],
+              ],
+              const SizedBox(height: 12),
+
+              // ── Disability — Yes/No → type chips → free text if Other
+              _buildYesNoRow(
+                label: 'HAS DISABILITY?',
+                value: _hasDisability,
+                onChanged: (v) {
+                  setState(() {
+                    _hasDisability = v;
+                    if (v == false) {
+                      _disabilityType = null;
+                      widget.disabilityController.clear();
+                    }
+                  });
+                  widget.onHasDisabilityChanged?.call(v);
+                },
+              ),
+              if (_hasDisability == true) ...[
+                const SizedBox(height: 10),
+                _buildLabelRow('TYPE OF DISABILITY'),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final type in [
+                      'Physical',
+                      'Visual',
+                      'Hearing',
+                      'Intellectual',
+                      'Psychosocial',
+                      'Speech',
+                      'Multiple',
+                      'Other',
+                    ])
+                      _buildTogglePill(type, _disabilityType == type, () {
+                        setState(() {
+                          _disabilityType = type;
+                          if (type != 'Other') {
+                            widget.disabilityController.text = type;
+                          } else {
+                            widget.disabilityController.clear();
+                          }
+                        });
+                      }),
+                  ],
+                ),
+                if (_disabilityType == 'Other') ...[
+                  const SizedBox(height: 10),
+                  _buildField(
+                    label: 'SPECIFY DISABILITY',
                     controller: widget.disabilityController,
                     icon: Icons.accessibility_new_outlined,
-                    hint: 'Describe disability',
+                    hint: 'Describe the disability',
+                    validator: (v) =>
+                        _requiredOnSubmit(v, 'Please describe the disability'),
                   ),
                 ],
               ],
-            ),
+            ],
           ),
+        ),
 
-          const SizedBox(height: 10),
+        const SizedBox(height: 10),
 
-          // ── Card 2: Address & Residence ─────────────────────────────
-          _buildCard(
-            headerTitle: 'ADDRESS & RESIDENCE',
-            headerIcon: Icons.home_outlined,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildField(
-                  label: 'ADDRESS',
-                  controller: widget.addressController,
-                  icon: Icons.home_outlined,
-                  validator: (v) =>
-                      _requiredOnSubmit(v, 'Address is required'),
-                ),
-                const SizedBox(height: 12),
-                _buildField(
-                  label: 'PLACE OF BIRTH',
-                  controller: widget.placeOfBirthController,
-                  icon: Icons.location_on_outlined,
-                  validator: (v) =>
-                      _requiredOnSubmit(v, 'Place of birth is required'),
-                ),
-                const SizedBox(height: 12),
-
-                // Status of Residence
-                _buildLabelRow('STATUS OF RESIDENCE'),
-                Row(
-                  children: [
-                    _buildTogglePill(
-                        'Tenant', _residenceStatus == 'Tenant', () {
-                      setState(() {
-                        _residenceStatus = 'Tenant';
-                        widget.residenceStatusController.text = 'Tenant';
-                      });
-                    }),
-                    const SizedBox(width: 8),
-                    _buildTogglePill(
-                        'Permanent', _residenceStatus == 'Permanent', () {
-                      setState(() {
-                        _residenceStatus = 'Permanent';
-                        widget.residenceStatusController.text = 'Permanent';
-                      });
-                    }),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                _buildField(
-                  label: 'LENGTH OF STAY',
-                  controller: widget.lengthOfStayController,
-                  icon: Icons.timelapse_outlined,
-                  hint: 'e.g. 3 years',
-                  keyboardType: TextInputType.text,
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 10),
-
-          // ── Card 3: Mother's Info ───────────────────────────────────
-          _buildCard(
-            headerTitle: "MOTHER'S INFORMATION",
-            headerIcon: Icons.woman_outlined,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildField(
-                  label: "MOTHER'S FULL NAME *",
-                  controller: widget.motherController,
-                  icon: Icons.person_outline,
-                  validator: (v) =>
-                      _requiredOnSubmit(v, "Mother's name is required"),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildField(
-                        label: 'AGE',
-                        controller: widget.motherAgeController,
-                        keyboardType: TextInputType.number,
-                        icon: Icons.cake_outlined,
-                        hint: 'Years',
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _buildField(
-                        label: 'CONTACT NUMBER *',
-                        controller: widget.motherContactController,
-                        keyboardType: TextInputType.phone,
-                        hint: '09XXXXXXXXX',
-                        icon: Icons.phone_outlined,
-                        validator: _validatePhone,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                _buildField(
-                  label: 'OCCUPATION',
-                  controller: widget.motherOccupationController,
-                  icon: Icons.work_outline,
-                  hint: 'e.g. Farmer, Teacher…',
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 10),
-
-          // ── Card 4: Father's Info ───────────────────────────────────
-          _buildCard(
-            headerTitle: "FATHER'S INFORMATION",
-            headerIcon: Icons.man_outlined,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildField(
-                  label: "FATHER'S FULL NAME",
-                  controller: widget.fatherController,
-                  icon: Icons.person_outline,
-                  validator: (v) =>
-                      _requiredOnSubmit(v, "Father's name is required"),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildField(
-                        label: 'AGE',
-                        controller: widget.fatherAgeController,
-                        keyboardType: TextInputType.number,
-                        icon: Icons.cake_outlined,
-                        hint: 'Years',
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _buildField(
-                        label: 'CONTACT NUMBER',
-                        controller: widget.fatherContactController,
-                        keyboardType: TextInputType.phone,
-                        hint: '09XXXXXXXXX',
-                        icon: Icons.phone_outlined,
-                        validator: (v) {
-                          if (_isDraft) return null;
-                          if (v == null || v.trim().isEmpty) return null; // optional
-                          if (!_phoneRegex.hasMatch(v.trim())) {
-                            return 'Invalid PH number';
-                          }
-                          return null;
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                _buildField(
-                  label: 'OCCUPATION',
-                  controller: widget.fatherOccupationController,
-                  icon: Icons.work_outline,
-                  hint: 'e.g. Farmer, Driver…',
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 10),
-
-          // ── Card 5: Caregiver & Household ──────────────────────────
-          _buildCard(
-            headerTitle: 'CAREGIVER & HOUSEHOLD',
-            headerIcon: Icons.supervisor_account_outlined,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildField(
-                  label: "CAREGIVER'S FULL NAME",
-                  controller: widget.caregiverNameController,
-                  icon: Icons.person_outline,
-                  hint: 'If different from parents',
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildField(
-                        label: 'CAREGIVER AGE',
-                        controller: widget.caregiverAgeController,
-                        keyboardType: TextInputType.number,
-                        icon: Icons.cake_outlined,
-                        hint: 'Years',
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _buildField(
-                        label: 'RELATIONSHIP TO CHILD',
-                        controller: widget.caregiverRelationshipController,
-                        icon: Icons.family_restroom_outlined,
-                        hint: 'e.g. Lolo, Tita…',
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildField(
-                        label: 'ETHNICITY',
-                        controller: widget.caregiverEthnicityController,
-                        icon: Icons.groups_outlined,
-                        hint: 'e.g. Ibaloi…',
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _buildField(
-                        label: 'RELIGION',
-                        controller: widget.caregiverReligionController,
-                        icon: Icons.church_outlined,
-                        hint: 'e.g. Catholic…',
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // 4Ps
-                _buildYesNoRow(
-                  label: '4Ps MEMBER?',
-                  value: _isFourPsMember,
-                  onChanged: (v) {
-                    setState(() => _isFourPsMember = v);
-                    widget.onIsFourPsMemberChanged?.call(v);
-                  },
-                ),
-                if (_isFourPsMember == true) ...[
-                  const SizedBox(height: 10),
-                  _buildField(
-                    label: 'HOUSEHOLD ID NUMBER',
-                    controller: widget.fourPsHouseholdIdController,
-                    icon: Icons.tag_outlined,
-                    hint: 'Enter household ID',
-                    keyboardType: TextInputType.number,
-                  ),
-                ],
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 20),
-
-          // ── Draft / Submit buttons ──────────────────────────────────
-          Row(
+        // ── Card 2: Address & Residence ─────────────────────────────
+        _buildCard(
+          headerTitle: 'ADDRESS & RESIDENCE',
+          headerIcon: Icons.home_outlined,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _handleSaveDraft,
-                  icon: const Icon(Icons.save_outlined, size: 16),
-                  label: const Text('SAVE DRAFT',
-                      style: TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w700)),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFFF5A962),
-                    side: const BorderSide(
-                        color: Color(0xFFF5A962), width: 1.5),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
+              _buildField(
+                label: 'ADDRESS',
+                controller: widget.addressController,
+                icon: Icons.home_outlined,
+                validator: (v) =>
+                    _requiredOnSubmit(v, 'Address is required'),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: _handleSubmit,
-                  icon: const Icon(Icons.check_circle_outline, size: 16),
-                  label: const Text('SUBMIT',
-                      style: TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w700)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFF5A962),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    elevation: 2,
-                  ),
-                ),
+              const SizedBox(height: 12),
+              _buildField(
+                label: 'PLACE OF BIRTH',
+                controller: widget.placeOfBirthController,
+                icon: Icons.location_on_outlined,
+                validator: (v) =>
+                    _requiredOnSubmit(v, 'Place of birth is required'),
+              ),
+              const SizedBox(height: 12),
+
+              // Status of Residence
+              _buildLabelRow('STATUS OF RESIDENCE'),
+              Row(
+                children: [
+                  _buildTogglePill('Tenant', _residenceStatus == 'Tenant', () {
+                    setState(() {
+                      _residenceStatus = 'Tenant';
+                      widget.residenceStatusController.text = 'Tenant';
+                    });
+                  }),
+                  const SizedBox(width: 8),
+                  _buildTogglePill(
+                      'Permanent', _residenceStatus == 'Permanent', () {
+                    setState(() {
+                      _residenceStatus = 'Permanent';
+                      widget.residenceStatusController.text = 'Permanent';
+                    });
+                  }),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              _buildField(
+                label: 'LENGTH OF STAY',
+                controller: widget.lengthOfStayController,
+                icon: Icons.timelapse_outlined,
+                hint: 'e.g. 3 years',
+                keyboardType: TextInputType.text,
               ),
             ],
           ),
-          const SizedBox(height: 8),
-        ],
-      ),
+        ),
+
+        const SizedBox(height: 10),
+
+        // ── Card 3: Mother's Info ───────────────────────────────────
+        _buildCard(
+          headerTitle: "MOTHER'S INFORMATION",
+          headerIcon: Icons.woman_outlined,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Always required — basic patient identity
+              _buildField(
+                label: "MOTHER'S FULL NAME *",
+                controller: widget.motherController,
+                icon: Icons.person_outline,
+                validator: (v) =>
+                    _alwaysRequired(v, "Mother's name is required"),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildField(
+                      label: 'AGE',
+                      controller: widget.motherAgeController,
+                      keyboardType: TextInputType.number,
+                      icon: Icons.cake_outlined,
+                      hint: 'Years',
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _buildField(
+                      label: 'CONTACT NUMBER *',
+                      controller: widget.motherContactController,
+                      keyboardType: TextInputType.phone,
+                      hint: '09XXXXXXXXX',
+                      icon: Icons.phone_outlined,
+                      // Always required — basic contact info
+                      validator: _validateMotherPhone,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _buildField(
+                label: 'OCCUPATION',
+                controller: widget.motherOccupationController,
+                icon: Icons.work_outline,
+                hint: 'e.g. Farmer, Teacher…',
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 10),
+
+        // ── Card 4: Father's Info ───────────────────────────────────
+        _buildCard(
+          headerTitle: "FATHER'S INFORMATION",
+          headerIcon: Icons.man_outlined,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Always required — basic patient identity
+              _buildField(
+                label: "FATHER'S FULL NAME *",
+                controller: widget.fatherController,
+                icon: Icons.person_outline,
+                validator: (v) =>
+                    _alwaysRequired(v, "Father's name is required"),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildField(
+                      label: 'AGE',
+                      controller: widget.fatherAgeController,
+                      keyboardType: TextInputType.number,
+                      icon: Icons.cake_outlined,
+                      hint: 'Years',
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _buildField(
+                      label: 'CONTACT NUMBER *',
+                      controller: widget.fatherContactController,
+                      keyboardType: TextInputType.phone,
+                      hint: '09XXXXXXXXX',
+                      icon: Icons.phone_outlined,
+                      // Always required — basic contact info
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) {
+                          return 'Contact number is required';
+                        }
+                        if (!_phoneRegex.hasMatch(v.trim())) {
+                          return 'Invalid PH number';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _buildField(
+                label: 'OCCUPATION',
+                controller: widget.fatherOccupationController,
+                icon: Icons.work_outline,
+                hint: 'e.g. Farmer, Driver…',
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 10),
+
+        // ── Card 5: Caregiver & Household ──────────────────────────
+        _buildCard(
+          headerTitle: 'CAREGIVER & HOUSEHOLD',
+          headerIcon: Icons.supervisor_account_outlined,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildField(
+                label: "CAREGIVER'S FULL NAME",
+                controller: widget.caregiverNameController,
+                icon: Icons.person_outline,
+                hint: 'If different from parents',
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildField(
+                      label: 'CAREGIVER AGE',
+                      controller: widget.caregiverAgeController,
+                      keyboardType: TextInputType.number,
+                      icon: Icons.cake_outlined,
+                      hint: 'Years',
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _buildField(
+                      label: 'RELATIONSHIP TO CHILD',
+                      controller: widget.caregiverRelationshipController,
+                      icon: Icons.family_restroom_outlined,
+                      hint: 'e.g. Lolo, Tita…',
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildField(
+                      label: 'ETHNICITY',
+                      controller: widget.caregiverEthnicityController,
+                      icon: Icons.groups_outlined,
+                      hint: 'e.g. Ibaloi…',
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _buildField(
+                      label: 'RELIGION',
+                      controller: widget.caregiverReligionController,
+                      icon: Icons.church_outlined,
+                      hint: 'e.g. Catholic…',
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // 4Ps
+              _buildYesNoRow(
+                label: '4Ps MEMBER?',
+                value: _isFourPsMember,
+                onChanged: (v) {
+                  setState(() => _isFourPsMember = v);
+                  widget.onIsFourPsMemberChanged?.call(v);
+                },
+              ),
+              if (_isFourPsMember == true) ...[
+                const SizedBox(height: 10),
+                _buildField(
+                  label: 'HOUSEHOLD ID NUMBER',
+                  controller: widget.fourPsHouseholdIdController,
+                  icon: Icons.tag_outlined,
+                  hint: 'Enter household ID',
+                  keyboardType: TextInputType.number,
+                ),
+              ],
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 8),
+      ],
     );
   }
 }
