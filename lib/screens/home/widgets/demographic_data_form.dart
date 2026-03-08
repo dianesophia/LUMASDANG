@@ -107,6 +107,9 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
   // Residence status: 'Tenant' | 'Permanent'
   String? _residenceStatus;
 
+  // Sex dropdown selection: 'Male' | 'Female'
+  String? _selectedSex;
+
   @override
   void initState() {
     super.initState();
@@ -114,6 +117,13 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
     _ipEthnicity = widget.ipEthnicity;
     _isFourPsMember = widget.isFourPsMember;
     _hasDisability = widget.hasDisability;
+    // Seed sex dropdown from controller if already set
+    final sexText = widget.sexController.text.trim().toLowerCase();
+    if (sexText == 'male' || sexText == 'm') {
+      _selectedSex = 'Male';
+    } else if (sexText == 'female' || sexText == 'f') {
+      _selectedSex = 'Female';
+    }
   }
 
   @override
@@ -226,6 +236,88 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
   }
 
   // ── Reusable widgets ────────────────────────────────────────────────────────
+
+  Widget _buildDropdown({
+    required String label,
+    required String? value,
+    required List<String> items,
+    required ValueChanged<String?> onChanged,
+    IconData? icon,
+    String? Function(String?)? validator,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFFF5A962),
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 5),
+        DropdownButtonFormField<String>(
+          value: value,
+          validator: validator,
+          onChanged: onChanged,
+          dropdownColor: Colors.white,
+          icon: const Icon(Icons.keyboard_arrow_down_rounded,
+              color: Color(0xFFF5A962), size: 20),
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF1A1A1A),
+          ),
+          decoration: InputDecoration(
+            hintText: 'Select…',
+            hintStyle: const TextStyle(fontSize: 12, color: Colors.black26),
+            prefixIcon: icon != null
+                ? Icon(icon, size: 16, color: Colors.black38)
+                : null,
+            filled: true,
+            fillColor: const Color(0xFFFAFAFA),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide:
+                  const BorderSide(color: Color(0xFFEEEEEE), width: 1.5),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide:
+                  const BorderSide(color: Color(0xFFF5A962), width: 2),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide:
+                  const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide:
+                  const BorderSide(color: Color(0xFFEF4444), width: 2),
+            ),
+            errorStyle: const TextStyle(fontSize: 10),
+          ),
+          items: items
+              .map((item) => DropdownMenuItem(
+                    value: item,
+                    child: Text(item,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF1A1A1A),
+                        )),
+                  ))
+              .toList(),
+        ),
+      ],
+    );
+  }
+
   Widget _buildTogglePill(String label, bool selected, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
@@ -598,20 +690,21 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
               const SizedBox(height: 12),
 
               // Sex
-              _buildField(
+              _buildDropdown(
                 label: 'SEX',
-                controller: widget.sexController,
-                hint: 'M or F',
+                value: _selectedSex,
+                items: const ['Male', 'Female'],
                 icon: Icons.wc_outlined,
                 validator: (v) {
                   if (widget.isDraft) return null;
-                  if (v == null || v.trim().isEmpty) return 'Required';
-                  final s = v.trim().toUpperCase();
-                  if (s != 'M' &&
-                      s != 'F' &&
-                      s != 'MALE' &&
-                      s != 'FEMALE') return 'Enter M or F';
+                  if (v == null || v.isEmpty) return 'Required';
                   return null;
+                },
+                onChanged: (v) {
+                  setState(() {
+                    _selectedSex = v;
+                    widget.sexController.text = v ?? '';
+                  });
                 },
               ),
               const SizedBox(height: 12),
