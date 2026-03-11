@@ -84,6 +84,11 @@ class VaccineDoseSelector extends StatelessWidget {
   }
 
   void _showDoseMenu(BuildContext context) {
+    // Move focus to a dummy node so that when the dialog closes,
+    // Flutter doesn't restore focus (and scroll) back to a text field
+    // higher up in the form.
+    FocusScope.of(context).requestFocus(FocusNode());
+
     showDialog<void>(
       context: context,
       barrierDismissible: true,

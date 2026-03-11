@@ -30,6 +30,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final ScrollController _homeScrollController = ScrollController();
 
   // ── Form controllers ───────────────────────────────────────────────────────
   final TextEditingController firstNameController = TextEditingController();
@@ -182,6 +183,7 @@ class _HomePageState extends State<HomePage>
 
   @override
   void dispose() {
+    _homeScrollController.dispose();
     _patientListRefreshTrigger.dispose();
     _tabController.dispose();
 
@@ -804,6 +806,8 @@ class _HomePageState extends State<HomePage>
 
   Widget _buildHomeTab() {
     return SingleChildScrollView(
+      key: const PageStorageKey<String>('home_scroll'),
+      controller: _homeScrollController,
       padding: const EdgeInsets.all(16),
       child: Form(
         key: _formKey,
