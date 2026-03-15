@@ -35,8 +35,14 @@ class DemographicDataForm extends StatefulWidget {
   final TextEditingController fourPsHouseholdIdController;
   // Disability
   final TextEditingController disabilityController;
-  // Blood Type  ← NEW
+  // Blood Type
   final TextEditingController bloodTypeController;
+  // PhilHealth — Mother
+  final TextEditingController motherPhilHealthNumberController;
+  final TextEditingController motherPhilHealthMemberTypeController;
+  // PhilHealth — Father
+  final TextEditingController fatherPhilHealthNumberController;
+  final TextEditingController fatherPhilHealthMemberTypeController;
 
   final bool? belongsToIpGroup;
   final String? ipEthnicity;
@@ -81,7 +87,11 @@ class DemographicDataForm extends StatefulWidget {
     required this.caregiverReligionController,
     required this.fourPsHouseholdIdController,
     required this.disabilityController,
-    required this.bloodTypeController, // ← NEW
+    required this.bloodTypeController,
+    required this.motherPhilHealthNumberController,
+    required this.motherPhilHealthMemberTypeController,
+    required this.fatherPhilHealthNumberController,
+    required this.fatherPhilHealthMemberTypeController,
     this.belongsToIpGroup,
     this.ipEthnicity,
     this.isFourPsMember,
@@ -107,7 +117,13 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
 
   String? _residenceStatus;
   String? _selectedSex;
-  String? _selectedBloodType; // ← NEW
+  String? _selectedBloodType;
+  String? _motherPhilHealthMemberType;
+  String? _fatherPhilHealthMemberType;
+
+  static const _philHealthMemberTypes = [
+    'Member', 'Dependent', 'Indigent', 'Senior Citizen', 'PWD', 'Other',
+  ];
 
   static const _bloodTypes = [
     'A+', 'A−', 'B+', 'B−', 'AB+', 'AB−', 'O+', 'O−', 'Unknown',
@@ -132,6 +148,16 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
     final btText = widget.bloodTypeController.text.trim();
     if (_bloodTypes.contains(btText)) {
       _selectedBloodType = btText;
+    }
+
+    // Seed PhilHealth member type dropdowns
+    final mPhType = widget.motherPhilHealthMemberTypeController.text.trim();
+    if (_philHealthMemberTypes.contains(mPhType)) {
+      _motherPhilHealthMemberType = mPhType;
+    }
+    final fPhType = widget.fatherPhilHealthMemberTypeController.text.trim();
+    if (_philHealthMemberTypes.contains(fPhType)) {
+      _fatherPhilHealthMemberType = fPhType;
     }
   }
 
@@ -971,6 +997,38 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                 icon: Icons.work_outline,
                 hint: 'e.g. Farmer, Teacher…',
               ),
+              const SizedBox(height: 12),
+              // PhilHealth
+              _buildSubHeader('PHILHEALTH'),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildField(
+                      label: 'PHILHEALTH NUMBER',
+                      controller: widget.motherPhilHealthNumberController,
+                      keyboardType: TextInputType.number,
+                      icon: Icons.credit_card_outlined,
+                      hint: '12-digit number',
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _buildDropdown(
+                      label: 'MEMBER TYPE',
+                      value: _motherPhilHealthMemberType,
+                      items: _philHealthMemberTypes,
+                      icon: Icons.badge_outlined,
+                      onChanged: (v) {
+                        setState(() {
+                          _motherPhilHealthMemberType = v;
+                          widget.motherPhilHealthMemberTypeController.text =
+                              v ?? '';
+                        });
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -1030,6 +1088,38 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                 controller: widget.fatherOccupationController,
                 icon: Icons.work_outline,
                 hint: 'e.g. Farmer, Driver…',
+              ),
+              const SizedBox(height: 12),
+              // PhilHealth
+              _buildSubHeader('PHILHEALTH'),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildField(
+                      label: 'PHILHEALTH NUMBER',
+                      controller: widget.fatherPhilHealthNumberController,
+                      keyboardType: TextInputType.number,
+                      icon: Icons.credit_card_outlined,
+                      hint: '12-digit number',
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _buildDropdown(
+                      label: 'MEMBER TYPE',
+                      value: _fatherPhilHealthMemberType,
+                      items: _philHealthMemberTypes,
+                      icon: Icons.badge_outlined,
+                      onChanged: (v) {
+                        setState(() {
+                          _fatherPhilHealthMemberType = v;
+                          widget.fatherPhilHealthMemberTypeController.text =
+                              v ?? '';
+                        });
+                      },
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

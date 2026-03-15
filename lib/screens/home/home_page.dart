@@ -42,6 +42,12 @@ class _HomePageState extends State<HomePage>
   final TextEditingController sexController = TextEditingController();
   // ▼ ADDED: blood type controller
   final TextEditingController bloodTypeController = TextEditingController();
+  // PhilHealth — Mother
+  final TextEditingController motherPhilHealthNumberController = TextEditingController();
+  final TextEditingController motherPhilHealthMemberTypeController = TextEditingController();
+  // PhilHealth — Father
+  final TextEditingController fatherPhilHealthNumberController = TextEditingController();
+  final TextEditingController fatherPhilHealthMemberTypeController = TextEditingController();
   final TextEditingController addressController = TextEditingController();
   final TextEditingController placeOfBirthController = TextEditingController();
   final TextEditingController dobController = TextEditingController();
@@ -198,6 +204,10 @@ class _HomePageState extends State<HomePage>
     ageYearsController.dispose();
     sexController.dispose();
     bloodTypeController.dispose(); // ▼ ADDED
+    motherPhilHealthNumberController.dispose();
+    motherPhilHealthMemberTypeController.dispose();
+    fatherPhilHealthNumberController.dispose();
+    fatherPhilHealthMemberTypeController.dispose();
     addressController.dispose();
     placeOfBirthController.dispose();
     dobController.dispose();
@@ -352,10 +362,14 @@ class _HomePageState extends State<HomePage>
         'motherContact': motherContactController.text.trim(),
         'motherAge': motherAgeController.text.trim(),
         'motherOccupation': motherOccupationController.text.trim(),
+        'motherPhilHealthNumber': motherPhilHealthNumberController.text.trim(),
+        'motherPhilHealthMemberType': motherPhilHealthMemberTypeController.text.trim(),
         'father': fatherController.text.trim(),
         'fatherContact': fatherContactController.text.trim(),
         'fatherAge': fatherAgeController.text.trim(),
         'fatherOccupation': fatherOccupationController.text.trim(),
+        'fatherPhilHealthNumber': fatherPhilHealthNumberController.text.trim(),
+        'fatherPhilHealthMemberType': fatherPhilHealthMemberTypeController.text.trim(),
         'caregiverName': caregiverNameController.text.trim(),
         'caregiverAge': caregiverAgeController.text.trim(),
         'caregiverEthnicity': caregiverEthnicityController.text.trim(),
@@ -571,6 +585,10 @@ class _HomePageState extends State<HomePage>
         ageYearsController,
         sexController,
         bloodTypeController, // ▼ ADDED
+        motherPhilHealthNumberController,
+        motherPhilHealthMemberTypeController,
+        fatherPhilHealthNumberController,
+        fatherPhilHealthMemberTypeController,
         addressController,
         placeOfBirthController,
         dobController,
@@ -853,6 +871,10 @@ class _HomePageState extends State<HomePage>
               ageYearsController: ageYearsController,
               sexController: sexController,
               bloodTypeController: bloodTypeController, // ▼ ADDED
+              motherPhilHealthNumberController: motherPhilHealthNumberController,
+              motherPhilHealthMemberTypeController: motherPhilHealthMemberTypeController,
+              fatherPhilHealthNumberController: fatherPhilHealthNumberController,
+              fatherPhilHealthMemberTypeController: fatherPhilHealthMemberTypeController,
               addressController: addressController,
               placeOfBirthController: placeOfBirthController,
               dobController: dobController,
