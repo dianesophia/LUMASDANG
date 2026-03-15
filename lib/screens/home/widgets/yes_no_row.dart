@@ -3,8 +3,14 @@ import 'package:flutter/material.dart';
 class YesNoRow extends StatefulWidget {
   final String text;
   final Color color;
+  final ValueChanged<bool?>? onChanged; // ← ADD THIS LINE
 
-  const YesNoRow({super.key, required this.text, required this.color});
+  const YesNoRow({
+    super.key,
+    required this.text,
+    required this.color,
+    this.onChanged, // ← ADD THIS LINE
+  });
 
   @override
   State<YesNoRow> createState() => _YesNoRowState();
@@ -31,6 +37,7 @@ class _YesNoRowState extends State<YesNoRow> {
               setState(() {
                 _selectedValue = _selectedValue == true ? null : true;
               });
+              widget.onChanged?.call(_selectedValue); // ← ADD THIS LINE
             },
             child: Container(
               width: 35,
@@ -51,6 +58,7 @@ class _YesNoRowState extends State<YesNoRow> {
               setState(() {
                 _selectedValue = _selectedValue == false ? null : false;
               });
+              widget.onChanged?.call(_selectedValue); // ← ADD THIS LINE
             },
             child: Container(
               width: 35,
