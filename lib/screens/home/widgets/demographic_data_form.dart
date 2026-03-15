@@ -5,9 +5,9 @@ class DemographicDataForm extends StatefulWidget {
   final TextEditingController firstNameController;
   final TextEditingController middleNameController;
   final TextEditingController lastNameController;
-  final TextEditingController ageController;         // age in months (auto)
-  final TextEditingController ageDaysController;     // age in days (auto)
-  final TextEditingController ageYearsController;    // age in years (auto)
+  final TextEditingController ageController;
+  final TextEditingController ageDaysController;
+  final TextEditingController ageYearsController;
   final TextEditingController sexController;
   final TextEditingController addressController;
   final TextEditingController placeOfBirthController;
@@ -35,6 +35,8 @@ class DemographicDataForm extends StatefulWidget {
   final TextEditingController fourPsHouseholdIdController;
   // Disability
   final TextEditingController disabilityController;
+  // Blood Type  ← NEW
+  final TextEditingController bloodTypeController;
 
   final bool? belongsToIpGroup;
   final String? ipEthnicity;
@@ -45,8 +47,6 @@ class DemographicDataForm extends StatefulWidget {
   final ValueChanged<bool?>? onIsFourPsMemberChanged;
   final ValueChanged<bool?>? onHasDisabilityChanged;
 
-  /// When true, only basic required fields are validated (name + parent contacts).
-  /// All other fields are optional.
   final bool isDraft;
 
   const DemographicDataForm({
@@ -81,6 +81,7 @@ class DemographicDataForm extends StatefulWidget {
     required this.caregiverReligionController,
     required this.fourPsHouseholdIdController,
     required this.disabilityController,
+    required this.bloodTypeController, // ← NEW
     this.belongsToIpGroup,
     this.ipEthnicity,
     this.isFourPsMember,
@@ -102,13 +103,15 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
   bool _middleNameNA = false;
   bool? _isFourPsMember;
   bool? _hasDisability;
-  String? _disabilityType; // selected chip value
+  String? _disabilityType;
 
-  // Residence status: 'Tenant' | 'Permanent'
   String? _residenceStatus;
-
-  // Sex dropdown selection: 'Male' | 'Female'
   String? _selectedSex;
+  String? _selectedBloodType; // ← NEW
+
+  static const _bloodTypes = [
+    'A+', 'A−', 'B+', 'B−', 'AB+', 'AB−', 'O+', 'O−', 'Unknown',
+  ];
 
   @override
   void initState() {
@@ -117,12 +120,18 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
     _ipEthnicity = widget.ipEthnicity;
     _isFourPsMember = widget.isFourPsMember;
     _hasDisability = widget.hasDisability;
-    // Seed sex dropdown from controller if already set
+
     final sexText = widget.sexController.text.trim().toLowerCase();
     if (sexText == 'male' || sexText == 'm') {
       _selectedSex = 'Male';
     } else if (sexText == 'female' || sexText == 'f') {
       _selectedSex = 'Female';
+    }
+
+    // Seed blood type from controller if already set
+    final btText = widget.bloodTypeController.text.trim();
+    if (_bloodTypes.contains(btText)) {
+      _selectedBloodType = btText;
     }
   }
 
@@ -143,39 +152,23 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
   // ── Validators ──────────────────────────────────────────────────────────────
   static final _phoneRegex = RegExp(r'^(09\d{9}|\+639\d{9})$');
 
-  /// Always required — even in draft mode (basic patient identity).
   String? _alwaysRequired(String? v, String message) {
     if (v == null || v.trim().isEmpty) return message;
     if (v.trim().length < 2) return 'Min. 2 chars';
     return null;
   }
 
-  /// Required on full submit only; optional for draft.
   String? _requiredOnSubmit(String? v, String message) {
     if (widget.isDraft) return null;
     if (v == null || v.trim().isEmpty) return message;
     return null;
   }
 
-  /// Mother's contact is always required (basic contact info).
   String? _validateMotherPhone(String? v) {
     if (v == null || v.trim().isEmpty) return 'Contact number is required';
     if (!_phoneRegex.hasMatch(v.trim())) {
       return 'Enter a valid PH number (09XXXXXXXXX or +639XXXXXXXXX)';
     }
-    return null;
-  }
-
-  /// Father's contact is required on full submit; format-checked if filled in draft.
-  String? _validateFatherPhone(String? v) {
-    if (widget.isDraft) {
-      if (v == null || v.trim().isEmpty) return null; // optional in draft
-      if (!_phoneRegex.hasMatch(v.trim())) return 'Invalid PH number';
-      return null;
-    }
-    // Full submit: optional but validate format if provided
-    if (v == null || v.trim().isEmpty) return null;
-    if (!_phoneRegex.hasMatch(v.trim())) return 'Invalid PH number';
     return null;
   }
 
@@ -214,17 +207,11 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
     if (picked != null) {
       widget.dobController.text = DateFormat('MM-dd-yyyy').format(picked);
       final now = DateTime.now();
-
-      // Age in days
       final days = now.difference(picked).inDays;
       widget.ageDaysController.text = days.clamp(0, 99999).toString();
-
-      // Age in months
       final months =
           (now.year - picked.year) * 12 + (now.month - picked.month);
       widget.ageController.text = months.clamp(0, 60).toString();
-
-      // Age in years (floor)
       final years = now.year -
           picked.year -
           (now.month < picked.month ||
@@ -572,7 +559,6 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // First + Last Name — always required (even in draft)
               Row(
                 children: [
                   Expanded(
@@ -598,7 +584,6 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
               ),
               const SizedBox(height: 12),
 
-              // Middle Name + N/A checkbox
               _buildField(
                 label: 'MIDDLE NAME',
                 controller: widget.middleNameController,
@@ -639,7 +624,6 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
               ),
               const SizedBox(height: 12),
 
-              // Date of Birth → auto-computes all age fields
               _buildField(
                 label: 'DATE OF BIRTH',
                 controller: widget.dobController,
@@ -652,7 +636,6 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
               ),
               const SizedBox(height: 12),
 
-              // Age: Days / Months / Years (read-only, auto-filled)
               _buildSubHeader('AUTO-COMPUTED AGE'),
               Row(
                 children: [
@@ -689,27 +672,48 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
               ),
               const SizedBox(height: 12),
 
-              // Sex
-              _buildDropdown(
-                label: 'SEX',
-                value: _selectedSex,
-                items: const ['Male', 'Female'],
-                icon: Icons.wc_outlined,
-                validator: (v) {
-                  if (widget.isDraft) return null;
-                  if (v == null || v.isEmpty) return 'Required';
-                  return null;
-                },
-                onChanged: (v) {
-                  setState(() {
-                    _selectedSex = v;
-                    widget.sexController.text = v ?? '';
-                  });
-                },
+              // ── Sex + Blood Type side by side ───────────────────────
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildDropdown(
+                      label: 'SEX',
+                      value: _selectedSex,
+                      items: const ['Male', 'Female'],
+                      icon: Icons.wc_outlined,
+                      validator: (v) {
+                        if (widget.isDraft) return null;
+                        if (v == null || v.isEmpty) return 'Required';
+                        return null;
+                      },
+                      onChanged: (v) {
+                        setState(() {
+                          _selectedSex = v;
+                          widget.sexController.text = v ?? '';
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  // ── BLOOD TYPE dropdown ─────────────────────────────
+                  Expanded(
+                    child: _buildDropdown(
+                      label: 'BLOOD TYPE',
+                      value: _selectedBloodType,
+                      items: _bloodTypes,
+                      icon: Icons.bloodtype_outlined,
+                      onChanged: (v) {
+                        setState(() {
+                          _selectedBloodType = v;
+                          widget.bloodTypeController.text = v ?? '';
+                        });
+                      },
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 12),
 
-              // Birth Weight + Birth Order
               Row(
                 children: [
                   Expanded(
@@ -743,7 +747,6 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
               ),
               const SizedBox(height: 12),
 
-              // Religion — patient's religion
               _buildField(
                 label: 'RELIGION',
                 controller: widget.religionController,
@@ -752,7 +755,6 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
               ),
               const SizedBox(height: 12),
 
-              // ── IP Group — Yes/No → chips → free text if Other ──────
               _buildLabelRow('BELONGS TO IP GROUP?'),
               Row(
                 children: [
@@ -772,7 +774,6 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                 ],
               ),
 
-              // IP Ethnicity chips (shown only when IP = Yes)
               if (_belongsToIpGroup == true) ...[
                 const SizedBox(height: 10),
                 _buildLabelRow('ETHNICITY'),
@@ -805,7 +806,6 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
               ],
               const SizedBox(height: 12),
 
-              // ── Disability — Yes/No → type chips → free text if Other
               _buildYesNoRow(
                 label: 'HAS DISABILITY?',
                 value: _hasDisability,
@@ -891,7 +891,6 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
               ),
               const SizedBox(height: 12),
 
-              // Status of Residence
               _buildLabelRow('STATUS OF RESIDENCE'),
               Row(
                 children: [
@@ -933,7 +932,6 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Always required — basic patient identity
               _buildField(
                 label: "MOTHER'S FULL NAME *",
                 controller: widget.motherController,
@@ -961,7 +959,6 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                       keyboardType: TextInputType.phone,
                       hint: '09XXXXXXXXX',
                       icon: Icons.phone_outlined,
-                      // Always required — basic contact info
                       validator: _validateMotherPhone,
                     ),
                   ),
@@ -987,7 +984,6 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Always required — basic patient identity
               _buildField(
                 label: "FATHER'S FULL NAME *",
                 controller: widget.fatherController,
@@ -1015,7 +1011,6 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                       keyboardType: TextInputType.phone,
                       hint: '09XXXXXXXXX',
                       icon: Icons.phone_outlined,
-                      // Always required — basic contact info
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) {
                           return 'Contact number is required';
@@ -1102,7 +1097,6 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
               ),
               const SizedBox(height: 16),
 
-              // 4Ps
               _buildYesNoRow(
                 label: '4Ps MEMBER?',
                 value: _isFourPsMember,

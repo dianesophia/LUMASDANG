@@ -40,6 +40,8 @@ class _HomePageState extends State<HomePage>
   final TextEditingController ageDaysController = TextEditingController();
   final TextEditingController ageYearsController = TextEditingController();
   final TextEditingController sexController = TextEditingController();
+  // ▼ ADDED: blood type controller
+  final TextEditingController bloodTypeController = TextEditingController();
   final TextEditingController addressController = TextEditingController();
   final TextEditingController placeOfBirthController = TextEditingController();
   final TextEditingController dobController = TextEditingController();
@@ -195,6 +197,7 @@ class _HomePageState extends State<HomePage>
     ageDaysController.dispose();
     ageYearsController.dispose();
     sexController.dispose();
+    bloodTypeController.dispose(); // ▼ ADDED
     addressController.dispose();
     placeOfBirthController.dispose();
     dobController.dispose();
@@ -332,6 +335,7 @@ class _HomePageState extends State<HomePage>
         'ageDays': ageDaysController.text.trim(),
         'ageYears': ageYearsController.text.trim(),
         'sex': sexController.text.trim(),
+        'bloodType': bloodTypeController.text.trim(), // ▼ ADDED
         'address': addressController.text.trim(),
         'placeOfBirth': placeOfBirthController.text.trim(),
         'dateOfBirth': dobController.text.trim(),
@@ -566,6 +570,7 @@ class _HomePageState extends State<HomePage>
         ageDaysController,
         ageYearsController,
         sexController,
+        bloodTypeController, // ▼ ADDED
         addressController,
         placeOfBirthController,
         dobController,
@@ -847,6 +852,7 @@ class _HomePageState extends State<HomePage>
               ageDaysController: ageDaysController,
               ageYearsController: ageYearsController,
               sexController: sexController,
+              bloodTypeController: bloodTypeController, // ▼ ADDED
               addressController: addressController,
               placeOfBirthController: placeOfBirthController,
               dobController: dobController,
