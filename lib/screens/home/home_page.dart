@@ -18,6 +18,7 @@ import 'widgets/vaccination_form.dart';
 import 'widgets/deworming_form.dart';
 import 'widgets/family_planning_form.dart';
 import 'widgets/nutrition_environment_form.dart';
+import 'widgets/allergies_form.dart';
 import 'package:flutter/foundation.dart';
 
 class HomePage extends StatefulWidget {
@@ -124,6 +125,7 @@ class _HomePageState extends State<HomePage>
   Map<String, dynamic>? _vaccinationData;
   Map<String, dynamic>? _familyPlanningData;
   Map<String, dynamic>? _nutritionEnvData;
+  Map<String, dynamic>? _allergiesData;
 
   /// When true, only the basic required fields (patient name, parent names &
   /// contacts) are enforced; all other form validators are skipped.
@@ -140,6 +142,7 @@ class _HomePageState extends State<HomePage>
   int _vaccinationFormKey = 0;
   int _familyPlanningFormKey = 0;
   int _nutritionEnvFormKey = 0;
+  int _allergiesFormKey = 0;
 
   // ── Validation ─────────────────────────────────────────────────────────────
   final _formKey = GlobalKey<FormState>();
@@ -404,6 +407,7 @@ class _HomePageState extends State<HomePage>
         'mealFrequency': mealFreqController.text.trim(),
       },
       'nutritionEnvironment': _nutritionEnvData,
+      'allergies': _allergiesData,
       'deworming': _dewormingData,
       'oral': _oralData,
       'vaccination': _vaccinationData,
@@ -638,6 +642,7 @@ class _HomePageState extends State<HomePage>
         _vaccinationFormKey++;
         _familyPlanningFormKey++;
         _nutritionEnvFormKey++;
+        _allergiesFormKey++;
         _diarrhea = false;
         _fever = false;
         _cough = false;
@@ -656,6 +661,7 @@ class _HomePageState extends State<HomePage>
         _dewormingError = null;
         _familyPlanningData = null;
         _nutritionEnvData = null;
+        _allergiesData = null;
         _isDraft = false;
       });
 
@@ -945,7 +951,15 @@ class _HomePageState extends State<HomePage>
             ),
             const SizedBox(height: 16),
 
-            // ── 4. Family Planning ─────────────────────────────────────
+            // ── 4. Allergies ───────────────────────────────────────────
+            AllergiesForm(
+              key: ValueKey('allergies_form_$_allergiesFormKey'),
+              onDataChanged: (data) =>
+                  setState(() => _allergiesData = data),
+            ),
+            const SizedBox(height: 16),
+
+            // ── 5. Family Planning ─────────────────────────────────────
             FamilyPlanningForm(
               key: ValueKey('fp_form_$_familyPlanningFormKey'),
               onDataChanged: (data) =>
@@ -953,7 +967,7 @@ class _HomePageState extends State<HomePage>
             ),
             const SizedBox(height: 16),
 
-            // ── 5. Dietary Assessment ──────────────────────────────────
+            // ── 6. Dietary Assessment ──────────────────────────────────
             DietaryAssessmentForm(
               key: ValueKey('dietary_form_$_dietaryFormKey'),
               purelyBreastfed: _purelyBreastfed,
@@ -971,7 +985,7 @@ class _HomePageState extends State<HomePage>
             ),
             const SizedBox(height: 16),
 
-            // ── 6. Nutrition Environment ───────────────────────────────
+            // ── 7. Nutrition Environment ───────────────────────────────
             NutritionEnvironmentForm(
               key: ValueKey('nutrition_env_form_$_nutritionEnvFormKey'),
               onDataChanged: (data) =>
@@ -979,7 +993,7 @@ class _HomePageState extends State<HomePage>
             ),
             const SizedBox(height: 16),
 
-            // ── 7. Oral Assessment ─────────────────────────────────────
+            // ── 8. Oral Assessment ─────────────────────────────────────
             OralAssessmentForm(
               key: ValueKey('oral_form_$_oralFormKey'),
               onDataChanged: (data) {
@@ -990,14 +1004,14 @@ class _HomePageState extends State<HomePage>
             ),
             const SizedBox(height: 16),
 
-            // ── 8. Vaccination ─────────────────────────────────────────
+            // ── 9. Vaccination ─────────────────────────────────────────
             VaccinationForm(
               key: ValueKey('vaccination_form_$_vaccinationFormKey'),
               onDataChanged: (data) => _vaccinationData = data,
             ),
             const SizedBox(height: 16),
 
-            // ── 9. Deworming ───────────────────────────────────────────
+            // ── 10. Deworming ──────────────────────────────────────────
             DewormingForm(
               key: ValueKey('deworming_form_$_dewormingFormKey'),
               onSave: (map) {
