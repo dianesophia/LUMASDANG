@@ -29,7 +29,6 @@ class _NotificationsTabState extends State<NotificationsTab> {
   }
 
   Future<void> _checkConnectivity() async {
-    //final online = await ConnectivityService.instance.checkOnline();
     final online = kIsWeb ? true : await ConnectivityService.instance.checkOnline();
     if (mounted) setState(() => _isOnline = online);
     if (!online) _loadOffline();
@@ -88,12 +87,7 @@ class _NotificationsTabState extends State<NotificationsTab> {
         .limit(50)
         .snapshots()
         .map((snap) => snap.docs.map((d) {
-              final data = {
-                ...d.data(),
-                'id': d.id,
-                '_collection': 'notifications'
-              };
-              return data;
+              return {...d.data(), 'id': d.id, '_collection': 'notifications'};
             }).toList());
   }
 
@@ -111,12 +105,10 @@ class _NotificationsTabState extends State<NotificationsTab> {
         .limit(50)
         .snapshots()
         .map((snap) => snap.docs.map((d) {
-              final data = {
-                ...d.data(),
-                'id': d.id,
+              return {
+                ...d.data(), 'id': d.id,
                 '_collection': 'calendarNotifications'
               };
-              return data;
             }).toList());
   }
 
@@ -125,20 +117,20 @@ class _NotificationsTabState extends State<NotificationsTab> {
     List<Map<String, dynamic>> patients,
     List<Map<String, dynamic>> events,
   ) {
-    final all = [...patients, ...events];
-    final seen = <String>{};
-    final deduped = <Map<String, dynamic>>[];
+    final all    = [...patients, ...events];
+    final seen   = <String>{};
+    final result = <Map<String, dynamic>>[];
     for (final n in all) {
       final key = '${n['_collection']}_${n['id']}';
-      if (seen.add(key)) deduped.add(n);
+      if (seen.add(key)) result.add(n);
     }
-    deduped.sort((a, b) {
+    result.sort((a, b) {
       final aTs = a['createdAt'];
       final bTs = b['createdAt'];
       if (aTs is Timestamp && bTs is Timestamp) return bTs.compareTo(aTs);
       return 0;
     });
-    return deduped;
+    return result;
   }
 
   List<Map<String, dynamic>> _filtered(List<Map<String, dynamic>> all) {
@@ -149,48 +141,37 @@ class _NotificationsTabState extends State<NotificationsTab> {
   int _unreadCount(List<Map<String, dynamic>> all) =>
       all.where((n) => n['read'] == false).length;
 
-  String _formatTimestamp(dynamic timestamp) {
+  String _formatTimestamp(dynamic ts) {
     try {
       DateTime dt;
-      if (timestamp is Timestamp) {
-        dt = timestamp.toDate();
-      } else if (timestamp is String) {
-        dt = DateTime.parse(timestamp);
-      } else {
-        return 'Unknown time';
-      }
+      if (ts is Timestamp)   dt = ts.toDate();
+      else if (ts is String) dt = DateTime.parse(ts);
+      else                   return 'Unknown time';
       final diff = DateTime.now().difference(dt);
-      if (diff.inMinutes < 1) return 'Just now';
+      if (diff.inMinutes < 1)  return 'Just now';
       if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-      if (diff.inHours < 24) return '${diff.inHours}h ago';
-      if (diff.inDays < 7) return '${diff.inDays}d ago';
-      const m = [
-        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-      ];
+      if (diff.inHours   < 24) return '${diff.inHours}h ago';
+      if (diff.inDays    <  7) return '${diff.inDays}d ago';
+      const m = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
       return '${m[dt.month - 1]} ${dt.day}, ${dt.year}';
-    } catch (_) {
-      return 'Unknown time';
-    }
+    } catch (_) { return 'Unknown time'; }
   }
 
   Color _avatarColor(String sex) {
     final s = sex.toLowerCase();
-    if (s == 'male' || s == 'm') return const Color(0xFF4A9B6F);
+    if (s == 'male'   || s == 'm') return const Color(0xFF4A9B6F);
     if (s == 'female' || s == 'f') return const Color(0xFFE8924A);
     return const Color(0xFF6EB56D);
   }
 
-  // ── Delete single notification ─────────────────────────────────────────────
+  // ── Delete / Clear ─────────────────────────────────────────────────────────
   Future<void> _deleteNotification(Map<String, dynamic> n) async {
-    final id = n['id'] as String?;
+    final id         = n['id']          as String?;
     final collection = n['_collection'] as String?;
     if (id == null || collection == null) return;
-
     try {
       final barangayId = await FirestoreService().getCurrentUserBarangayId();
       if (barangayId == null || barangayId.isEmpty) return;
-
       await FirebaseFirestore.instance
           .collection('barangays')
           .doc(barangayId)
@@ -198,27 +179,10 @@ class _NotificationsTabState extends State<NotificationsTab> {
           .doc(id)
           .delete();
     } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Row(
-              children: [
-                Icon(Icons.error_outline, color: Colors.white, size: 16),
-                SizedBox(width: 8),
-                Text('Failed to delete notification'),
-              ],
-            ),
-            backgroundColor: Colors.redAccent,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            margin: const EdgeInsets.all(16),
-          ),
-        );
-      }
+      if (mounted) _showError('Failed to delete notification');
     }
   }
 
-  // ── Clear All ──────────────────────────────────────────────────────────────
   Future<void> _clearAllNotifications(List<Map<String, dynamic>> all) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -243,7 +207,8 @@ class _NotificationsTabState extends State<NotificationsTab> {
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF2E8B7B),
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
             ),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Clear All'),
@@ -251,18 +216,15 @@ class _NotificationsTabState extends State<NotificationsTab> {
         ],
       ),
     );
-
     if (confirmed != true || !mounted) return;
 
     try {
       final barangayId = await FirestoreService().getCurrentUserBarangayId();
       if (barangayId == null || barangayId.isEmpty) return;
-
-      final db = FirebaseFirestore.instance;
+      final db    = FirebaseFirestore.instance;
       final batch = db.batch();
-
       for (final n in all) {
-        final id = n['id'] as String?;
+        final id         = n['id']          as String?;
         final collection = n['_collection'] as String?;
         if (id == null || collection == null) continue;
         batch.delete(db
@@ -271,45 +233,39 @@ class _NotificationsTabState extends State<NotificationsTab> {
             .collection(collection)
             .doc(id));
       }
-
       await batch.commit();
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Row(
-              children: [
-                Icon(Icons.check_circle_outline, color: Colors.white, size: 16),
-                SizedBox(width: 8),
-                Text('All notifications cleared'),
-              ],
-            ),
-            backgroundColor: const Color(0xFF2E8B7B),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            margin: const EdgeInsets.all(16),
-          ),
-        );
-      }
+      if (mounted) _showSuccess('All notifications cleared');
     } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Row(
-              children: [
-                Icon(Icons.error_outline, color: Colors.white, size: 16),
-                SizedBox(width: 8),
-                Text('Failed to clear notifications'),
-              ],
-            ),
-            backgroundColor: Colors.redAccent,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            margin: const EdgeInsets.all(16),
-          ),
-        );
-      }
+      if (mounted) _showError('Failed to clear notifications');
     }
+  }
+
+  void _showSuccess(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Row(children: [
+        const Icon(Icons.check_circle_outline, color: Colors.white, size: 16),
+        const SizedBox(width: 8),
+        Text(msg),
+      ]),
+      backgroundColor: const Color(0xFF2E8B7B),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      margin: const EdgeInsets.all(16),
+    ));
+  }
+
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Row(children: [
+        const Icon(Icons.error_outline, color: Colors.white, size: 16),
+        const SizedBox(width: 8),
+        Text(msg),
+      ]),
+      backgroundColor: Colors.redAccent,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      margin: const EdgeInsets.all(16),
+    ));
   }
 
   // ── Navigation ─────────────────────────────────────────────────────────────
@@ -317,21 +273,19 @@ class _NotificationsTabState extends State<NotificationsTab> {
     Navigator.push(
       context,
       PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) =>
-            const CalendarEventsPage(),
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          final tween = Tween(begin: const Offset(1.0, 0.0), end: Offset.zero)
+        pageBuilder: (_, a, __) => const CalendarEventsPage(),
+        transitionsBuilder: (_, a, __, child) {
+          final tween = Tween(
+                  begin: const Offset(1.0, 0.0), end: Offset.zero)
               .chain(CurveTween(curve: Curves.easeInOutCubic));
-          return SlideTransition(position: animation.drive(tween), child: child);
+          return SlideTransition(position: a.drive(tween), child: child);
         },
         transitionDuration: const Duration(milliseconds: 350),
       ),
     );
   }
 
-  void _navigateToPatientList() {
-    widget.onNavigateToPatients?.call();
-  }
+  void _navigateToPatientList() => widget.onNavigateToPatients?.call();
 
   // ── Build ──────────────────────────────────────────────────────────────────
   @override
@@ -345,13 +299,13 @@ class _NotificationsTabState extends State<NotificationsTab> {
           stream: _eventNotifsStream(),
           builder: (context, eventSnap) {
             final patients = patientSnap.data ?? [];
-            final events = eventSnap.data ?? [];
-            final all = _merged(patients, events);
+            final events   = eventSnap.data   ?? [];
+            final all      = _merged(patients, events);
             final filtered = _filtered(all);
-            final unread = _unreadCount(all);
-            final isLoading =
+            final unread   = _unreadCount(all);
+            final loading  =
                 patientSnap.connectionState == ConnectionState.waiting ||
-                    eventSnap.connectionState == ConnectionState.waiting;
+                eventSnap.connectionState   == ConnectionState.waiting;
 
             return Container(
               decoration: const BoxDecoration(
@@ -359,9 +313,7 @@ class _NotificationsTabState extends State<NotificationsTab> {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    Color(0xFF2E8B7B),
-                    Color(0xFF5CAA7F),
-                    Color(0xFF8BC88A)
+                    Color(0xFF2E8B7B), Color(0xFF5CAA7F), Color(0xFF8BC88A)
                   ],
                 ),
               ),
@@ -369,7 +321,7 @@ class _NotificationsTabState extends State<NotificationsTab> {
                 children: [
                   _buildHeader(unread, all),
                   _buildFilterChips(all),
-                  if (isLoading)
+                  if (loading)
                     const LinearProgressIndicator(
                       backgroundColor: Colors.transparent,
                       color: Colors.white54,
@@ -399,46 +351,40 @@ class _NotificationsTabState extends State<NotificationsTab> {
                   color: Colors.white.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.notifications, color: Colors.white, size: 22),
+                child: const Icon(Icons.notifications,
+                    color: Colors.white, size: 22),
               ),
               if (unread > 0)
                 Positioned(
-                  top: -4,
-                  right: -4,
+                  top: -4, right: -4,
                   child: Container(
                     padding: const EdgeInsets.all(3),
                     decoration: const BoxDecoration(
-                      color: Color(0xFFF08030),
-                      shape: BoxShape.circle,
+                      color: Color(0xFFF08030), shape: BoxShape.circle,
                     ),
-                    child: Text(
-                      '$unread',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
+                    child: Text('$unread',
+                        style: const TextStyle(
+                          color: Colors.white, fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                        )),
                   ),
                 ),
             ],
           ),
           const SizedBox(width: 10),
           const Expanded(
-            child: Text(
-              'Notifications',
-              style: TextStyle(
-                fontSize: 19,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
+            child: Text('Notifications',
+                style: TextStyle(
+                  fontSize: 19, fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                )),
           ),
-          if (all.isNotEmpty) ...[
+          if (all.isNotEmpty)
             GestureDetector(
               onTap: () => _clearAllNotifications(all),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(10),
@@ -453,39 +399,45 @@ class _NotificationsTabState extends State<NotificationsTab> {
                     SizedBox(width: 4),
                     Text('Clear',
                         style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600)),
+                          color: Colors.white70, fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        )),
                   ],
                 ),
               ),
             ),
-          ],
         ],
       ),
     );
   }
 
-  // ── Filter chips ────────────────────────────────────────────────────────────
+  // ── Filter chips ───────────────────────────────────────────────────────────
   Widget _buildFilterChips(List<Map<String, dynamic>> all) {
     final patientCount = all.where((n) => n['type'] == 'new_patient').length;
-    final eventCount = all.where((n) => n['type'] == 'new_event').length;
+    final eventCount   = all.where((n) => n['type'] == 'new_event').length;
+    final vaccineCount = all.where((n) => n['type'] == 'vaccine_due').length;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-      child: Row(
-        children: [
-          _chip('All', 'all', all.length),
-          const SizedBox(width: 8),
-          _chip('Patients', 'new_patient', patientCount),
-          const SizedBox(width: 8),
-          _chip('Events', 'new_event', eventCount),
-        ],
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            _chip('All',      'all',         all.length),
+            const SizedBox(width: 8),
+            _chip('Patients', 'new_patient', patientCount),
+            const SizedBox(width: 8),
+            _chip('Events',   'new_event',   eventCount),
+            const SizedBox(width: 8),
+            _chip('Vaccines', 'vaccine_due', vaccineCount,
+                icon: Icons.vaccines_outlined),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _chip(String label, String filter, int count) {
+  Widget _chip(String label, String filter, int count, {IconData? icon}) {
     final isActive = _activeFilter == filter;
     return GestureDetector(
       onTap: () => setState(() => _activeFilter = filter),
@@ -499,33 +451,37 @@ class _NotificationsTabState extends State<NotificationsTab> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: isActive ? const Color(0xFF2E8B7B) : Colors.white,
-              ),
-            ),
+            if (icon != null) ...[
+              Icon(icon,
+                  size: 12,
+                  color: isActive
+                      ? const Color(0xFFF08030)
+                      : Colors.white),
+              const SizedBox(width: 4),
+            ],
+            Text(label,
+                style: TextStyle(
+                  fontSize: 12, fontWeight: FontWeight.w600,
+                  color: isActive
+                      ? const Color(0xFF2E8B7B)
+                      : Colors.white,
+                )),
             if (count > 0) ...[
               const SizedBox(width: 5),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 5, vertical: 1),
                 decoration: BoxDecoration(
                   color: isActive
                       ? const Color(0xFF2E8B7B)
                       : Colors.white.withOpacity(0.3),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Text(
-                  '$count',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+                child: Text('$count',
+                    style: const TextStyle(
+                      color: Colors.white, fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                    )),
               ),
             ],
           ],
@@ -534,7 +490,7 @@ class _NotificationsTabState extends State<NotificationsTab> {
     );
   }
 
-  // ── List ────────────────────────────────────────────────────────────────────
+  // ── List ───────────────────────────────────────────────────────────────────
   Widget _buildList(List<Map<String, dynamic>> items) {
     if (items.isEmpty) {
       return Center(
@@ -544,21 +500,20 @@ class _NotificationsTabState extends State<NotificationsTab> {
             Icon(Icons.notifications_none,
                 size: 60, color: Colors.white.withOpacity(0.4)),
             const SizedBox(height: 12),
-            Text(
-              'No notifications yet',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.white.withOpacity(0.7),
-                fontWeight: FontWeight.w500,
-              ),
-            ),
+            Text('No notifications yet',
+                style: TextStyle(
+                  fontSize: 16, color: Colors.white.withOpacity(0.7),
+                  fontWeight: FontWeight.w500,
+                )),
             const SizedBox(height: 6),
             Text(
               _activeFilter == 'new_patient'
                   ? 'Patient assessments will appear here'
                   : _activeFilter == 'new_event'
                       ? 'Calendar events will appear here'
-                      : 'New activity from your barangay\nteam will appear here in real-time',
+                      : _activeFilter == 'vaccine_due'
+                          ? 'Vaccine due reminders will appear here'
+                          : 'New activity from your barangay\nteam will appear here in real-time',
               textAlign: TextAlign.center,
               style: TextStyle(
                   fontSize: 13, color: Colors.white.withOpacity(0.5)),
@@ -573,117 +528,109 @@ class _NotificationsTabState extends State<NotificationsTab> {
       itemCount: items.length,
       itemBuilder: (context, i) {
         final n = items[i];
-        return n['type'] == 'new_event'
-            ? _buildEventCard(n)
-            : _buildPatientCard(n);
+        if (n['type'] == 'new_event')    return _buildEventCard(n);
+        if (n['type'] == 'vaccine_due')  return _buildVaccineDueCard(n);
+        return _buildPatientCard(n);
       },
     );
   }
 
-  // ── Patient card ────────────────────────────────────────────────────────────
+  // ── Patient card ───────────────────────────────────────────────────────────
   Widget _buildPatientCard(Map<String, dynamic> n) {
-    final isRead = n['read'] ?? false;
-    final patientName = n['patientName'] ?? '';
-    final patientAge = n['patientAge'] ?? '';
-    final patientSex = n['patientSex'] ?? '';
-    final createdBy = n['createdByName'] ?? 'Unknown';
+    final isRead      = n['read']          ?? false;
+    final patientName = n['patientName']   ?? '';
+    final patientAge  = n['patientAge']    ?? '';
+    final patientSex  = n['patientSex']    ?? '';
+    final createdBy   = n['createdByName'] ?? 'Unknown';
     final avatarColor = _avatarColor(patientSex);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isRead ? Colors.transparent : const Color(0xFF2E8B7B),
-          width: 1.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.07),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
+    return _dismissible(
+      n: n,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
           borderRadius: BorderRadius.circular(14),
-          onTap: () async {
-            if (!isRead && n['id'] != null) {
-              try {
-                await FirestoreService().markNotificationAsRead(n['id']);
-              } catch (_) {}
-            }
-            if (mounted) _navigateToPatientList();
-          },
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-            child: Row(
-              children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: avatarColor,
-                    borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isRead ? Colors.transparent : const Color(0xFF2E8B7B),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.07),
+              blurRadius: 6, offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: () async {
+              if (!isRead && n['id'] != null) {
+                try {
+                  await FirestoreService().markNotificationAsRead(n['id']);
+                } catch (_) {}
+              }
+              if (mounted) _navigateToPatientList();
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 12, vertical: 11),
+              child: Row(
+                children: [
+                  Container(
+                    width: 42, height: 42,
+                    decoration: BoxDecoration(
+                      color: avatarColor,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.person,
+                        color: Colors.white, size: 22),
                   ),
-                  child: const Icon(Icons.person, color: Colors.white, size: 22),
-                ),
-                const SizedBox(width: 11),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
+                  const SizedBox(width: 11),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(children: [
                           Expanded(
-                            child: Text(
-                              'New Assessment',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: isRead
-                                    ? Colors.grey
-                                    : const Color(0xFF2E8B7B),
-                                letterSpacing: 0.3,
-                              ),
-                            ),
+                            child: Text('New Assessment',
+                                style: TextStyle(
+                                  fontSize: 10, fontWeight: FontWeight.w600,
+                                  color: isRead
+                                      ? Colors.grey
+                                      : const Color(0xFF2E8B7B),
+                                  letterSpacing: 0.3,
+                                )),
                           ),
                           if (!isRead)
                             Container(
-                              width: 7,
-                              height: 7,
+                              width: 7, height: 7,
                               decoration: const BoxDecoration(
                                 color: Color(0xFF2E8B7B),
                                 shape: BoxShape.circle,
                               ),
                             ),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        patientName,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight:
-                              isRead ? FontWeight.w500 : FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Added by $createdBy',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey.shade500,
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                      const SizedBox(height: 5),
-                      Row(
-                        children: [
+                        ]),
+                        const SizedBox(height: 2),
+                        Text(patientName,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: isRead
+                                  ? FontWeight.w500
+                                  : FontWeight.bold,
+                              color: Colors.black87,
+                            )),
+                        const SizedBox(height: 2),
+                        Text('Added by $createdBy',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey.shade500,
+                              fontStyle: FontStyle.italic,
+                            )),
+                        const SizedBox(height: 5),
+                        Row(children: [
                           Icon(Icons.cake_outlined,
                               size: 10, color: Colors.grey.shade400),
                           const SizedBox(width: 3),
@@ -692,7 +639,8 @@ class _NotificationsTabState extends State<NotificationsTab> {
                                 ? '$patientAge months'
                                 : 'Age N/A',
                             style: TextStyle(
-                                fontSize: 11, color: Colors.grey.shade500),
+                                fontSize: 11,
+                                color: Colors.grey.shade500),
                           ),
                           const SizedBox(width: 10),
                           Icon(Icons.wc,
@@ -701,29 +649,28 @@ class _NotificationsTabState extends State<NotificationsTab> {
                           Text(
                             patientSex.isNotEmpty ? patientSex : 'N/A',
                             style: TextStyle(
-                                fontSize: 11, color: Colors.grey.shade500),
+                                fontSize: 11,
+                                color: Colors.grey.shade500),
                           ),
                           const Spacer(),
                           Icon(Icons.schedule,
                               size: 10, color: Colors.grey.shade400),
                           const SizedBox(width: 3),
-                          Text(
-                            _formatTimestamp(n['createdAt']),
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Colors.grey.shade400,
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                          Text(_formatTimestamp(n['createdAt']),
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.grey.shade400,
+                                fontStyle: FontStyle.italic,
+                              )),
+                        ]),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(width: 6),
-                Icon(Icons.chevron_right,
-                    color: Colors.grey.shade300, size: 18),
-              ],
+                  const SizedBox(width: 6),
+                  Icon(Icons.chevron_right,
+                      color: Colors.grey.shade300, size: 18),
+                ],
+              ),
             ),
           ),
         ),
@@ -731,159 +678,146 @@ class _NotificationsTabState extends State<NotificationsTab> {
     );
   }
 
-  // ── Event card ──────────────────────────────────────────────────────────────
+  // ── Event card ─────────────────────────────────────────────────────────────
   Widget _buildEventCard(Map<String, dynamic> n) {
-    final isRead = n['read'] ?? false;
-    final eventTitle = n['eventTitle'] ?? 'Untitled Event';
-    final eventTime = n['eventTime'] ?? '';
-    final eventDate = n['eventDate'];
-    final createdBy = n['createdByName'] ?? 'Unknown';
+    final isRead     = n['read']          ?? false;
+    final eventTitle = n['eventTitle']    ?? 'Untitled Event';
+    final eventTime  = n['eventTime']     ?? '';
+    final eventDate  = n['eventDate'];
+    final createdBy  = n['createdByName'] ?? 'Unknown';
     final eventColor = Color(n['colorValue'] ?? 0xFFF5A962);
 
     String dateLabel = '';
     if (eventDate is Timestamp) {
       final d = eventDate.toDate();
       const months = [
-        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+        'Jan','Feb','Mar','Apr','May','Jun',
+        'Jul','Aug','Sep','Oct','Nov','Dec'
       ];
       dateLabel = '${months[d.month - 1]} ${d.day}, ${d.year}';
     }
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isRead ? Colors.transparent : eventColor,
-          width: 1.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.07),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
+    return _dismissible(
+      n: n,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
           borderRadius: BorderRadius.circular(14),
-          onTap: () async {
-            if (!isRead && n['id'] != null) {
-              try {
-                await FirestoreService()
-                    .markCalendarNotificationAsRead(n['id']);
-              } catch (_) {}
-            }
-            if (mounted) _navigateToCalendar();
-          },
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-            child: Row(
-              children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: eventColor,
-                    borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isRead ? Colors.transparent : eventColor,
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.07),
+              blurRadius: 6, offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: () async {
+              if (!isRead && n['id'] != null) {
+                try {
+                  await FirestoreService()
+                      .markCalendarNotificationAsRead(n['id']);
+                } catch (_) {}
+              }
+              if (mounted) _navigateToCalendar();
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 12, vertical: 11),
+              child: Row(
+                children: [
+                  Container(
+                    width: 42, height: 42,
+                    decoration: BoxDecoration(
+                      color: eventColor,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.event,
+                        color: Colors.white, size: 20),
                   ),
-                  child: const Icon(Icons.event, color: Colors.white, size: 20),
-                ),
-                const SizedBox(width: 11),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
+                  const SizedBox(width: 11),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(children: [
                           Expanded(
-                            child: Text(
-                              'New Event Added',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: isRead ? Colors.grey : eventColor,
-                                letterSpacing: 0.3,
-                              ),
-                            ),
+                            child: Text('New Event Added',
+                                style: TextStyle(
+                                  fontSize: 10, fontWeight: FontWeight.w600,
+                                  color: isRead ? Colors.grey : eventColor,
+                                  letterSpacing: 0.3,
+                                )),
                           ),
                           if (!isRead)
                             Container(
-                              width: 7,
-                              height: 7,
+                              width: 7, height: 7,
                               decoration: BoxDecoration(
-                                color: eventColor,
-                                shape: BoxShape.circle,
+                                color: eventColor, shape: BoxShape.circle,
                               ),
                             ),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        eventTitle,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight:
-                              isRead ? FontWeight.w500 : FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Added by $createdBy',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey.shade500,
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                      const SizedBox(height: 5),
-                      Row(
-                        children: [
+                        ]),
+                        const SizedBox(height: 2),
+                        Text(eventTitle,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: isRead
+                                  ? FontWeight.w500
+                                  : FontWeight.bold,
+                              color: Colors.black87,
+                            )),
+                        const SizedBox(height: 2),
+                        Text('Added by $createdBy',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey.shade500,
+                              fontStyle: FontStyle.italic,
+                            )),
+                        const SizedBox(height: 5),
+                        Row(children: [
                           Icon(Icons.calendar_today,
                               size: 10, color: Colors.grey.shade400),
                           const SizedBox(width: 3),
-                          Text(
-                            dateLabel,
-                            style: TextStyle(
-                                fontSize: 11, color: Colors.grey.shade500),
-                          ),
+                          Text(dateLabel,
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey.shade500)),
                           if (eventTime.isNotEmpty) ...[
                             const SizedBox(width: 8),
                             Icon(Icons.schedule,
                                 size: 10, color: Colors.grey.shade400),
                             const SizedBox(width: 3),
-                            Text(
-                              eventTime,
-                              style: TextStyle(
-                                  fontSize: 11, color: Colors.grey.shade500),
-                            ),
+                            Text(eventTime,
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey.shade500)),
                           ],
                           const Spacer(),
                           Icon(Icons.schedule,
                               size: 10, color: Colors.grey.shade400),
                           const SizedBox(width: 3),
-                          Text(
-                            _formatTimestamp(n['createdAt']),
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Colors.grey.shade400,
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                          Text(_formatTimestamp(n['createdAt']),
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.grey.shade400,
+                                fontStyle: FontStyle.italic,
+                              )),
+                        ]),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(width: 6),
-                Icon(Icons.chevron_right,
-                    color: Colors.grey.shade300, size: 18),
-              ],
+                  const SizedBox(width: 6),
+                  Icon(Icons.chevron_right,
+                      color: Colors.grey.shade300, size: 18),
+                ],
+              ),
             ),
           ),
         ),
@@ -891,14 +825,241 @@ class _NotificationsTabState extends State<NotificationsTab> {
     );
   }
 
-  // ── Offline view ────────────────────────────────────────────────────────────
+  // ── Vaccine due card ───────────────────────────────────────────────────────
+  Widget _buildVaccineDueCard(Map<String, dynamic> n) {
+    final isRead        = n['read']           ?? false;
+    final patientName   = n['patientName']    ?? 'Unknown';
+    final vaccine       = n['vaccine']        ?? '';
+    final dateStr       = n['nextDoseDateStr'] ?? '';
+    final motherContact = n['motherContact']  ?? '';
+    final fatherContact = n['fatherContact']  ?? '';
+    final isOverdue     = n['isOverdue']      ?? false;
+    final accentColor   = isOverdue
+        ? const Color(0xFFEF4444)
+        : const Color(0xFFF5A962);
+
+    return _dismissible(
+      n: n,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isRead ? Colors.transparent : accentColor,
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.07),
+              blurRadius: 6, offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: () async {
+              if (!isRead && n['id'] != null) {
+                try {
+                  await FirestoreService()
+                      .markNotificationAsRead(n['id']);
+                } catch (_) {}
+              }
+              if (mounted) _navigateToPatientList();
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 12, vertical: 11),
+              child: Row(
+                children: [
+                  // Icon
+                  Container(
+                    width: 42, height: 42,
+                    decoration: BoxDecoration(
+                      color: accentColor,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      isOverdue
+                          ? Icons.warning_amber_rounded
+                          : Icons.vaccines_outlined,
+                      color: Colors.white, size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 11),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Title row
+                        Row(children: [
+                          Expanded(
+                            child: Text(
+                              isOverdue
+                                  ? 'VACCINE OVERDUE'
+                                  : 'VACCINE DUE TODAY',
+                              style: TextStyle(
+                                fontSize: 10, fontWeight: FontWeight.w700,
+                                color: isRead ? Colors.grey : accentColor,
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                          ),
+                          if (!isRead)
+                            Container(
+                              width: 7, height: 7,
+                              decoration: BoxDecoration(
+                                color: accentColor,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                        ]),
+                        const SizedBox(height: 2),
+                        // Patient + vaccine
+                        RichText(
+                          text: TextSpan(
+                            style: const TextStyle(
+                                fontSize: 14, color: Colors.black87),
+                            children: [
+                              TextSpan(
+                                text: patientName,
+                                style: TextStyle(
+                                  fontWeight: isRead
+                                      ? FontWeight.w500
+                                      : FontWeight.bold,
+                                ),
+                              ),
+                              TextSpan(
+                                text: '  ·  $vaccine',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: accentColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        // Date
+                        Row(children: [
+                          Icon(Icons.event_outlined,
+                              size: 10, color: Colors.grey.shade400),
+                          const SizedBox(width: 3),
+                          Text(dateStr,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: isOverdue
+                                    ? const Color(0xFFEF4444)
+                                    : Colors.grey.shade600,
+                              )),
+                        ]),
+                        const SizedBox(height: 4),
+                        // Contact numbers
+                        if (motherContact.isNotEmpty ||
+                            fatherContact.isNotEmpty) ...[
+                          Wrap(
+                            spacing: 12,
+                            children: [
+                              if (motherContact.isNotEmpty)
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.phone_outlined,
+                                        size: 10,
+                                        color: Colors.grey.shade400),
+                                    const SizedBox(width: 3),
+                                    Text('Mother: $motherContact',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.grey.shade500,
+                                        )),
+                                  ],
+                                ),
+                              if (fatherContact.isNotEmpty)
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.phone_outlined,
+                                        size: 10,
+                                        color: Colors.grey.shade400),
+                                    const SizedBox(width: 3),
+                                    Text('Father: $fatherContact',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.grey.shade500,
+                                        )),
+                                  ],
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                        ],
+                        // Timestamp
+                        Row(children: [
+                          const Spacer(),
+                          Icon(Icons.schedule,
+                              size: 10, color: Colors.grey.shade400),
+                          const SizedBox(width: 3),
+                          Text(_formatTimestamp(n['createdAt']),
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.grey.shade400,
+                                fontStyle: FontStyle.italic,
+                              )),
+                        ]),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Icon(Icons.chevron_right,
+                      color: Colors.grey.shade300, size: 18),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Swipe-to-dismiss wrapper ───────────────────────────────────────────────
+  Widget _dismissible({
+    required Map<String, dynamic> n,
+    required Widget child,
+  }) {
+    final id = n['id'] as String? ?? '';
+    return Dismissible(
+      key: Key('notif_$id'),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        decoration: BoxDecoration(
+          color: Colors.redAccent,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        child: const Icon(Icons.delete_outline, color: Colors.white, size: 22),
+      ),
+      onDismissed: (_) => _deleteNotification(n),
+      child: child,
+    );
+  }
+
+  // ── Offline view ───────────────────────────────────────────────────────────
   Widget _buildOfflineView() {
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFF2E8B7B), Color(0xFF5CAA7F), Color(0xFF8BC88A)],
+          colors: [
+            Color(0xFF2E8B7B), Color(0xFF5CAA7F), Color(0xFF8BC88A)
+          ],
         ),
       ),
       child: Column(
@@ -909,7 +1070,7 @@ class _NotificationsTabState extends State<NotificationsTab> {
               children: [
                 Container(
                   padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(   
+                  decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -917,28 +1078,24 @@ class _NotificationsTabState extends State<NotificationsTab> {
                       color: Colors.white, size: 22),
                 ),
                 const SizedBox(width: 10),
-                Expanded(
+                const Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text(
-                        'Notifications',
-                        style: TextStyle(
-                          fontSize: 19,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                      Text(
-                        'Offline mode — local records only',
-                        style: TextStyle(fontSize: 12, color: Colors.white70),
-                      ),
+                    children: [
+                      Text('Notifications',
+                          style: TextStyle(
+                            fontSize: 19, fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          )),
+                      Text('Offline mode — local records only',
+                          style: TextStyle(
+                              fontSize: 12, color: Colors.white70)),
                     ],
                   ),
                 ),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.orange.withOpacity(0.3),
                     borderRadius: BorderRadius.circular(10),
@@ -950,9 +1107,9 @@ class _NotificationsTabState extends State<NotificationsTab> {
                       SizedBox(width: 4),
                       Text('Offline',
                           style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600)),
+                            color: Colors.white, fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          )),
                     ],
                   ),
                 ),
@@ -976,14 +1133,12 @@ class _NotificationsTabState extends State<NotificationsTab> {
                                 size: 56,
                                 color: Colors.white.withOpacity(0.4)),
                             const SizedBox(height: 12),
-                            Text(
-                              'You are offline',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.white.withOpacity(0.7),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
+                            Text('You are offline',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.white.withOpacity(0.7),
+                                  fontWeight: FontWeight.w500,
+                                )),
                             const SizedBox(height: 6),
                             Text(
                               'Connect to the internet to see\nshared barangay notifications',

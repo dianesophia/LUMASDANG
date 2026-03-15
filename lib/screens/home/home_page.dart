@@ -6,6 +6,7 @@ import 'package:lumasdang/screens/notifications_tab.dart';
 import '../../services/firestore_service.dart';
 import '../../services/local_db_service.dart';
 import '../../services/connectivity_service.dart';
+import '../../services/vaccine_reminder_service.dart';
 
 import 'widgets/stats_row.dart';
 import 'widgets/upcoming_events.dart';
@@ -41,7 +42,6 @@ class _HomePageState extends State<HomePage>
   final TextEditingController ageDaysController = TextEditingController();
   final TextEditingController ageYearsController = TextEditingController();
   final TextEditingController sexController = TextEditingController();
-  // ▼ ADDED: blood type controller
   final TextEditingController bloodTypeController = TextEditingController();
   // PhilHealth — Mother
   final TextEditingController motherPhilHealthNumberController = TextEditingController();
@@ -178,6 +178,14 @@ class _HomePageState extends State<HomePage>
         if (synced > 0 && mounted) {
           _showSnackBar('$synced pending assessment(s) synced.');
         }
+        // Check for vaccine doses due today or overdue
+        final due = await VaccineReminderService().checkAndFireDueReminders();
+        if (due > 0 && mounted) {
+          _showSnackBar(
+            '$due vaccine dose reminder(s) are due — check Notifications.',
+            color: const Color(0xFFF08030),
+          );
+        }
       }
     });
 
@@ -206,7 +214,7 @@ class _HomePageState extends State<HomePage>
     ageDaysController.dispose();
     ageYearsController.dispose();
     sexController.dispose();
-    bloodTypeController.dispose(); // ▼ ADDED
+    bloodTypeController.dispose();
     motherPhilHealthNumberController.dispose();
     motherPhilHealthMemberTypeController.dispose();
     fatherPhilHealthNumberController.dispose();
@@ -306,16 +314,17 @@ class _HomePageState extends State<HomePage>
             _dewormingError = 'Please fill in deworming information');
         hasNonTextErrors = true;
       } else {
-        final isNA = _dewormingData!['isNA'] == true;
+        final dw = _dewormingData!['deworming'] as Map<String, dynamic>?;
+        final isNA = dw?['isNA'] == true;
         if (!isNA) {
-          if ((_dewormingData!['dateOfLastDeworming'] ?? '')
+          if ((dw?['dateOfLastDeworming'] ?? '')
               .toString()
               .trim()
               .isEmpty) {
             setState(
                 () => _dewormingError = 'Please enter a date or select N/A');
             hasNonTextErrors = true;
-          } else if (_dewormingData!['drugGiven'] == null) {
+          } else if (dw?['drugGiven'] == null) {
             setState(() => _dewormingError = 'Please select a drug given');
             hasNonTextErrors = true;
           } else {
@@ -348,7 +357,7 @@ class _HomePageState extends State<HomePage>
         'ageDays': ageDaysController.text.trim(),
         'ageYears': ageYearsController.text.trim(),
         'sex': sexController.text.trim(),
-        'bloodType': bloodTypeController.text.trim(), // ▼ ADDED
+        'bloodType': bloodTypeController.text.trim(),
         'address': addressController.text.trim(),
         'placeOfBirth': placeOfBirthController.text.trim(),
         'dateOfBirth': dobController.text.trim(),
@@ -408,7 +417,8 @@ class _HomePageState extends State<HomePage>
       },
       'nutritionEnvironment': _nutritionEnvData,
       'allergies': _allergiesData,
-      'deworming': _dewormingData,
+      'deworming': _dewormingData?['deworming'],
+      'vitaminA': _dewormingData?['vitaminA'],
       'oral': _oralData,
       'vaccination': _vaccinationData,
     };
@@ -423,6 +433,23 @@ class _HomePageState extends State<HomePage>
         final docId = await firestore.saveHomePageData(data);
         try {
           barangayPatientId = await firestore.savePatientToBarangay(data);
+          // Save next-dose reminders if vaccination data present
+          if (_vaccinationData != null && barangayPatientId != null) {
+            try {
+              await VaccineReminderService().saveReminders(
+                patientId: barangayPatientId!,
+                vaccinationData: _vaccinationData!,
+                patientInfo: {
+                  'firstName':     firstNameController.text.trim(),
+                  'lastName':      lastNameController.text.trim(),
+                  'motherContact': motherContactController.text.trim(),
+                  'fatherContact': fatherContactController.text.trim(),
+                },
+              );
+            } catch (eReminder) {
+              debugPrint('Vaccine reminder save error: $eReminder');
+            }
+          }
         } catch (eBarangay) {
           debugPrint('Barangay patient save: $eBarangay');
           if (mounted) {
@@ -458,83 +485,50 @@ class _HomePageState extends State<HomePage>
       );
     }
 
-    // Sync vaccination status (skip for drafts)
+    // ── Sync vaccination status (skip for drafts) ──────────────────────────
     if (_vaccinationData != null && online && !_isDraft) {
       try {
-        int highestDoseNumber(String vaccine) {
+        // Count columns recorded as true, ignoring _date and nextDoseDate keys.
+        // Works with any column key names — future-proof.
+        int doseCount(String vaccine) {
           final doses = _vaccinationData![vaccine] as Map<String, dynamic>?;
           if (doses == null) return 0;
-          const birth = 'BIRTH';
-          const m1_5 = '1½';
-          const m2_5 = '2½';
-          const m3_5 = '3½';
-          const m9 = '9';
-          const y1 = '1 YR';
-          List<String> relevantHeaders;
-          switch (vaccine) {
-            case 'BCG':
-              relevantHeaders = [birth];
-              break;
-            case 'HEP B':
-              relevantHeaders = [birth, m1_5, m2_5];
-              break;
-            case 'PENTAVALENT':
-              relevantHeaders = [m1_5, m2_5, m3_5, y1];
-              break;
-            case 'OPV':
-              relevantHeaders = [birth, m2_5, m9];
-              break;
-            case 'IPV':
-              relevantHeaders = [m1_5, m2_5, m3_5, y1];
-              break;
-            case 'PCV':
-              relevantHeaders = [m1_5, m2_5, m3_5, y1];
-              break;
-            case 'MMR':
-              relevantHeaders = [m9, y1];
-              break;
-            default:
-              relevantHeaders = [birth, m1_5, m2_5, m3_5, m9, y1];
-          }
-          for (int i = relevantHeaders.length - 1; i >= 0; i--) {
-            if (doses[relevantHeaders[i]] == true) return i + 1;
-          }
-          return 0;
+          return doses.entries
+              .where((e) =>
+                  !e.key.endsWith('_date') &&
+                  e.key != 'nextDoseDate' &&
+                  e.value == true)
+              .length;
         }
 
-        String doseLabelForNumber(int number) {
-          if (number <= 0) return 'Pending';
-          switch (number) {
-            case 1:
-              return '1st dose';
-            case 2:
-              return '2nd dose';
-            case 3:
-              return '3rd dose';
-            case 4:
-              return '4th dose';
-            case 5:
-              return '5th dose';
-            default:
-              return 'Booster';
+        String doseLabelForCount(int count) {
+          if (count <= 0) return 'Pending';
+          switch (count) {
+            case 1:  return '1st dose';
+            case 2:  return '2nd dose';
+            case 3:  return '3rd dose';
+            case 4:  return '4th dose';
+            case 5:  return '5th dose';
+            default: return 'Booster';
           }
         }
 
         String vaccineStatus(String name) =>
-            doseLabelForNumber(highestDoseNumber(name));
-        final opvNumber = highestDoseNumber('OPV');
-        final ipvNumber = highestDoseNumber('IPV');
+            doseLabelForCount(doseCount(name));
+
+        final opvCount = doseCount('OPV');
+        final ipvCount = doseCount('IPV');
 
         final statuses = <String, String>{
-          'bcg': vaccineStatus('BCG'),
-          'hepatitisB': vaccineStatus('HEP B'),
-          'dptPentavalent': vaccineStatus('PENTAVALENT'),
-          'opv': vaccineStatus('OPV'),
-          'ipv': vaccineStatus('IPV'),
-          'opvIpv': doseLabelForNumber(
-              opvNumber > ipvNumber ? opvNumber : ipvNumber),
-          'measlesMmr': vaccineStatus('MMR'),
-          'pcv': vaccineStatus('PCV'),
+          'bcg':            vaccineStatus('BCG'),
+          'hepatitisB':     vaccineStatus('Hepatitis B'),
+          'dptPentavalent': vaccineStatus('DTwP/DTaP-Hib-IPV'),
+          'opv':            vaccineStatus('OPV'),
+          'ipv':            vaccineStatus('IPV'),
+          'opvIpv':         doseLabelForCount(
+              opvCount > ipvCount ? opvCount : ipvCount),
+          'measlesMmr':     vaccineStatus('MMR/MR'),
+          'pcv':            vaccineStatus('PCV'),
         };
 
         final fs = FirestoreService();
@@ -588,7 +582,7 @@ class _HomePageState extends State<HomePage>
         ageDaysController,
         ageYearsController,
         sexController,
-        bloodTypeController, // ▼ ADDED
+        bloodTypeController,
         motherPhilHealthNumberController,
         motherPhilHealthMemberTypeController,
         fatherPhilHealthNumberController,
@@ -876,7 +870,7 @@ class _HomePageState extends State<HomePage>
               ageDaysController: ageDaysController,
               ageYearsController: ageYearsController,
               sexController: sexController,
-              bloodTypeController: bloodTypeController, // ▼ ADDED
+              bloodTypeController: bloodTypeController,
               motherPhilHealthNumberController: motherPhilHealthNumberController,
               motherPhilHealthMemberTypeController: motherPhilHealthMemberTypeController,
               fatherPhilHealthNumberController: fatherPhilHealthNumberController,
