@@ -1000,34 +1000,68 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
               const SizedBox(height: 12),
               // PhilHealth
               _buildSubHeader('PHILHEALTH'),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildField(
-                      label: 'PHILHEALTH NUMBER',
-                      controller: widget.motherPhilHealthNumberController,
-                      keyboardType: TextInputType.number,
-                      icon: Icons.credit_card_outlined,
-                      hint: '12-digit number',
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _buildDropdown(
-                      label: 'MEMBER TYPE',
-                      value: _motherPhilHealthMemberType,
-                      items: _philHealthMemberTypes,
-                      icon: Icons.badge_outlined,
-                      onChanged: (v) {
-                        setState(() {
-                          _motherPhilHealthMemberType = v;
-                          widget.motherPhilHealthMemberTypeController.text =
-                              v ?? '';
-                        });
-                      },
-                    ),
-                  ),
-                ],
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final wide = constraints.maxWidth > 320;
+                  if (wide) {
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: _buildField(
+                            label: 'PHILHEALTH NUMBER',
+                            controller: widget.motherPhilHealthNumberController,
+                            keyboardType: TextInputType.number,
+                            icon: Icons.credit_card_outlined,
+                            hint: '12-digit number',
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _buildDropdown(
+                            label: 'MEMBER TYPE',
+                            value: _motherPhilHealthMemberType,
+                            items: _philHealthMemberTypes,
+                            icon: Icons.badge_outlined,
+                            onChanged: (v) {
+                              setState(() {
+                                _motherPhilHealthMemberType = v;
+                                widget.motherPhilHealthMemberTypeController
+                                    .text = v ?? '';
+                              });
+                            },
+                          ),
+                        ),
+                      ],
+                    );
+                  }
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildField(
+                        label: 'PHILHEALTH NUMBER',
+                        controller: widget.motherPhilHealthNumberController,
+                        keyboardType: TextInputType.number,
+                        icon: Icons.credit_card_outlined,
+                        hint: '12-digit number',
+                      ),
+                      const SizedBox(height: 10),
+                      _buildDropdown(
+                        label: 'MEMBER TYPE',
+                        value: _motherPhilHealthMemberType,
+                        items: _philHealthMemberTypes,
+                        icon: Icons.badge_outlined,
+                        onChanged: (v) {
+                          setState(() {
+                            _motherPhilHealthMemberType = v;
+                            widget.motherPhilHealthMemberTypeController.text =
+                                v ?? '';
+                          });
+                        },
+                      ),
+                    ],
+                  );
+                },
               ),
             ],
           ),
@@ -1092,34 +1126,68 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
               const SizedBox(height: 12),
               // PhilHealth
               _buildSubHeader('PHILHEALTH'),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildField(
-                      label: 'PHILHEALTH NUMBER',
-                      controller: widget.fatherPhilHealthNumberController,
-                      keyboardType: TextInputType.number,
-                      icon: Icons.credit_card_outlined,
-                      hint: '12-digit number',
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _buildDropdown(
-                      label: 'MEMBER TYPE',
-                      value: _fatherPhilHealthMemberType,
-                      items: _philHealthMemberTypes,
-                      icon: Icons.badge_outlined,
-                      onChanged: (v) {
-                        setState(() {
-                          _fatherPhilHealthMemberType = v;
-                          widget.fatherPhilHealthMemberTypeController.text =
-                              v ?? '';
-                        });
-                      },
-                    ),
-                  ),
-                ],
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final wide = constraints.maxWidth > 320;
+                  if (wide) {
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: _buildField(
+                            label: 'PHILHEALTH NUMBER',
+                            controller: widget.fatherPhilHealthNumberController,
+                            keyboardType: TextInputType.number,
+                            icon: Icons.credit_card_outlined,
+                            hint: '12-digit number',
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _buildDropdown(
+                            label: 'MEMBER TYPE',
+                            value: _fatherPhilHealthMemberType,
+                            items: _philHealthMemberTypes,
+                            icon: Icons.badge_outlined,
+                            onChanged: (v) {
+                              setState(() {
+                                _fatherPhilHealthMemberType = v;
+                                widget.fatherPhilHealthMemberTypeController
+                                    .text = v ?? '';
+                              });
+                            },
+                          ),
+                        ),
+                      ],
+                    );
+                  }
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildField(
+                        label: 'PHILHEALTH NUMBER',
+                        controller: widget.fatherPhilHealthNumberController,
+                        keyboardType: TextInputType.number,
+                        icon: Icons.credit_card_outlined,
+                        hint: '12-digit number',
+                      ),
+                      const SizedBox(height: 10),
+                      _buildDropdown(
+                        label: 'MEMBER TYPE',
+                        value: _fatherPhilHealthMemberType,
+                        items: _philHealthMemberTypes,
+                        icon: Icons.badge_outlined,
+                        onChanged: (v) {
+                          setState(() {
+                            _fatherPhilHealthMemberType = v;
+                            widget.fatherPhilHealthMemberTypeController.text =
+                                v ?? '';
+                          });
+                        },
+                      ),
+                    ],
+                  );
+                },
               ),
             ],
           ),
