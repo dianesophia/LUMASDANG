@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'checkbox_field_row.dart';
 
 class DietaryAssessmentForm extends StatefulWidget {
+  final int? ageInMonths;
   final bool? purelyBreastfed;
   final ValueChanged<bool?>? onPurelyBreastfedChanged;
   final TextEditingController ageWhenCfController;
@@ -12,6 +13,7 @@ class DietaryAssessmentForm extends StatefulWidget {
 
   const DietaryAssessmentForm({
     super.key,
+    this.ageInMonths,
     this.purelyBreastfed,
     this.onPurelyBreastfedChanged,
     required this.ageWhenCfController,
@@ -27,6 +29,10 @@ class DietaryAssessmentForm extends StatefulWidget {
 
 class _DietaryAssessmentFormState extends State<DietaryAssessmentForm> {
   bool? _purelyBreastfed;
+
+  /// True when age is unknown (null) or <= 6 months → show breastfeeding section
+  /// False when age > 6 months → show complementary feeding section
+  bool get _isBreastfeedingAge => (widget.ageInMonths ?? 0) <= 6;
 
   @override
   void initState() {
@@ -197,103 +203,115 @@ class _DietaryAssessmentFormState extends State<DietaryAssessmentForm> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── Card 1: Breastfeeding ────────────────────────────────────
-        _buildCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildSectionHeader(
-                  'DIETARY ASSESSMENT', Icons.restaurant_outlined),
-              const SizedBox(height: 14),
 
-              const Text(
-                'PURELY BREASTFED',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFFF5A962),
-                  letterSpacing: 0.5,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  _buildTogglePill('Yes', _purelyBreastfed == true, () {
-                    setState(() => _purelyBreastfed = true);
-                    widget.onPurelyBreastfedChanged?.call(true);
-                  }),
-                  const SizedBox(width: 10),
-                  _buildTogglePill('No', _purelyBreastfed == false, () {
-                    setState(() => _purelyBreastfed = false);
-                    widget.onPurelyBreastfedChanged?.call(false);
-                  }),
-                ],
-              ),
-              if (widget.purelyBreastfedError != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Text(
-                    widget.purelyBreastfedError!,
-                    style: const TextStyle(
-                        fontSize: 10, color: Color(0xFFEF4444)),
+        // ── Card 1: Breastfeeding — shown only when age <= 6 months ─────────
+        if (_isBreastfeedingAge) ...[
+          _buildCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildSectionHeader(
+                    'DIETARY ASSESSMENT', Icons.restaurant_outlined),
+                const SizedBox(height: 14),
+
+                const Text(
+                  'PURELY BREASTFED',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFFF5A962),
+                    letterSpacing: 0.5,
                   ),
                 ),
-            ],
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    _buildTogglePill('Yes', _purelyBreastfed == true, () {
+                      setState(() => _purelyBreastfed = true);
+                      widget.onPurelyBreastfedChanged?.call(true);
+                    }),
+                    const SizedBox(width: 10),
+                    _buildTogglePill('No', _purelyBreastfed == false, () {
+                      setState(() => _purelyBreastfed = false);
+                      widget.onPurelyBreastfedChanged?.call(false);
+                    }),
+                  ],
+                ),
+                if (widget.purelyBreastfedError != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(
+                      widget.purelyBreastfedError!,
+                      style: const TextStyle(
+                          fontSize: 10, color: Color(0xFFEF4444)),
+                    ),
+                  ),
+              ],
+            ),
           ),
-        ),
+          const SizedBox(height: 10),
+        ],
 
-        const SizedBox(height: 10),
+        // ── Card 2: Complementary Feeding — shown only when age > 6 months ──
+        if (!_isBreastfeedingAge) ...[
+          _buildCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildSectionHeader(
+                    'COMPLEMENTARY FEEDING', Icons.child_care_outlined),
+                const SizedBox(height: 14),
 
-        // ── Card 2: Complementary Feeding ────────────────────────────
-        _buildCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildSectionHeader(
-                  'COMPLEMENTARY FEEDING', Icons.child_care_outlined),
-              const SizedBox(height: 14),
-
-              _buildField(
-                label: 'AGE WHEN CF STARTED',
-                controller: widget.ageWhenCfController,
-                keyboardType: TextInputType.number,
-                hint: 'Age in months',
-                icon: Icons.cake_outlined,
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Required';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
-              _buildField(
-                label: 'FREQUENCY OF CF PER DAY',
-                controller: widget.freqCfController,
-                keyboardType: TextInputType.number,
-                hint: 'e.g. 3',
-                icon: Icons.repeat_outlined,
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Required';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
-              _buildField(
-                label: 'FOODS GIVEN ON CF',
-                controller: widget.foodCfController,
-                hint: 'e.g. rice porridge, mashed vegetables',
-                icon: Icons.set_meal_outlined,
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Required';
-                  return null;
-                },
-              ),
-            ],
+                _buildField(
+                  label: 'AGE WHEN CF STARTED',
+                  controller: widget.ageWhenCfController,
+                  keyboardType: TextInputType.number,
+                  hint: 'Age in months',
+                  icon: Icons.cake_outlined,
+                  validator: (v) {
+                    if (!_isBreastfeedingAge &&
+                        (v == null || v.trim().isEmpty)) {
+                      return 'Required';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                _buildField(
+                  label: 'FREQUENCY OF CF PER DAY',
+                  controller: widget.freqCfController,
+                  keyboardType: TextInputType.number,
+                  hint: 'e.g. 3',
+                  icon: Icons.repeat_outlined,
+                  validator: (v) {
+                    if (!_isBreastfeedingAge &&
+                        (v == null || v.trim().isEmpty)) {
+                      return 'Required';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                _buildField(
+                  label: 'FOODS GIVEN ON CF',
+                  controller: widget.foodCfController,
+                  hint: 'e.g. rice porridge, mashed vegetables',
+                  icon: Icons.set_meal_outlined,
+                  validator: (v) {
+                    if (!_isBreastfeedingAge &&
+                        (v == null || v.trim().isEmpty)) {
+                      return 'Required';
+                    }
+                    return null;
+                  },
+                ),
+              ],
+            ),
           ),
-        ),
+          const SizedBox(height: 10),
+        ],
 
-        const SizedBox(height: 10),
-
-        // ── Card 3: Dietary Diversity ────────────────────────────────
+        // ── Card 3: Dietary Diversity — always shown ─────────────────────────
         _buildCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -334,13 +352,12 @@ class _DietaryAssessmentFormState extends State<DietaryAssessmentForm> {
 
         const SizedBox(height: 10),
 
-        // ── Card 4: Meal Frequency ────────────────────────────────────
+        // ── Card 4: Meal Frequency — always shown ────────────────────────────
         _buildCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildSectionHeader(
-                  'MEAL FREQUENCY', Icons.dining_outlined),
+              _buildSectionHeader('MEAL FREQUENCY', Icons.dining_outlined),
               const SizedBox(height: 14),
               _buildField(
                 label: 'MEALS PER DAY',
@@ -349,8 +366,9 @@ class _DietaryAssessmentFormState extends State<DietaryAssessmentForm> {
                 hint: 'e.g. 3',
                 icon: Icons.dining_outlined,
                 validator: (v) {
-                  if (v == null || v.trim().isEmpty)
+                  if (v == null || v.trim().isEmpty) {
                     return 'Meal frequency is required';
+                  }
                   return null;
                 },
               ),
@@ -360,4 +378,4 @@ class _DietaryAssessmentFormState extends State<DietaryAssessmentForm> {
       ],
     );
   }
-} 
+}

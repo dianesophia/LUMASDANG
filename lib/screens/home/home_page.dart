@@ -169,6 +169,10 @@ class _HomePageState extends State<HomePage>
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
 
+    // Rebuild dietary form whenever age changes so the correct
+    // section (breastfeeding vs complementary feeding) is shown.
+    ageController.addListener(() => setState(() {}));
+
     LocalDbService.instance.init().then((_) async {
       final online =
           kIsWeb ? true : await ConnectivityService.instance.checkOnline();
@@ -294,7 +298,12 @@ class _HomePageState extends State<HomePage>
       });
     } else {
       // Full submit: enforce all section validators
-      if (_purelyBreastfed == null) {
+
+      // Only validate purelyBreastfed if patient is <= 6 months
+      final ageMonths = int.tryParse(ageController.text.trim()) ?? 0;
+      final isBreastfeedingAge = ageMonths <= 6;
+
+      if (isBreastfeedingAge && _purelyBreastfed == null) {
         setState(() => _purelyBreastfedError = 'Please select Yes or No');
         hasNonTextErrors = true;
       } else {
@@ -964,6 +973,7 @@ class _HomePageState extends State<HomePage>
             // ── 6. Dietary Assessment ──────────────────────────────────
             DietaryAssessmentForm(
               key: ValueKey('dietary_form_$_dietaryFormKey'),
+              ageInMonths: int.tryParse(ageController.text.trim()), // ← ADDED
               purelyBreastfed: _purelyBreastfed,
               onPurelyBreastfedChanged: (v) {
                 setState(() {
