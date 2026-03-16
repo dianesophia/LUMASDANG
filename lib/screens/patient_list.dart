@@ -1601,10 +1601,7 @@ class _PatientListTabState extends State<PatientListTab> {
                   if (patient.visitTime.isNotEmpty)
                     _detailRow(Icons.schedule_outlined, 'Visit Time', patient.visitTime),
                   // ───────────────────────────────────────────────────────
-                    Icons.calendar_today_outlined,
-                    'Last Visit',
-                    '${patient.lastVisit.month}/${patient.lastVisit.day}/${patient.lastVisit.year}',
-                  ),
+                    
                   _detailRow(
                     Icons.phone_outlined,
                     'Contact',
