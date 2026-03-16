@@ -217,6 +217,7 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
       'oral': data['oral'],
       'deworming': data['deworming'],
       'vaccination': data['vaccination'],
+      'allergies': data['allergies'],        // ← ADDED
       'docId': docId,
       'dewormingOnly': data['dewormingOnly'] == true,
     };
@@ -231,6 +232,7 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
     return '$first $last' == '$patientFirst $patientLast';
   }
 
+  // ── FIXED: new vaccine names + doseCount instead of hardcoded column keys ──
   Map<String, String>? _computeLocalVaccinationStatuses() {
     if (_assessments.isEmpty) return null;
 
@@ -254,86 +256,64 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
       return null;
     }
 
-    Map<String, dynamic>? dosesFor(String vaccine) {
+    // Count columns recorded as true, ignoring _date and nextDoseDate keys.
+    // Works with any column key names — future-proof.
+    int doseCount(String vaccine) {
       final raw = vaccination[vaccine];
-      if (raw is Map<String, dynamic>) return raw;
-      if (raw is Map) return Map<String, dynamic>.from(raw);
-      return null;
-    }
-
-    int highestDoseNumber(String vaccine) {
-      final doses = dosesFor(vaccine);
+      Map<String, dynamic>? doses;
+      if (raw is Map<String, dynamic>) {
+        doses = raw;
+      } else if (raw is Map) {
+        doses = Map<String, dynamic>.from(raw);
+      }
       if (doses == null) return 0;
-      const birth = 'BIRTH';
-      const m1_5 = '1½';
-      const m2_5 = '2½';
-      const m3_5 = '3½';
-      const m9 = '9';
-      const y1 = '1 YR';
-      List<String> relevantHeaders;
-      switch (vaccine) {
-        case 'BCG':
-          relevantHeaders = [birth];
-          break;
-        case 'HEP B':
-          relevantHeaders = [birth, m1_5, m2_5];
-          break;
-        case 'PENTAVALENT':
-          relevantHeaders = [m1_5, m2_5, m3_5, y1];
-          break;
-        case 'OPV':
-          relevantHeaders = [birth, m2_5, m9];
-          break;
-        case 'IPV':
-          relevantHeaders = [m1_5, m2_5, m3_5, y1];
-          break;
-        case 'PCV':
-          relevantHeaders = [m1_5, m2_5, m3_5, y1];
-          break;
-        case 'MMR':
-          relevantHeaders = [m9, y1];
-          break;
-        default:
-          relevantHeaders = [birth, m1_5, m2_5, m3_5, m9, y1];
-      }
-      for (int i = relevantHeaders.length - 1; i >= 0; i--) {
-        if (doses[relevantHeaders[i]] == true) return i + 1;
-      }
-      return 0;
+      return doses.entries
+          .where((e) =>
+              !e.key.endsWith('_date') &&
+              e.key != 'nextDoseDate' &&
+              e.value == true)
+          .length;
     }
 
-    String doseLabelForNumber(int number) {
-      if (number <= 0) return 'Pending';
-      switch (number) {
-        case 1:
-          return '1st dose';
-        case 2:
-          return '2nd dose';
-        case 3:
-          return '3rd dose';
-        case 4:
-          return '4th dose';
-        case 5:
-          return '5th dose';
-        default:
-          return 'Booster';
+    String doseLabelForCount(int count) {
+      if (count <= 0) return 'Pending';
+      switch (count) {
+        case 1:  return '1st dose';
+        case 2:  return '2nd dose';
+        case 3:  return '3rd dose';
+        case 4:  return '4th dose';
+        case 5:  return '5th dose';
+        default: return 'Booster';
       }
     }
 
     String vaccineStatus(String name) =>
-        doseLabelForNumber(highestDoseNumber(name));
-    final opvNumber = highestDoseNumber('OPV');
-    final ipvNumber = highestDoseNumber('IPV');
+        doseLabelForCount(doseCount(name));
+
+    final opvCount = doseCount('OPV');
+    final ipvCount = doseCount('IPV');
 
     // Keys here must match _vaccines keys in VaccinationStatusSection.
     return <String, String>{
-      'bcg': vaccineStatus('BCG'),
-      'hepatitisB': vaccineStatus('HEP B'),
-      'dtap': vaccineStatus('PENTAVALENT'),
-      'opv': vaccineStatus('OPV'),
-      'ipv': vaccineStatus('IPV'),
-      'mmr': vaccineStatus('MMR'),
-      'pcv': vaccineStatus('PCV'),
+      'bcg':           vaccineStatus('BCG'),
+      'hepatitisB':    vaccineStatus('Hepatitis B'),
+      'opv':           vaccineStatus('OPV'),
+      'ipv':           vaccineStatus('IPV'),
+      'dtap':          vaccineStatus('DTwP/DTaP-Hib-IPV'),
+      'pcv':           vaccineStatus('PCV'),
+      'rv':            vaccineStatus('RV'),
+      'influenza':     vaccineStatus('Influenza'),
+      'mmr':           vaccineStatus('MMR/MR'),
+      'measlesMmr':    vaccineStatus('Measles/MMR'),
+      'jev':           vaccineStatus('JEV'),
+      'varicella':     vaccineStatus('Varicella'),
+      'hepatitisA':    vaccineStatus('Hepatitis A'),
+      'rabies':        vaccineStatus('Rabies'),
+      'meningococcal': vaccineStatus('Meningococcal'),
+      'cholera':       vaccineStatus('Cholera'),
+      'typhoid':       vaccineStatus('Typhoid'),
+      'opvIpv':        doseLabelForCount(
+          opvCount > ipvCount ? opvCount : ipvCount),
     };
   }
 
@@ -469,14 +449,11 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
       }
 
       // 3) De‑duplicate and sort all sources together
-      // Same assessment can come from local (docId = patientId) and Firestore (docId = assessment id).
-      // Dedupe by date+weight+height so we keep one; prefer the Firestore copy (has real assessment docId).
       final patientDocId = widget.patient.docId;
       final unique = <String, Map<String, dynamic>>{};
       for (var a in matched) {
         final dateMs = (a['date'] as DateTime?)?.millisecondsSinceEpoch ?? 0;
-        final contentKey =
-            '$dateMs-${a['weight']}-${a['height']}';
+        final contentKey = '$dateMs-${a['weight']}-${a['height']}';
         final existing = unique[contentKey];
         if (existing == null) {
           unique[contentKey] = a;
@@ -1194,9 +1171,6 @@ void _showEditDewormingSheet() {
                                   }
 
                                   // ✅ FIX: fetch the real Firestore assessment ID directly
-                                  // instead of relying on locally-cached _assessments which may
-                                  // have patient.docId as a placeholder — causing canUpdate to
-                                  // always be false and a new doc to be created every time.
                                   String? assessmentId;
                                   try {
                                     final freshAssessments = await firestore
@@ -1323,6 +1297,10 @@ void _showEditDewormingSheet() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 void _showAddAssessmentSheet() {
+  // ── ADDED: visit date & time controllers ──────────────────────────────────
+  final visitDateCtrl = TextEditingController();
+  final visitTimeCtrl = TextEditingController();
+
   final dateCtrl   = TextEditingController();
   final weightCtrl = TextEditingController();
   final heightCtrl = TextEditingController();
@@ -1585,6 +1563,98 @@ void _showAddAssessmentSheet() {
                         const SizedBox(height: 14),
                       ],
 
+                      // ── ADDED: Visit Date & Time ───────────────────────
+                      const Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'VISIT DATE & TIME',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: kInkMid,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Row(children: [
+                        Expanded(
+                          child: buildField(
+                            ctx: ctx,
+                            controller: visitDateCtrl,
+                            label: 'DATE OF VISIT',
+                            hint: 'MM / DD / YYYY',
+                            icon: Icons.calendar_today_outlined,
+                            onTap: () async {
+                              final picked = await showDatePicker(
+                                context: ctx,
+                                initialDate: DateTime.now(),
+                                firstDate: DateTime(2020),
+                                lastDate: DateTime.now()
+                                    .add(const Duration(days: 1)),
+                                builder: (c, child) => Theme(
+                                  data: Theme.of(c).copyWith(
+                                    colorScheme: const ColorScheme.light(
+                                        primary: kOrange,
+                                        onPrimary: Colors.white,
+                                        surface: Colors.white),
+                                  ),
+                                  child: child!,
+                                ),
+                              );
+                              if (picked != null) {
+                                setSheetState(() {
+                                  visitDateCtrl.text =
+                                      '${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}-${picked.year}';
+                                });
+                              }
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: buildField(
+                            ctx: ctx,
+                            controller: visitTimeCtrl,
+                            label: 'TIME OF VISIT',
+                            hint: 'e.g. 10:30 AM',
+                            icon: Icons.schedule_outlined,
+                            onTap: () async {
+                              final picked = await showTimePicker(
+                                context: ctx,
+                                initialTime: TimeOfDay.now(),
+                                builder: (c, child) => Theme(
+                                  data: Theme.of(c).copyWith(
+                                    colorScheme: const ColorScheme.light(
+                                        primary: kOrange,
+                                        onPrimary: Colors.white,
+                                        surface: Colors.white),
+                                  ),
+                                  child: child!,
+                                ),
+                              );
+                              if (picked != null) {
+                                final hour = picked.hourOfPeriod == 0
+                                    ? 12
+                                    : picked.hourOfPeriod;
+                                final minute = picked.minute
+                                    .toString()
+                                    .padLeft(2, '0');
+                                final period =
+                                    picked.period == DayPeriod.am
+                                        ? 'AM'
+                                        : 'PM';
+                                setSheetState(() {
+                                  visitTimeCtrl.text =
+                                      '$hour:$minute $period';
+                                });
+                              }
+                            },
+                          ),
+                        ),
+                      ]),
+                      const SizedBox(height: 16),
+
                       // ── Section label ──────────────────────────────────
                       const Align(
                         alignment: Alignment.centerLeft,
@@ -1702,10 +1772,12 @@ void _showAddAssessmentSheet() {
                                     return;
                                   }
                                   await _saveNewAssessment(
-                                    date:   dateCtrl.text.trim(),
-                                    weight: weightCtrl.text.trim(),
-                                    height: heightCtrl.text.trim(),
-                                    muac:   muacCtrl.text.trim(),
+                                    date:      dateCtrl.text.trim(),
+                                    weight:    weightCtrl.text.trim(),
+                                    height:    heightCtrl.text.trim(),
+                                    muac:      muacCtrl.text.trim(),
+                                    visitDate: visitDateCtrl.text.trim(), // ← ADDED
+                                    visitTime: visitTimeCtrl.text.trim(), // ← ADDED
                                   );
                                   if (ctx.mounted) Navigator.pop(ctx);
                                 },
@@ -1819,6 +1891,9 @@ Future<void> _saveNewAssessment({
   required String weight,
   required String height,
   required String muac,
+  // ── ADDED: visit date & time ──────────────────────────────────────────────
+  String? visitDate,
+  String? visitTime,
   // Add optional parameters for complete data
   bool? diarrhea,
   bool? fever,
@@ -1866,6 +1941,9 @@ Future<void> _saveNewAssessment({
 
   // ✅ NOW INCLUDES ALL DATA - just like home page
   final data = {
+    // ── ADDED: visit date & time ──────────────────────────────────────────
+    'visitDate': visitDate ?? '',
+    'visitTime': visitTime ?? '',
     'demographic': {
       'firstName': patient.firstName,
       'lastName': patient.lastName,

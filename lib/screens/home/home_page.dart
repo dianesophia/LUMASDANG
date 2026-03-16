@@ -88,6 +88,10 @@ class _HomePageState extends State<HomePage>
       TextEditingController();
   final TextEditingController disabilityController = TextEditingController();
 
+  // Visit
+  final TextEditingController visitDateController   = TextEditingController();
+  final TextEditingController visitTimeController   = TextEditingController();
+
   // Anthropometric
   final TextEditingController measurementDateController =
       TextEditingController();
@@ -169,10 +173,6 @@ class _HomePageState extends State<HomePage>
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
 
-    // Rebuild dietary form whenever age changes so the correct
-    // section (breastfeeding vs complementary feeding) is shown.
-    ageController.addListener(() => setState(() {}));
-
     LocalDbService.instance.init().then((_) async {
       final online =
           kIsWeb ? true : await ConnectivityService.instance.checkOnline();
@@ -253,6 +253,10 @@ class _HomePageState extends State<HomePage>
     fourPsHouseholdIdController.dispose();
     disabilityController.dispose();
 
+    // Visit
+    visitDateController.dispose();
+    visitTimeController.dispose();
+
     // Anthropometric
     measurementDateController.dispose();
     weightController.dispose();
@@ -298,12 +302,7 @@ class _HomePageState extends State<HomePage>
       });
     } else {
       // Full submit: enforce all section validators
-
-      // Only validate purelyBreastfed if patient is <= 6 months
-      final ageMonths = int.tryParse(ageController.text.trim()) ?? 0;
-      final isBreastfeedingAge = ageMonths <= 6;
-
-      if (isBreastfeedingAge && _purelyBreastfed == null) {
+      if (_purelyBreastfed == null) {
         setState(() => _purelyBreastfedError = 'Please select Yes or No');
         hasNonTextErrors = true;
       } else {
@@ -358,6 +357,8 @@ class _HomePageState extends State<HomePage>
 
     final data = {
       'isDraft': _isDraft,
+      'visitDate': visitDateController.text.trim(),
+      'visitTime': visitTimeController.text.trim(),
       'demographic': {
         'firstName': firstNameController.text.trim(),
         'middleName': middleNameController.text.trim(),
@@ -584,6 +585,8 @@ class _HomePageState extends State<HomePage>
     if (mounted) {
       // Clear all controllers
       for (final c in [
+        visitDateController,
+        visitTimeController,
         firstNameController,
         middleNameController,
         lastNameController,
@@ -854,6 +857,10 @@ class _HomePageState extends State<HomePage>
             const UpcomingEvents(),
             const SizedBox(height: 20),
 
+            // ── Visit Date & Time ──────────────────────────────────
+            _buildVisitCard(),
+            const SizedBox(height: 16),
+
             // Section label
             Padding(
               padding: const EdgeInsets.only(left: 4),
@@ -973,7 +980,6 @@ class _HomePageState extends State<HomePage>
             // ── 6. Dietary Assessment ──────────────────────────────────
             DietaryAssessmentForm(
               key: ValueKey('dietary_form_$_dietaryFormKey'),
-              ageInMonths: int.tryParse(ageController.text.trim()), // ← ADDED
               purelyBreastfed: _purelyBreastfed,
               onPurelyBreastfedChanged: (v) {
                 setState(() {
@@ -1115,6 +1121,279 @@ class _HomePageState extends State<HomePage>
             const SizedBox(height: 30),
           ],
         ),
+      ),
+    );
+  }
+
+  // ── Visit Date & Time card ─────────────────────────────────────────────────
+  Widget _buildVisitCard() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFF5A962), Color(0xFFF08030)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFF5A962).withValues(alpha: 0.35),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.access_time_rounded,
+                    color: Colors.white, size: 18),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'VISIT DATE & TIME',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFFF5A962),
+                  letterSpacing: 1.1,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          Row(
+            children: [
+              // ── Date of Visit ───────────────────────────────────────
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('DATE OF VISIT',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFFF5A962),
+                          letterSpacing: 0.5,
+                        )),
+                    const SizedBox(height: 5),
+                    GestureDetector(
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: DateTime.now(),
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime.now()
+                              .add(const Duration(days: 1)),
+                          builder: (ctx, child) => Theme(
+                            data: Theme.of(ctx).copyWith(
+                              colorScheme: const ColorScheme.light(
+                                primary: Color(0xFFF5A962),
+                                onPrimary: Colors.white,
+                                surface: Colors.white,
+                                onSurface: Color(0xFF1A1A1A),
+                              ),
+                              textButtonTheme: TextButtonThemeData(
+                                style: TextButton.styleFrom(
+                                    foregroundColor:
+                                        const Color(0xFFF5A962)),
+                              ),
+                            ),
+                            child: child!,
+                          ),
+                        );
+                        if (picked != null) {
+                          setState(() {
+                            visitDateController.text =
+                                '${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}-${picked.year}';
+                          });
+                        }
+                      },
+                      child: AbsorbPointer(
+                        child: TextFormField(
+                          controller: visitDateController,
+                          readOnly: true,
+                          style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF1A1A1A)),
+                          decoration: InputDecoration(
+                            hintText: 'Tap to select',
+                            hintStyle: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.black26),
+                            prefixIcon: const Icon(
+                                Icons.calendar_month_outlined,
+                                size: 16,
+                                color: Color(0xFFF5A962)),
+                            suffixIcon: visitDateController
+                                    .text.isNotEmpty
+                                ? GestureDetector(
+                                    onTap: () => setState(
+                                        () => visitDateController
+                                            .clear()),
+                                    child: const Icon(Icons.clear,
+                                        size: 14,
+                                        color: Colors.black38),
+                                  )
+                                : null,
+                            filled: true,
+                            fillColor: const Color(0xFFFAFAFA),
+                            contentPadding:
+                                const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 11),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius:
+                                  BorderRadius.circular(10),
+                              borderSide: const BorderSide(
+                                  color: Color(0xFFEEEEEE),
+                                  width: 1.5),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius:
+                                  BorderRadius.circular(10),
+                              borderSide: const BorderSide(
+                                  color: Color(0xFFF5A962),
+                                  width: 2),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(width: 10),
+
+              // ── Time of Visit ────────────────────────────────────────
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('TIME OF VISIT',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFFF5A962),
+                          letterSpacing: 0.5,
+                        )),
+                    const SizedBox(height: 5),
+                    GestureDetector(
+                      onTap: () async {
+                        final now = TimeOfDay.now();
+                        final picked = await showTimePicker(
+                          context: context,
+                          initialTime: now,
+                          builder: (ctx, child) => Theme(
+                            data: Theme.of(ctx).copyWith(
+                              colorScheme: const ColorScheme.light(
+                                primary: Color(0xFFF5A962),
+                                onPrimary: Colors.white,
+                                surface: Colors.white,
+                                onSurface: Color(0xFF1A1A1A),
+                              ),
+                              textButtonTheme: TextButtonThemeData(
+                                style: TextButton.styleFrom(
+                                    foregroundColor:
+                                        const Color(0xFFF5A962)),
+                              ),
+                            ),
+                            child: child!,
+                          ),
+                        );
+                        if (picked != null && mounted) {
+                          final hour = picked.hourOfPeriod == 0
+                              ? 12
+                              : picked.hourOfPeriod;
+                          final minute = picked.minute
+                              .toString()
+                              .padLeft(2, '0');
+                          final period =
+                              picked.period == DayPeriod.am
+                                  ? 'AM'
+                                  : 'PM';
+                          setState(() {
+                            visitTimeController.text =
+                                '$hour:$minute $period';
+                          });
+                        }
+                      },
+                      child: AbsorbPointer(
+                        child: TextFormField(
+                          controller: visitTimeController,
+                          readOnly: true,
+                          style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF1A1A1A)),
+                          decoration: InputDecoration(
+                            hintText: 'Tap to select',
+                            hintStyle: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.black26),
+                            prefixIcon: const Icon(
+                                Icons.schedule_outlined,
+                                size: 16,
+                                color: Color(0xFFF5A962)),
+                            suffixIcon: visitTimeController
+                                    .text.isNotEmpty
+                                ? GestureDetector(
+                                    onTap: () => setState(
+                                        () => visitTimeController
+                                            .clear()),
+                                    child: const Icon(Icons.clear,
+                                        size: 14,
+                                        color: Colors.black38),
+                                  )
+                                : null,
+                            filled: true,
+                            fillColor: const Color(0xFFFAFAFA),
+                            contentPadding:
+                                const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 11),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius:
+                                  BorderRadius.circular(10),
+                              borderSide: const BorderSide(
+                                  color: Color(0xFFEEEEEE),
+                                  width: 1.5),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius:
+                                  BorderRadius.circular(10),
+                              borderSide: const BorderSide(
+                                  color: Color(0xFFF5A962),
+                                  width: 2),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

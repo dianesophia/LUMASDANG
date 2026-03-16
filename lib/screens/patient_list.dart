@@ -522,6 +522,8 @@ class _PatientListTabState extends State<PatientListTab> {
               fatherContact: demographic['fatherContact'] ?? '',
               createdBy: mostRecent['createdByName'] ?? 'Unknown',
               barangayId: '',
+              visitDate: mostRecent['visitDate'] ?? '',   // ← ADD
+              visitTime: mostRecent['visitTime'] ?? '',   // ← ADD
             );
           }).toList();
           _loading = false;
@@ -639,6 +641,8 @@ class _PatientListTabState extends State<PatientListTab> {
           fatherContact: demographic['fatherContact'] ?? '',
           createdBy: data['createdByName'] ?? 'Unknown',
           barangayId: barangayId,
+          visitDate: data['visitDate'] ?? '',   // ← THIS WAS MISSING
+          visitTime: data['visitTime'] ?? '',
         );
       }).toList();
 
@@ -701,6 +705,8 @@ class _PatientListTabState extends State<PatientListTab> {
             fatherContact: demographic['fatherContact'] ?? '',
             createdBy: data['createdByName'] ?? 'Unknown',
             barangayId: barangayId,
+            visitDate: data['visitDate'] ?? '',   // ← ADD
+            visitTime: data['visitTime'] ?? '',   // ← ADD
           ),
         );
       }
@@ -1535,6 +1541,12 @@ class _PatientListTabState extends State<PatientListTab> {
                       Icons.calendar_today_outlined,
                       'Last Visit',
                       '${patient.lastVisit.month}/${patient.lastVisit.day}/${patient.lastVisit.year}'),
+                  // ── ADD THESE TWO ──────────────────────────────────────
+                  if (patient.visitDate.isNotEmpty)
+                    _detailRow(Icons.event_outlined, 'Visit Date', patient.visitDate),
+                  if (patient.visitTime.isNotEmpty)
+                    _detailRow(Icons.schedule_outlined, 'Visit Time', patient.visitTime),
+                  // ───────────────────────────────────────────────────────
                   _detailRow(
                       Icons.phone_outlined,
                       'Contact',
@@ -1655,6 +1667,12 @@ class Patient {
   final String createdBy;
   final String barangayId;
   final bool isArchived;
+  final String visitDate;   // ← ADD
+  final String visitTime;
+  
+  
+
+  
 
   Patient({
     required this.lastName,
@@ -1675,5 +1693,7 @@ class Patient {
     this.createdBy = 'Unknown',
     this.barangayId = '',
     this.isArchived = false,
+    this.visitDate = '',    // ← ADD
+    this.visitTime = '',
   });
 }
