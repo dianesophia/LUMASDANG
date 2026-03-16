@@ -4,10 +4,12 @@ import '../../patient_list.dart';
 /// Patient information card — clean clinical dark-accent style.
 class ProfileInfoCard extends StatelessWidget {
   final Patient patient;
+  final Map<String, dynamic>? latestDemographic;
 
   const ProfileInfoCard({
     super.key,
     required this.patient,
+    this.latestDemographic,
   });
 
   // ─── Design Tokens ─────────────────────────────────────────────
@@ -21,6 +23,27 @@ class ProfileInfoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final int ageMonths = patient.age; // age displayed in months
+
+    final demo = latestDemographic ?? const <String, dynamic>{};
+
+    String _stringField(String key) =>
+        (demo[key] ?? '').toString().trim();
+
+    String _boolLabel(String key) {
+      final v = demo[key];
+      if (v is bool) return v ? 'Yes' : 'No';
+      if (v is String && v.isNotEmpty) return v;
+      return '';
+    }
+
+    final bloodType     = _stringField('bloodType');
+    final birthWeight   = _stringField('birthWeight');
+    final birthOrder    = _stringField('birthOrder');
+    final religion      = _stringField('religion');
+    final ipGroup       = _boolLabel('belongsToIpGroup');
+    final disability    = _boolLabel('hasDisability');
+    final residence     = _stringField('residenceStatus');
+    final lengthOfStay  = _stringField('lengthOfStay');
 
     return Container(
       width: double.infinity,
@@ -161,6 +184,86 @@ class ProfileInfoCard extends StatelessWidget {
                   label: 'Address',
                   value: patient.address,
                   fullWidth: true,
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _InfoTile(
+                        icon: Icons.bloodtype_outlined,
+                        label: 'Blood Type',
+                        value: bloodType,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _InfoTile(
+                        icon: Icons.scale_outlined,
+                        label: 'Birth Weight (kg)',
+                        value: birthWeight,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _InfoTile(
+                        icon: Icons.format_list_numbered_rounded,
+                        label: 'Birth Order',
+                        value: birthOrder,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _InfoTile(
+                        icon: Icons.self_improvement_outlined,
+                        label: 'Religion',
+                        value: religion,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _InfoTile(
+                        icon: Icons.groups_2_outlined,
+                        label: 'Belongs to IP Group',
+                        value: ipGroup,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _InfoTile(
+                        icon: Icons.accessible_outlined,
+                        label: 'Has Disability',
+                        value: disability,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _InfoTile(
+                        icon: Icons.home_work_outlined,
+                        label: 'Status of Residence',
+                        value: residence,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _InfoTile(
+                        icon: Icons.schedule_outlined,
+                        label: 'Length of Stay (yrs)',
+                        value: lengthOfStay,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

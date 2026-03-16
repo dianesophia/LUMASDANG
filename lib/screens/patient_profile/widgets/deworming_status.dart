@@ -197,6 +197,22 @@
       final recent      = _isRecent(dewormDate);
       final weightNote  = _weightOutcome();
 
+      // Vitamin A — same assessment payload stores this at top level.
+      final rawVitA = latest['vitaminA'];
+      final Map<String, dynamic> vitA = rawVitA is Map<String, dynamic>
+          ? rawVitA
+          : (rawVitA is Map
+              ? Map<String, dynamic>.from(rawVitA)
+              : <String, dynamic>{});
+      final bool hasVitAData = rawVitA != null && vitA.isNotEmpty;
+      final bool vitIsNA = vitA['isNA'] == true;
+      final String vitDose = vitA['dose']?.toString() ?? '';
+      final String vitDateStr = vitA['date']?.toString() ?? '';
+      final String vitNextStr = vitA['nextDate']?.toString() ?? '';
+      final String vitRemarks = vitA['remarks']?.toString() ?? '';
+      final DateTime? vitDate = _parseDate(vitDateStr);
+      final DateTime? vitNextDate = _parseDate(vitNextStr);
+
       return Padding(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
         child: Column(
@@ -271,6 +287,49 @@
                 text: weightNote,
                 positive: !weightNote.contains('decrease'),
               ),
+              const SizedBox(height: 16),
+            ],
+            // ── Vitamin A Supplementation ───────────────────────────────────
+            const Divider(height: 1, color: _border),
+            const SizedBox(height: 14),
+            const Text(
+              'VITAMIN A SUPPLEMENTATION',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: _inkMid,
+                letterSpacing: 1.2,
+              ),
+            ),
+            const SizedBox(height: 10),
+            if (!hasVitAData) ...[
+              _outcomeRow(
+                icon: Icons.info_outline_rounded,
+                text: 'No vitamin A data recorded yet.',
+                positive: false,
+              ),
+            ] else ...[
+              _datePill('Last Vitamin A: ${_formatDate(vitDate)}'),
+              if (!vitIsNA && (vitNextStr.isNotEmpty || vitNextDate != null)) ...[
+                const SizedBox(height: 8),
+                _datePill('Next Vitamin A: ${_formatDate(vitNextDate)}'),
+              ],
+              const SizedBox(height: 12),
+              _infoTile(
+                icon: Icons.local_pharmacy_outlined,
+                label: 'Dose',
+                value: vitIsNA
+                    ? 'Not yet given (N/A)'
+                    : (vitDose.isNotEmpty ? vitDose : 'Not recorded'),
+              ),
+              if (vitRemarks.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                _infoTile(
+                  icon: Icons.notes_outlined,
+                  label: 'Remarks',
+                  value: vitRemarks,
+                ),
+              ],
             ],
           ],
         ),

@@ -4,6 +4,7 @@ import 'profile_info_card.dart';
 
 class ParentContactTab extends StatelessWidget {
   final Patient patient;
+  final Map<String, dynamic>? latestDemographic;
   final bool preferPhoneCall;
   final bool preferSMS;
   final ValueChanged<bool?> onPhoneCallChanged;
@@ -12,6 +13,7 @@ class ParentContactTab extends StatelessWidget {
   const ParentContactTab({
     super.key,
     required this.patient,
+    this.latestDemographic,
     required this.preferPhoneCall,
     required this.preferSMS,
     required this.onPhoneCallChanged,
@@ -61,6 +63,26 @@ class ParentContactTab extends StatelessWidget {
       patient.fatherContact.isNotEmpty ? patient.fatherContact :
       patient.motherContact.isNotEmpty ? patient.motherContact : 'N/A';
 
+  // ── Demographic-derived fields (from latest assessment) ────────────────────
+  Map<String, dynamic> get _demo => latestDemographic ?? const <String, dynamic>{};
+
+  String _s(String key) => (_demo[key] ?? '').toString().trim();
+
+  String get _motherOccupation => _s('motherOccupation');
+  String get _fatherOccupation => _s('fatherOccupation');
+
+  String get _motherPhilHealthNumber => _s('motherPhilHealthNumber');
+  String get _motherPhilHealthType => _s('motherPhilHealthMemberType');
+  String get _fatherPhilHealthNumber => _s('fatherPhilHealthNumber');
+  String get _fatherPhilHealthType => _s('fatherPhilHealthMemberType');
+
+  // Caregiver fields saved in demographic form
+  String get _caregiverName => _s('caregiverName');
+  String get _caregiverRelationship => _s('caregiverRelationship');
+  String get _caregiverAge => _s('caregiverAge');
+  String get _caregiverEthnicity => _s('caregiverEthnicity');
+  String get _caregiverReligion => _s('caregiverReligion');
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -68,7 +90,10 @@ class ParentContactTab extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ProfileInfoCard(patient: patient),
+          ProfileInfoCard(
+            patient: patient,
+            latestDemographic: latestDemographic,
+          ),
           const SizedBox(height: 20),
 
           _sectionLabel('GUARDIAN INFORMATION'),
@@ -83,6 +108,18 @@ class ParentContactTab extends StatelessWidget {
             _infoTile(Icons.phone_in_talk_outlined,       'Secondary Phone', _secondaryPhone),
             _divider(),
             _infoTile(Icons.location_on_outlined,         'Address',         _guardianAddress),
+            _divider(),
+            _infoTile(Icons.work_outline_rounded,         'Mother Occupation', _motherOccupation),
+            _divider(),
+            _infoTile(Icons.work_history_outlined,        'Father Occupation', _fatherOccupation),
+            _divider(),
+            _infoTile(Icons.health_and_safety_outlined,   'Mother PhilHealth No.', _motherPhilHealthNumber),
+            _divider(),
+            _infoTile(Icons.assignment_turned_in_outlined,'Mother Member Type',    _motherPhilHealthType),
+            _divider(),
+            _infoTile(Icons.health_and_safety_outlined,   'Father PhilHealth No.', _fatherPhilHealthNumber),
+            _divider(),
+            _infoTile(Icons.assignment_turned_in_outlined,'Father Member Type',    _fatherPhilHealthType),
           ]),
 
           const SizedBox(height: 20),
@@ -93,6 +130,22 @@ class ParentContactTab extends StatelessWidget {
             _infoTile(Icons.emergency_outlined, 'Name',  _emergencyName),
             _divider(),
             _infoTile(Icons.phone_outlined,     'Phone', _emergencyPhone),
+          ]),
+
+          const SizedBox(height: 20),
+
+          _sectionLabel('CAREGIVER DETAILS'),
+          const SizedBox(height: 8),
+          _card(children: [
+            _infoTile(Icons.person_2_outlined,        'Caregiver Name',        _caregiverName),
+            _divider(),
+            _infoTile(Icons.diversity_3_outlined,     'Relationship to Child', _caregiverRelationship),
+            _divider(),
+            _infoTile(Icons.cake_outlined,            'Caregiver Age',         _caregiverAge),
+            _divider(),
+            _infoTile(Icons.flag_outlined,            'Caregiver Ethnicity',   _caregiverEthnicity),
+            _divider(),
+            _infoTile(Icons.self_improvement_outlined,'Caregiver Religion',    _caregiverReligion),
           ]),
 
           const SizedBox(height: 20),

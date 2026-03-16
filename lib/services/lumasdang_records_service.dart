@@ -107,6 +107,20 @@ class LumasdangRecordsService {
   /// Deduplicates by child identity (lastName + firstName + dateOfBirth) and
   /// uses the patient record with the most recent assessment for each unique child.
   static Future<String> generateExcelFile() async {
+    final result = await _buildExcelFileBytesAndName();
+    final dir = await getTemporaryDirectory();
+    final outPath = p.join(dir.path, result.fileName);
+    await File(outPath).writeAsBytes(result.bytes);
+    return outPath;
+  }
+
+  /// Generate filled Excel file and return bytes + filename (for web download).
+  static Future<({Uint8List bytes, String fileName})> generateExcelBytes() {
+    return _buildExcelFileBytesAndName();
+  }
+
+  /// Core implementation used by both file-path and bytes-based generation.
+  static Future<({Uint8List bytes, String fileName})> _buildExcelFileBytesAndName() async {
     final data = await rootBundle.load(_templateAsset);
     final bytes = Uint8List.fromList(
       data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
@@ -250,14 +264,33 @@ class LumasdangRecordsService {
           : null;
       final ipFromPatient = (demographic['belongsToIpGroup']);
       final ipValue = ipFromAssessment ?? ipFromPatient;
+
+      // IP ethnicity: prefer value from latest assessment.demographic, then patient.demographic
+      String ipEthnicity = '';
+      if (latestAssessment != null) {
+        final assessDemo = latestAssessment['demographic'];
+        if (assessDemo is Map<String, dynamic>) {
+          ipEthnicity = (assessDemo['ipEthnicity'] ?? '').toString().trim();
+        }
+      }
+      if (ipEthnicity.isEmpty) {
+        ipEthnicity = (demographic['ipEthnicity'] ?? '').toString().trim();
+      }
+
       final String ipGroupStr;
       if (ipValue == true) {
-        ipGroupStr = 'YES';
+        // When child belongs to IP group, append ethnicity inside the same column if available
+        ipGroupStr = ipEthnicity.isNotEmpty ? 'YES - $ipEthnicity' : 'YES';
       } else if (ipValue == false) {
         ipGroupStr = 'NO';
       } else if (ipValue is String) {
         final v = (ipValue as String).trim().toUpperCase();
-        ipGroupStr = (v == 'YES' || v == 'Y') ? 'YES' : (v == 'NO' || v == 'N') ? 'NO' : (ipValue as String).trim();
+        final base = (v == 'YES' || v == 'Y')
+            ? 'YES'
+            : (v == 'NO' || v == 'N')
+                ? 'NO'
+                : (ipValue as String).trim();
+        ipGroupStr = base == 'YES' && ipEthnicity.isNotEmpty ? '$base - $ipEthnicity' : base;
       } else {
         ipGroupStr = '';
       }
@@ -293,14 +326,11 @@ class LumasdangRecordsService {
     }
 
     final patched = _patchXlsxCellValues(bytes, updates);
-    final dir = await getTemporaryDirectory();
     final safeName = _sanitizeFileName(barangayName.trim());
     final fileName = safeName.isEmpty
         ? 'lumasdang_records_${DateTime.now().millisecondsSinceEpoch}.xlsx'
         : 'lumasdang_records_$safeName.xlsx';
-    final outPath = p.join(dir.path, fileName);
-    await File(outPath).writeAsBytes(patched);
-    return outPath;
+    return (bytes: patched, fileName: fileName);
   }
 
   /// Sanitize barangay name for use in filename: spaces -> underscore, remove invalid chars.

@@ -217,6 +217,11 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
       'oral': data['oral'],
       'deworming': data['deworming'],
       'vaccination': data['vaccination'],
+      'demographic': data['demographic'],
+      'familyPlanning': data['familyPlanning'],
+      'nutritionEnvironment': data['nutritionEnvironment'],
+      'allergies': data['allergies'],
+      'vitaminA': data['vitaminA'],
       'docId': docId,
       'dewormingOnly': data['dewormingOnly'] == true,
     };
@@ -521,13 +526,18 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
   // ── Tab bodies ─────────────────────────────────────────────────────────────
   Widget _buildProfileTab() {
     final patient = widget.patient;
+    final Map<String, dynamic>? latestDemo =
+        _assessments.isNotEmpty ? _assessments.last['demographic'] as Map<String, dynamic>? : null;
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           const SizedBox(height: 16),
-          ProfileInfoCard(patient: patient),
+          ProfileInfoCard(
+            patient: patient,
+            latestDemographic: latestDemo,
+          ),
           const SizedBox(height: 20),
           AssessmentTable(
             patientId: widget.sharedPatientId ?? widget.patient.docId,
@@ -604,6 +614,9 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
       case 1:
         return ParentContactTab(
           patient: widget.patient,
+          latestDemographic: _assessments.isNotEmpty
+              ? _assessments.last['demographic'] as Map<String, dynamic>?
+              : null,
           preferPhoneCall: _preferPhoneCall,
           preferSMS: _preferSMS,
           onPhoneCallChanged: (v) {

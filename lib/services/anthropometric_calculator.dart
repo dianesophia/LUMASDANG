@@ -490,6 +490,17 @@ class AnthropometricCalculator {
 
   static String _fmt(double z, String type) => '${z.toStringAsFixed(2)} (${_interpret(z, type)})';
 
+  // ── Asian BMI classification (adolescents/adults) ─────────────────────────────
+  /// Uses commonly adopted Asian BMI cut-offs (WHO Expert Consultation for
+  /// Asian populations). Applied only when age > 5 years (ageMonths > 60).
+  static String _asianBmiCategory(double bmi) {
+    if (bmi < 18.5) return 'Underweight';
+    if (bmi < 23.0) return 'Normal (Asian)';
+    if (bmi < 25.0) return 'Overweight (at risk)';
+    if (bmi < 30.0) return 'Obese I';
+    return 'Obese II';
+  }
+
   // ── Public API ───────────────────────────────────────────────────────────────
   static AnthropometricResult? calculate({
     required String weightStr,
@@ -514,8 +525,12 @@ class AnthropometricCalculator {
 
     final bmiValue = weight / math.pow(height / 100, 2);
 
+    // For children older than 5 years, use Asian BMI classification instead of WHO z-scores.
     if (ageMonths > 60) {
-      return AnthropometricResult(bmi: bmiValue.toStringAsFixed(1));
+      final category = _asianBmiCategory(bmiValue);
+      return AnthropometricResult(
+        bmi: '${bmiValue.toStringAsFixed(1)} ($category)',
+      );
     }
 
     final wfaTable = male ? _wfaBoys : _wfaGirls;

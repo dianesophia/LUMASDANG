@@ -1,9 +1,14 @@
+import 'dart:typed_data';
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:downloadsfolder/downloadsfolder.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../services/lumasdang_records_service.dart';
+import 'lumasdang_records_download_stub.dart'
+    if (dart.library.html) 'lumasdang_records_download_web.dart';
 
 class LumasdangRecordsScreen extends StatefulWidget {
   const LumasdangRecordsScreen({super.key});
@@ -20,46 +25,62 @@ class _LumasdangRecordsScreenState extends State<LumasdangRecordsScreen> {
     setState(() => _isGenerating = true);
 
     try {
-      final path = await LumasdangRecordsService.generateExcelFile();
-      final fileName = p.basename(path);
-      // Save to the device's visible Downloads folder (uses MediaStore on Android)
-      final saved = await copyFileIntoDownloadFolder(path, fileName);
-      if (saved == true && mounted) {
-        // Open the Downloads folder so the user sees the file
-        await openDownloadFolder();
-        if (mounted) {
-          ScaffoldMessenger.of(this.context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Saved: $fileName\nDownloads folder opened so you can see the file.',
-                style: const TextStyle(fontSize: 13),
-              ),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 4),
-              action: SnackBarAction(
-                label: 'OK',
-                textColor: Colors.white,
-                onPressed: () {},
-              ),
-            ),
-          );
-        }
-      } else {
-        // Fallback: share so user can save to Files/Downloads manually
-        await Share.shareXFiles(
-          [XFile(path, name: fileName)],
-          text: 'Lumasdang records (child list with assessments). Choose "Save to Files" or "Downloads" to save.',
-        );
+      if (kIsWeb) {
+        final webResult = await LumasdangRecordsService.generateExcelBytes();
+        await triggerLumasdangDownload(webResult.bytes as Uint8List, webResult.fileName);
         if (mounted) {
           ScaffoldMessenger.of(this.context).showSnackBar(
             const SnackBar(
               content: Text(
-                'Choose "Save to Files" or "Downloads" to save the file to your device.',
+                'Lumasdang records downloaded. Check your browser Downloads.',
                 style: TextStyle(fontSize: 13),
               ),
-              backgroundColor: Color(0xFF2E8B7B),
+              backgroundColor: Colors.green,
             ),
           );
+        }
+      } else {
+        final path = await LumasdangRecordsService.generateExcelFile();
+        final fileName = p.basename(path);
+        // Save to the device's visible Downloads folder (uses MediaStore on Android)
+        final saved = await copyFileIntoDownloadFolder(path, fileName);
+        if (saved == true && mounted) {
+          // Open the Downloads folder so the user sees the file
+          await openDownloadFolder();
+          if (mounted) {
+            ScaffoldMessenger.of(this.context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Saved: $fileName\nDownloads folder opened so you can see the file.',
+                  style: const TextStyle(fontSize: 13),
+                ),
+                backgroundColor: Colors.green,
+                duration: const Duration(seconds: 4),
+                action: SnackBarAction(
+                  label: 'OK',
+                  textColor: Colors.white,
+                  onPressed: () {},
+                ),
+              ),
+            );
+          }
+        } else {
+          // Fallback: share so user can save to Files/Downloads manually
+          await Share.shareXFiles(
+            [XFile(path, name: fileName)],
+            text: 'Lumasdang records (child list with assessments). Choose "Save to Files" or "Downloads" to save.',
+          );
+          if (mounted) {
+            ScaffoldMessenger.of(this.context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Choose "Save to Files" or "Downloads" to save the file to your device.',
+                  style: TextStyle(fontSize: 13),
+                ),
+                backgroundColor: Color(0xFF2E8B7B),
+              ),
+            );
+          }
         }
       }
     } catch (e) {

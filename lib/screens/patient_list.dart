@@ -170,7 +170,14 @@ class _PatientListScreenState extends State<PatientListScreen>
 // ==================== PATIENT LIST TAB ====================
 class PatientListTab extends StatefulWidget {
   final ValueNotifier<int>? refreshTrigger;
-  const PatientListTab({super.key, this.refreshTrigger});
+  /// When true, only malnourished / underweight children are shown.
+  final bool showOnlyMalnourished;
+
+  const PatientListTab({
+    super.key,
+    this.refreshTrigger,
+    this.showOnlyMalnourished = false,
+  });
 
   @override
   State<PatientListTab> createState() => _PatientListTabState();
@@ -522,6 +529,8 @@ class _PatientListTabState extends State<PatientListTab> {
               fatherContact: demographic['fatherContact'] ?? '',
               createdBy: mostRecent['createdByName'] ?? 'Unknown',
               barangayId: '',
+              nextFollowUpDate: null,
+              followUpNotes: (mostRecent['followUpNotes'] as String?) ?? '',
             );
           }).toList();
           _loading = false;
@@ -619,6 +628,9 @@ class _PatientListTabState extends State<PatientListTab> {
             int.tryParse(demographic['age']?.toString() ?? '0') ??
             0;
 
+        final nextFollowUpTs = data['nextFollowUpDate'] as Timestamp?;
+        final followUpNotes = data['followUpNotes'] as String? ?? '';
+
         return Patient(
           firstName: demographic['firstName'] ?? '',
           lastName: demographic['lastName'] ?? '',
@@ -639,6 +651,8 @@ class _PatientListTabState extends State<PatientListTab> {
           fatherContact: demographic['fatherContact'] ?? '',
           createdBy: data['createdByName'] ?? 'Unknown',
           barangayId: barangayId,
+          nextFollowUpDate: nextFollowUpTs?.toDate(),
+          followUpNotes: followUpNotes,
         );
       }).toList();
 
@@ -669,6 +683,8 @@ class _PatientListTabState extends State<PatientListTab> {
 
         final createdAt = data['createdAt'] as Timestamp?;
         final assessmentRemarks = _buildAssessmentRemarks(data, 1);
+        final nextFollowUpTs = data['nextFollowUpDate'] as Timestamp?;
+        final followUpNotes = data['followUpNotes'] as String? ?? '';
         final ageMonths = ageInMonthsFromDemographic(demographic) ??
             int.tryParse(demographic['age']?.toString() ?? '0') ??
             0;
@@ -701,6 +717,8 @@ class _PatientListTabState extends State<PatientListTab> {
             fatherContact: demographic['fatherContact'] ?? '',
             createdBy: data['createdByName'] ?? 'Unknown',
             barangayId: barangayId,
+            nextFollowUpDate: nextFollowUpTs?.toDate(),
+            followUpNotes: followUpNotes,
           ),
         );
       }
@@ -728,12 +746,16 @@ class _PatientListTabState extends State<PatientListTab> {
   }
 
   List<Patient> get _filteredPatients {
-    final filtered = _patients.where((p) {
+    final base = _patients.where((p) {
       final q = _searchQuery.toLowerCase();
       return p.lastName.toLowerCase().contains(q) ||
           p.firstName.toLowerCase().contains(q) ||
           p.assessmentRemarks.toLowerCase().contains(q);
     }).toList();
+
+    final filtered = widget.showOnlyMalnourished
+        ? base.where(_isMalnourished).toList()
+        : base;
 
     filtered.sort((a, b) {
       // Case-insensitive A–Z by last name, then first name
@@ -748,6 +770,12 @@ class _PatientListTabState extends State<PatientListTab> {
       return _sortAscending ? cmp : -cmp;
     });
     return filtered;
+  }
+
+  bool _isMalnourished(Patient p) {
+    final status = p.assessmentRemarks.toLowerCase();
+    // For the dedicated Malnourished list we only show Underweight children.
+    return status.contains('underweight');
   }
 
   @override
@@ -909,6 +937,29 @@ class _PatientListTabState extends State<PatientListTab> {
                 icon: const Icon(Icons.list_alt_rounded, size: 16),
                 label: const Text(
                   'Lumasdang Records',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Malnourished / Underweight list screen button
+              ElevatedButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => MalnourishedPatientsScreen(),
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: const Color(0xFFB23A48),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  elevation: 2,
+                ),
+                icon: const Icon(Icons.child_care_outlined, size: 16),
+                label: const Text(
+                  'Malnourished List',
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
                 ),
               ),
@@ -1529,20 +1580,40 @@ class _PatientListTabState extends State<PatientListTab> {
               padding: const EdgeInsets.all(20),
               child: Column(
                 children: [
-                  _detailRow(Icons.cake_outlined, 'Age',
-                      '${patient.age} months old'),
                   _detailRow(
-                      Icons.calendar_today_outlined,
-                      'Last Visit',
-                      '${patient.lastVisit.month}/${patient.lastVisit.day}/${patient.lastVisit.year}'),
+                    Icons.cake_outlined,
+                    'Age',
+                    '${patient.age} months old',
+                  ),
                   _detailRow(
-                      Icons.phone_outlined,
-                      'Contact',
-                      patient.guardianContact.isEmpty
-                          ? '—'
-                          : patient.guardianContact),
-                  _detailRow(Icons.person_outline_rounded, 'Added by',
-                      patient.createdBy),
+                    Icons.calendar_today_outlined,
+                    'Last Visit',
+                    '${patient.lastVisit.month}/${patient.lastVisit.day}/${patient.lastVisit.year}',
+                  ),
+                  _detailRow(
+                    Icons.phone_outlined,
+                    'Contact',
+                    patient.guardianContact.isEmpty
+                        ? '—'
+                        : patient.guardianContact,
+                  ),
+                  _detailRow(
+                    Icons.person_outline_rounded,
+                    'Added by',
+                    patient.createdBy,
+                  ),
+                  if (patient.nextFollowUpDate != null)
+                    _detailRow(
+                      Icons.event_available_outlined,
+                      'Next Follow-up',
+                      '${patient.nextFollowUpDate!.month}/${patient.nextFollowUpDate!.day}/${patient.nextFollowUpDate!.year}',
+                    ),
+                  if (patient.followUpNotes.isNotEmpty)
+                    _detailRow(
+                      Icons.notes_outlined,
+                      'Notes',
+                      patient.followUpNotes,
+                    ),
                 ],
               ),
             ),
@@ -1567,6 +1638,25 @@ class _PatientListTabState extends State<PatientListTab> {
                       child: const Text('Close',
                           style:
                               TextStyle(fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => _openFollowUpDialog(patient),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2E8B7B),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        padding:
+                            const EdgeInsets.symmetric(vertical: 12),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'Follow-up',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -1633,6 +1723,198 @@ class _PatientListTabState extends State<PatientListTab> {
       ),
     );
   }
+
+  Future<void> _openFollowUpDialog(Patient patient) async {
+    DateTime selectedDate =
+        patient.nextFollowUpDate ?? DateTime.now().add(const Duration(days: 30));
+    final notesController = TextEditingController(text: patient.followUpNotes);
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setStateDialog) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20)),
+              title: const Text(
+                'Schedule Follow-up',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.event_available_outlined,
+                        color: Color(0xFF2E8B7B)),
+                    title: const Text(
+                      'Follow-up Date',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w600, fontSize: 13),
+                    ),
+                    subtitle: Text(
+                      '${selectedDate.month}/${selectedDate.day}/${selectedDate.year}',
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                    onTap: () async {
+                      final now = DateTime.now();
+                      final picked = await showDatePicker(
+                        context: ctx,
+                        initialDate: selectedDate,
+                        firstDate: now,
+                        lastDate: now.add(const Duration(days: 365 * 3)),
+                      );
+                      if (picked != null) {
+                        setStateDialog(() {
+                          selectedDate = picked;
+                        });
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: notesController,
+                    maxLines: 3,
+                    decoration: const InputDecoration(
+                      labelText: 'Notes for health worker (optional)',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(color: Color(0xFF2E8B7B)),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2E8B7B),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('Save'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (result != true) return;
+
+    try {
+      final firestore = FirebaseFirestore.instance;
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text(
+                  'You must be online and signed in to save follow-ups'),
+              backgroundColor: Colors.redAccent,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              margin: const EdgeInsets.all(16),
+            ),
+          );
+        }
+        return;
+      }
+
+      DocumentReference targetRef;
+
+      // Prefer barangay-shared patient document when available.
+      if (patient.barangayId.isNotEmpty) {
+        targetRef = firestore
+            .collection('barangays')
+            .doc(patient.barangayId)
+            .collection('patients')
+            .doc(patient.docId);
+      } else {
+        // Fallback: user's homepageData copy.
+        targetRef = firestore
+            .collection('users')
+            .doc(user.uid)
+            .collection('homepageData')
+            .doc(patient.docId);
+      }
+
+      await targetRef.update({
+        'nextFollowUpDate': Timestamp.fromDate(selectedDate),
+        'followUpNotes': notesController.text.trim(),
+        'followUpStatus': 'pending',
+      });
+
+      await _fetchPatients();
+
+      if (mounted) {
+        // Close the patient details dialog after a successful save.
+        Navigator.of(context).pop();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Follow-up saved successfully'),
+            backgroundColor: const Color(0xFF2E8B7B),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12)),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save follow-up: $e'),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12)),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      }
+    }
+  }
+}
+
+/// Standalone screen that shows only malnourished / underweight patients.
+class MalnourishedPatientsScreen extends StatelessWidget {
+  const MalnourishedPatientsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Malnourished / Underweight'),
+        backgroundColor: const Color(0xFF2E8B7B),
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF2E8B7B), Color(0xFF5CAA7F)],
+          ),
+        ),
+        child: const SafeArea(
+          child: PatientListTab(showOnlyMalnourished: true),
+        ),
+      ),
+    );
+  }
 }
 
 // ==================== PATIENT MODEL ====================
@@ -1655,6 +1937,8 @@ class Patient {
   final String createdBy;
   final String barangayId;
   final bool isArchived;
+  final DateTime? nextFollowUpDate;
+  final String followUpNotes;
 
   Patient({
     required this.lastName,
@@ -1675,5 +1959,7 @@ class Patient {
     this.createdBy = 'Unknown',
     this.barangayId = '',
     this.isArchived = false,
+    this.nextFollowUpDate,
+    this.followUpNotes = '',
   });
 }

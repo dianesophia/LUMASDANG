@@ -166,6 +166,163 @@ class StatusSections extends StatelessWidget {
   int _getOralDataCount() =>
       assessments.where((a) => a['oral'] != null).length;
 
+  // Allergies
+  String _getAllergiesSummary() {
+    if (assessments.isEmpty) return 'No allergy data available';
+    for (var i = assessments.length - 1; i >= 0; i--) {
+      final raw = assessments[i]['allergies'];
+      Map<String, dynamic>? allergies;
+      if (raw is Map<String, dynamic>) {
+        allergies = raw;
+      } else if (raw is Map) {
+        allergies = Map<String, dynamic>.from(raw);
+      }
+      if (allergies != null) {
+        final hasAllergies = allergies['hasAllergies'] as bool?;
+        final entries = (allergies['entries'] as List?) ?? const [];
+        if (hasAllergies == false) return 'No known allergies';
+        if (hasAllergies == true && entries.isNotEmpty) {
+          final count = entries.length;
+          return '$count documented allerg${count == 1 ? 'y' : 'ies'}';
+        }
+      }
+    }
+    return 'No allergy data available';
+  }
+
+  bool _isAllergiesPositive() {
+    for (var i = assessments.length - 1; i >= 0; i--) {
+      final raw = assessments[i]['allergies'];
+      Map<String, dynamic>? allergies;
+      if (raw is Map<String, dynamic>) {
+        allergies = raw;
+      } else if (raw is Map) {
+        allergies = Map<String, dynamic>.from(raw);
+      }
+      if (allergies != null) {
+        final hasAllergies = allergies['hasAllergies'] as bool?;
+        final entries = (allergies['entries'] as List?) ?? const [];
+        // Positive when explicitly marked as no allergies, or no severe entries.
+        if (hasAllergies == false) return true;
+        if (hasAllergies == true && entries.isNotEmpty) {
+          final hasSevere = entries.any((e) {
+            if (e is Map<String, dynamic>) {
+              return (e['severity']?.toString().toLowerCase() == 'severe');
+            } else if (e is Map) {
+              final m = Map<String, dynamic>.from(e);
+              return (m['severity']?.toString().toLowerCase() == 'severe');
+            }
+            return false;
+          });
+          return !hasSevere;
+        }
+      }
+    }
+    return false;
+  }
+
+  int _getAllergyDataCount() =>
+      assessments.where((a) => a['allergies'] != null).length;
+
+  // Family planning
+  String _getFamilyPlanningSummary() {
+    if (assessments.isEmpty) return 'No family planning data available';
+    for (var i = assessments.length - 1; i >= 0; i--) {
+      final raw = assessments[i]['familyPlanning'];
+      Map<String, dynamic>? fp;
+      if (raw is Map<String, dynamic>) {
+        fp = raw;
+      } else if (raw is Map) {
+        fp = Map<String, dynamic>.from(raw);
+      }
+      if (fp != null) {
+        final using = fp['usingFamilyPlanning'] as bool?;
+        final method = fp['methodUsed']?.toString() ?? '';
+        final other = fp['otherMethod']?.toString() ?? '';
+        if (using == true) {
+          final resolvedMethod =
+              method == 'Other' && other.isNotEmpty ? other : method;
+          if (resolvedMethod.isNotEmpty) {
+            return 'Using family planning — $resolvedMethod';
+          }
+          return 'Using family planning method';
+        }
+        if (using == false) return 'Not using family planning';
+      }
+    }
+    return 'No family planning data available';
+  }
+
+  bool _isFamilyPlanningPositive() {
+    for (var i = assessments.length - 1; i >= 0; i--) {
+      final raw = assessments[i]['familyPlanning'];
+      Map<String, dynamic>? fp;
+      if (raw is Map<String, dynamic>) {
+        fp = raw;
+      } else if (raw is Map) {
+        fp = Map<String, dynamic>.from(raw);
+      }
+      if (fp != null) {
+        final using = fp['usingFamilyPlanning'] as bool?;
+        // Neutral/positive card – we don’t treat FP as a “problem state”.
+        return using != null;
+      }
+    }
+    return false;
+  }
+
+  int _getFamilyPlanningCount() =>
+      assessments.where((a) => a['familyPlanning'] != null).length;
+
+  // Nutrition environment
+  String _getNutritionEnvSummary() {
+    if (assessments.isEmpty) return 'No nutrition environment data available';
+    for (var i = assessments.length - 1; i >= 0; i--) {
+      final raw = assessments[i]['nutritionEnvironment'];
+      Map<String, dynamic>? env;
+      if (raw is Map<String, dynamic>) {
+        env = raw;
+      } else if (raw is Map) {
+        env = Map<String, dynamic>.from(raw);
+      }
+      if (env != null) {
+        final oil = env['oilType']?.toString() ?? '';
+        final salt = env['saltType']?.toString() ?? '';
+        final water = env['waterSource']?.toString() ?? '';
+        final hasGarden = env['hasBackyardGarden'] as bool?;
+        final parts = <String>[];
+        if (oil.isNotEmpty) parts.add('Oil: $oil');
+        if (salt.isNotEmpty) parts.add('Salt: $salt');
+        if (water.isNotEmpty) parts.add('Water: $water');
+        if (hasGarden != null) {
+          parts.add(hasGarden ? 'Has backyard garden' : 'No backyard garden');
+        }
+        if (parts.isNotEmpty) return parts.join(' · ');
+      }
+    }
+    return 'No nutrition environment data available';
+  }
+
+  bool _isNutritionEnvPositive() {
+    for (var i = assessments.length - 1; i >= 0; i--) {
+      final raw = assessments[i]['nutritionEnvironment'];
+      Map<String, dynamic>? env;
+      if (raw is Map<String, dynamic>) {
+        env = raw;
+      } else if (raw is Map) {
+        env = Map<String, dynamic>.from(raw);
+      }
+      if (env != null) {
+        // Consider positive if we have any structured data.
+        return true;
+      }
+    }
+    return false;
+  }
+
+  int _getNutritionEnvCount() =>
+      assessments.where((a) => a['nutritionEnvironment'] != null).length;
+
   // ─── Shared card builder ────────────────────────────────────────────────────
 
   Widget _buildCard({
@@ -390,6 +547,42 @@ class StatusSections extends StatelessWidget {
           isPositive: _isOralPositive(),
           onPressed: () => _showOralDetails(context),
         ),
+        const SizedBox(height: _sectionGap),
+        _buildCard(
+          context: context,
+          icon: Icons.coronavirus_outlined,
+          title: 'Allergies',
+          statusText: _getAllergiesSummary(),
+          buttonLabel: 'View Details',
+          buttonIcon: Icons.info_outline_rounded,
+          dataCount: _getAllergyDataCount(),
+          isPositive: _isAllergiesPositive(),
+          onPressed: () => _showAllergyDetails(context),
+        ),
+        const SizedBox(height: _sectionGap),
+        _buildCard(
+          context: context,
+          icon: Icons.favorite_border_outlined,
+          title: 'Family Planning',
+          statusText: _getFamilyPlanningSummary(),
+          buttonLabel: 'View History',
+          buttonIcon: Icons.history_rounded,
+          dataCount: _getFamilyPlanningCount(),
+          isPositive: _isFamilyPlanningPositive(),
+          onPressed: () => _showFamilyPlanningHistory(context),
+        ),
+        const SizedBox(height: _sectionGap),
+        _buildCard(
+          context: context,
+          icon: Icons.eco_outlined,
+          title: 'Nutrition Environment',
+          statusText: _getNutritionEnvSummary(),
+          buttonLabel: 'View Details',
+          buttonIcon: Icons.info_outline_rounded,
+          dataCount: _getNutritionEnvCount(),
+          isPositive: _isNutritionEnvPositive(),
+          onPressed: () => _showNutritionEnvDetails(context),
+        ),
       ],
     );
   }
@@ -420,6 +613,33 @@ class StatusSections extends StatelessWidget {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _OralDetailsSheet(assessments: assessments),
+    );
+  }
+
+  void _showAllergyDetails(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _AllergiesSheet(assessments: assessments),
+    );
+  }
+
+  void _showFamilyPlanningHistory(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _FamilyPlanningSheet(assessments: assessments),
+    );
+  }
+
+  void _showNutritionEnvDetails(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _NutritionEnvSheet(assessments: assessments),
     );
   }
 }
@@ -773,6 +993,221 @@ class _OralDetailsSheet extends StatelessWidget {
                       )
                     else
                       _buildBullet('No risk assessment available', color: const Color(0xFF6C6C70)),
+                  ],
+                );
+              },
+            ),
+    );
+  }
+}
+
+// ─── Allergies Details Sheet ───────────────────────────────────────────────────
+
+class _AllergiesSheet extends StatelessWidget {
+  final List<Map<String, dynamic>> assessments;
+  const _AllergiesSheet({required this.assessments});
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = assessments
+        .where((a) => a['allergies'] != null)
+        .toList()
+        .reversed
+        .toList();
+
+    return _SheetShell(
+      icon: Icons.coronavirus_outlined,
+      title: 'Allergies & Reactions',
+      body: filtered.isEmpty
+          ? _buildEmpty('No allergy data available')
+          : ListView.separated(
+              shrinkWrap: true,
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 28),
+              itemCount: filtered.length,
+              separatorBuilder: (_, __) =>
+                  const Divider(height: 28, color: Color(0xFFE8E8ED)),
+              itemBuilder: (_, i) {
+                final a = filtered[i];
+                final raw = a['allergies'];
+                final Map<String, dynamic> allergies =
+                    raw is Map<String, dynamic>
+                        ? raw
+                        : Map<String, dynamic>.from(raw as Map);
+                final hasAllergies = allergies['hasAllergies'] as bool?;
+                final entries =
+                    (allergies['entries'] as List?)?.cast<Map>() ?? const [];
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildDateLabel(a['date'] as DateTime?),
+                    const SizedBox(height: 8),
+                    if (hasAllergies == false || entries.isEmpty)
+                      _buildBullet(
+                        'No known allergies recorded',
+                        color: const Color(0xFF1A7A3C),
+                      )
+                    else ...[
+                      _buildBullet(
+                        'Documented allergies (${entries.length}):',
+                        bold: true,
+                        color: const Color(0xFFF08030),
+                      ),
+                      for (final rawEntry in entries)
+                        _buildSubItem(_formatAllergyEntry(rawEntry)),
+                    ],
+                  ],
+                );
+              },
+            ),
+    );
+  }
+
+  String _formatAllergyEntry(Map entryRaw) {
+    final e = Map<String, dynamic>.from(entryRaw);
+    final type = (e['type'] ?? '').toString();
+    final allergen = (e['allergen'] ?? '').toString();
+    final reaction = (e['reaction'] ?? '').toString();
+    final severity = (e['severity'] ?? '').toString();
+
+    final parts = <String>[];
+    if (type.isNotEmpty) parts.add(type);
+    if (allergen.isNotEmpty) parts.add(allergen);
+    if (severity.isNotEmpty) parts.add('($severity)');
+    var base = parts.isEmpty ? 'Allergy' : parts.join(' · ');
+    if (reaction.isNotEmpty) {
+      base = '$base — $reaction';
+    }
+    return base;
+  }
+}
+
+// ─── Family Planning Sheet ─────────────────────────────────────────────────────
+
+class _FamilyPlanningSheet extends StatelessWidget {
+  final List<Map<String, dynamic>> assessments;
+  const _FamilyPlanningSheet({required this.assessments});
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = assessments
+        .where((a) => a['familyPlanning'] != null)
+        .toList()
+        .reversed
+        .toList();
+
+    return _SheetShell(
+      icon: Icons.favorite_border_outlined,
+      title: 'Family Planning History',
+      body: filtered.isEmpty
+          ? _buildEmpty('No family planning data available')
+          : ListView.separated(
+              shrinkWrap: true,
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 28),
+              itemCount: filtered.length,
+              separatorBuilder: (_, __) =>
+                  const Divider(height: 28, color: Color(0xFFE8E8ED)),
+              itemBuilder: (_, i) {
+                final a = filtered[i];
+                final raw = a['familyPlanning'];
+                final Map<String, dynamic> fp =
+                    raw is Map<String, dynamic>
+                        ? raw
+                        : Map<String, dynamic>.from(raw as Map);
+                final using = fp['usingFamilyPlanning'] as bool?;
+                final method = fp['methodUsed']?.toString() ?? '';
+                final other = fp['otherMethod']?.toString() ?? '';
+                final resolvedMethod =
+                    method == 'Other' && other.isNotEmpty ? other : method;
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildDateLabel(a['date'] as DateTime?),
+                    const SizedBox(height: 8),
+                    if (using == true)
+                      _buildBullet(
+                        resolvedMethod.isNotEmpty
+                            ? 'Currently using family planning: $resolvedMethod'
+                            : 'Currently using family planning',
+                        color: const Color(0xFF1A7A3C),
+                        bold: true,
+                      )
+                    else if (using == false)
+                      _buildBullet(
+                        'Not using family planning',
+                        color: const Color(0xFF6C6C70),
+                      )
+                    else
+                      _buildBullet(
+                        'Family planning status not specified',
+                        color: const Color(0xFF6C6C70),
+                      ),
+                  ],
+                );
+              },
+            ),
+    );
+  }
+}
+
+// ─── Nutrition Environment Sheet ───────────────────────────────────────────────
+
+class _NutritionEnvSheet extends StatelessWidget {
+  final List<Map<String, dynamic>> assessments;
+  const _NutritionEnvSheet({required this.assessments});
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = assessments
+        .where((a) => a['nutritionEnvironment'] != null)
+        .toList()
+        .reversed
+        .toList();
+
+    return _SheetShell(
+      icon: Icons.eco_outlined,
+      title: 'Nutrition Environment',
+      body: filtered.isEmpty
+          ? _buildEmpty('No nutrition environment data available')
+          : ListView.separated(
+              shrinkWrap: true,
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 28),
+              itemCount: filtered.length,
+              separatorBuilder: (_, __) =>
+                  const Divider(height: 28, color: Color(0xFFE8E8ED)),
+              itemBuilder: (_, i) {
+                final a = filtered[i];
+                final raw = a['nutritionEnvironment'];
+                final Map<String, dynamic> env =
+                    raw is Map<String, dynamic>
+                        ? raw
+                        : Map<String, dynamic>.from(raw as Map);
+                final oil = env['oilType']?.toString() ?? '';
+                final salt = env['saltType']?.toString() ?? '';
+                final water = env['waterSource']?.toString() ?? '';
+                final hasGarden = env['hasBackyardGarden'] as bool?;
+                final gardenWhat = env['gardenWhat']?.toString() ?? '';
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildDateLabel(a['date'] as DateTime?),
+                    const SizedBox(height: 8),
+                    if (oil.isNotEmpty)
+                      _buildBullet('Cooking oil: $oil'),
+                    if (salt.isNotEmpty)
+                      _buildBullet('Salt type: $salt'),
+                    if (water.isNotEmpty)
+                      _buildBullet('Drinking water: $water'),
+                    if (hasGarden != null)
+                      _buildBullet(
+                        hasGarden
+                            ? 'Backyard garden present'
+                            : 'No backyard garden',
+                      ),
+                    if (hasGarden == true && gardenWhat.isNotEmpty)
+                      _buildSubItem('Grows: $gardenWhat'),
                   ],
                 );
               },
