@@ -9,20 +9,16 @@ import 'dart:convert';
 class FirestoreService {
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
-  //final FirebaseStorage _storage;  // Add this
 
   FirestoreService({
     FirebaseFirestore? firestore,
     FirebaseAuth? auth,
-    //FirebaseStorage? storage,  // Add this
   })  : _firestore = firestore ?? FirebaseFirestore.instance,
         _auth = auth ?? FirebaseAuth.instance;
-        //_storage = storage ?? FirebaseStorage.instance;  // Add this
 
   // Add these getters
   FirebaseFirestore get firestore => _firestore;
   FirebaseAuth get auth => _auth;
-  //FirebaseStorage get storage => _storage;
 
 
   /// Saves a map containing data from HomePage under:
@@ -43,7 +39,7 @@ class FirestoreService {
       .collection('users')
       .doc(uid)
       .collection('homepageData')
-      .doc(docId); // use provided docId or auto-generate when null
+      .doc(docId);
 
     final payload = {
       ...data,
@@ -56,7 +52,6 @@ class FirestoreService {
   }
 
   /// Update an existing homepageData document by document id.
-  /// Uses merge so it won't overwrite unrelated fields.
   Future<void> updateHomePageData(String docId, Map<String, dynamic> data) async {
     final user = _auth.currentUser;
     if (user == null) {
@@ -116,7 +111,7 @@ class FirestoreService {
     return userDoc.data()?['barangayId'] as String?;
   }
 
-  /// Returns the current user's barangay display name (e.g. "Barangay Alapang"), or empty string if not set.
+  /// Returns the current user's barangay display name, or empty string if not set.
   Future<String> getCurrentUserBarangayName() async {
     final user = _auth.currentUser;
     if (user == null) return '';
@@ -131,8 +126,8 @@ class FirestoreService {
     return (name != null && name.trim().isNotEmpty) ? name.trim() : barangayId;
   }
 
-  /// Saves vaccination status to the barangay patient doc so Profile Overview (shared mode) shows it.
-  /// Maps home-page status keys to the keys expected by VaccinationStatusSection.
+  /// Saves vaccination status to the barangay patient doc.
+  /// ── UPDATED: profileKeys and flat map now include all 17 new vaccines ──
   Future<void> saveVaccinationStatusToBarangayPatient({
     required String barangayId,
     required String patientId,
@@ -143,25 +138,60 @@ class FirestoreService {
   }) async {
     final user = _auth.currentUser;
     if (user == null) return;
-    // Map home-page keys to profile vaccine keys; default others to Pending
+
+    // All keys expected by VaccinationStatusSection in vaccination_status.dart
     const profileKeys = [
-      'bcg', 'hepatitisB', 'opv', 'ipv', 'dtap', 'hib', 'rotaV', 'pcv', 'mmr',
-      'typhoid', 'hepatitisA', 'varicella',
+      'bcg',
+      'hepatitisB',
+      'opv',
+      'ipv',
+      'dtap',
+      'pcv',
+      'rv',
+      'influenza',
+      'mmr',
+      'measlesMmr',
+      'jev',
+      'varicella',
+      'hepatitisA',
+      'rabies',
+      'meningococcal',
+      'cholera',
+      'typhoid',
+      'opvIpv',
     ];
+
+    // Start with all keys defaulting to Pending
     final flat = <String, String>{};
     for (final k in profileKeys) {
       flat[k] = 'Pending';
     }
-    flat['bcg'] = statuses['bcg'] ?? 'Pending';
-    flat['hepatitisB'] = statuses['hepatitisB'] ?? 'Pending';
-    flat['dtap'] = statuses['dptPentavalent'] ?? 'Pending';
-    flat['opv'] = statuses['opv'] ?? statuses['opvIpv'] ?? 'Pending';
-    flat['ipv'] = statuses['ipv'] ?? statuses['opvIpv'] ?? 'Pending';
-    flat['mmr'] = statuses['measlesMmr'] ?? 'Pending';
-    flat['pcv'] = statuses['pcv'] ?? 'Pending';
+
+    // Map home-page vaccine keys → profile keys
+    flat['bcg']           = statuses['bcg']           ?? 'Pending';
+    flat['hepatitisB']    = statuses['hepatitisB']     ?? 'Pending';
+    flat['opv']           = statuses['opv']            ?? statuses['opvIpv'] ?? 'Pending';
+    flat['ipv']           = statuses['ipv']            ?? statuses['opvIpv'] ?? 'Pending';
+    flat['dtap']          = statuses['dptPentavalent'] ?? 'Pending';
+    flat['pcv']           = statuses['pcv']            ?? 'Pending';
+    flat['rv']            = statuses['rv']             ?? 'Pending';
+    flat['influenza']     = statuses['influenza']      ?? 'Pending';
+    flat['mmr']           = statuses['measlesMmr']     ?? 'Pending';
+    flat['measlesMmr']    = statuses['measlesMmr']     ?? 'Pending';
+    flat['jev']           = statuses['jev']            ?? 'Pending';
+    flat['varicella']     = statuses['varicella']      ?? 'Pending';
+    flat['hepatitisA']    = statuses['hepatitisA']     ?? 'Pending';
+    flat['rabies']        = statuses['rabies']         ?? 'Pending';
+    flat['meningococcal'] = statuses['meningococcal']  ?? 'Pending';
+    flat['cholera']       = statuses['cholera']        ?? 'Pending';
+    flat['typhoid']       = statuses['typhoid']        ?? 'Pending';
+    flat['opvIpv']        = statuses['opvIpv']         ?? 'Pending';
 
     final userDoc = await _firestore.collection('users').doc(user.uid).get();
-    final userName = userDoc.data()?['fullName'] ?? userDoc.data()?['username'] ?? user?.email ?? 'Unknown';
+    final userName = userDoc.data()?['fullName'] ??
+        userDoc.data()?['username'] ??
+        user.email ??
+        'Unknown';
 
     final ref = _firestore
         .collection('barangays')
@@ -172,13 +202,13 @@ class FirestoreService {
         .doc('record');
 
     await ref.set({
-      'firstName': firstName.trim(),
-      'middleName': middleName.trim(),
-      'lastName': lastName.trim(),
-      'lastReviewDate': FieldValue.serverTimestamp(),
-      'lastModifiedBy': user.uid,
+      'firstName':          firstName.trim(),
+      'middleName':         middleName.trim(),
+      'lastName':           lastName.trim(),
+      'lastReviewDate':     FieldValue.serverTimestamp(),
+      'lastModifiedBy':     user.uid,
       'lastModifiedByName': userName,
-      'updatedAt': FieldValue.serverTimestamp(),
+      'updatedAt':          FieldValue.serverTimestamp(),
       ...flat,
     }, SetOptions(merge: true));
   }
@@ -186,18 +216,14 @@ class FirestoreService {
   /// SOFT DELETE USER: marks all user's records as deleted
   Future<void> softDeleteUser(String uid) async {
     final userDoc = _firestore.collection('users').doc(uid);
-
-    // Soft delete all documents in "homepageData" subcollection
     final snapshot = await userDoc.collection('homepageData').get();
     for (var doc in snapshot.docs) {
       await doc.reference.update({'isDeleted': true});
     }
-
-    // Optionally, mark the user document itself as deleted
     await userDoc.set({'isDeleted': true}, SetOptions(merge: true));
   }
 
-  /// CHANGE PASSWORD - Using sign-out/sign-in method (more reliable)
+  /// CHANGE PASSWORD
   Future<bool> changePassword({
     required String currentPassword,
     required String newPassword,
@@ -226,12 +252,10 @@ class FirestoreService {
       final email = user.email!;
       print('User email: $email');
       
-      // Step 1: Sign out
       print('Step 1: Signing out...');
       await _auth.signOut();
       print('Signed out successfully');
       
-      // Step 2: Sign back in with current password to verify it's correct
       print('Step 2: Signing in with current password...');
       UserCredential userCred;
       
@@ -251,7 +275,6 @@ class FirestoreService {
         rethrow;
       }
       
-      // Step 3: Update password
       print('Step 3: Updating password...');
       try {
         await userCred.user!.updatePassword(newPassword).timeout(
@@ -348,153 +371,143 @@ class FirestoreService {
 
 
   /// CHANGE USERNAME
-/// Updates username in both users and usernames collections
-Future<bool> changeUsername({
-  required String newUsername,
-  required BuildContext context,
-}) async {
-  print('========================================');
-  print('FirestoreService.changeUsername called');
-  print('========================================');
-  
-  try {
-    final user = _auth.currentUser;
+  Future<bool> changeUsername({
+    required String newUsername,
+    required BuildContext context,
+  }) async {
+    print('========================================');
+    print('FirestoreService.changeUsername called');
+    print('========================================');
     
-    if (user == null) {
-      print('No user logged in');
+    try {
+      final user = _auth.currentUser;
+      
+      if (user == null) {
+        print('No user logged in');
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("No user logged in"),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return false;
+      }
+
+      final uid = user.uid;
+      print('User UID: $uid');
+      print('New username: $newUsername');
+      
+      print('Step 1: Checking username availability...');
+      final usernameDoc = await _firestore
+          .collection('usernames')
+          .doc(newUsername.toLowerCase())
+          .get();
+      
+      if (usernameDoc.exists) {
+        print('Username already taken');
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Username is already taken"),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return false;
+      }
+      print('Username is available');
+      
+      print('Step 2: Getting current username...');
+      final userDoc = await _firestore
+          .collection('users')
+          .doc(uid)
+          .get();
+      
+      final currentUsername = userDoc.data()?['username'] as String?;
+      print('Current username: $currentUsername');
+      
+      print('Step 3: Updating username in Firestore...');
+      final batch = _firestore.batch();
+      
+      batch.set(
+        _firestore.collection('users').doc(uid),
+        {
+          'username': newUsername,
+          'updatedAt': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
+
+      batch.set(
+        _firestore.collection('usernames').doc(newUsername.toLowerCase()),
+        {
+          'email': user.email,
+          'uid': uid,
+          'createdAt': FieldValue.serverTimestamp(),
+        },
+      );
+      
+      if (currentUsername != null && currentUsername.isNotEmpty) {
+        batch.delete(
+          _firestore.collection('usernames').doc(currentUsername.toLowerCase()),
+        );
+      }
+      
+      await batch.commit();
+      print('Username updated successfully');
+      
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text("No user logged in"),
-            backgroundColor: Colors.red,
+            content: Text("Username updated successfully!"),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
           ),
         );
       }
-      return false;
-    }
-
-    final uid = user.uid;
-    print('User UID: $uid');
-    print('New username: $newUsername');
-    
-    // Step 1: Check if new username is available
-    print('Step 1: Checking username availability...');
-    final usernameDoc = await _firestore
-        .collection('usernames')
-        .doc(newUsername.toLowerCase())
-        .get();
-    
-    if (usernameDoc.exists) {
-      print('Username already taken');
+      
+      return true;
+      
+    } on FirebaseException catch (e) {
+      print('========================================');
+      print('FirebaseException: ${e.code}');
+      print('Message: ${e.message}');
+      print('========================================');
+      
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Username is already taken"),
+          SnackBar(
+            content: Text("Error: ${e.message}"),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
           ),
         );
       }
+      
+      return false;
+      
+    } catch (e) {
+      print('========================================');
+      print('General exception: $e');
+      print('========================================');
+      
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Error: $e"),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+      
       return false;
     }
-    print('Username is available');
-    
-    // Step 2: Get current username from user document
-    print('Step 2: Getting current username...');
-    final userDoc = await _firestore
-        .collection('users')
-        .doc(uid)
-        .get();
-    
-    final currentUsername = userDoc.data()?['username'] as String?;
-    print('Current username: $currentUsername');
-    
-    // Step 3: Update using batch write for atomicity
-    print('Step 3: Updating username in Firestore...');
-    final batch = _firestore.batch();
-    
-    // Update username in users collection
-  batch.set(
-  _firestore.collection('users').doc(uid),
-  {
-    'username': newUsername,
-    'updatedAt': FieldValue.serverTimestamp(),
-  },
-  SetOptions(merge: true),
-);
-
-    
-    // Add new username mapping
-    batch.set(
-      _firestore.collection('usernames').doc(newUsername.toLowerCase()),
-      {
-        'email': user.email,
-        'uid': uid,
-        'createdAt': FieldValue.serverTimestamp(),
-      },
-    );
-    
-    // Delete old username mapping if it exists
-    if (currentUsername != null && currentUsername.isNotEmpty) {
-      batch.delete(
-        _firestore.collection('usernames').doc(currentUsername.toLowerCase()),
-      );
-    }
-    
-    await batch.commit();
-    print('Username updated successfully');
-    
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Username updated successfully!"),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 2),
-        ),
-      );
-    }
-    
-    return true;
-    
-  } on FirebaseException catch (e) {
-    print('========================================');
-    print('FirebaseException: ${e.code}');
-    print('Message: ${e.message}');
-    print('========================================');
-    
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Error: ${e.message}"),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 4),
-        ),
-      );
-    }
-    
-    return false;
-    
-  } catch (e) {
-    print('========================================');
-    print('General exception: $e');
-    print('========================================');
-    
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Error: $e"),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 4),
-        ),
-      );
-    }
-    
-    return false;
   }
-}
 
-/// CHANGE EMAIL
-/// Updates email in Firebase Auth, Firestore, and requires re-authentication
- /// CHANGE EMAIL - FIXED VERSION
+  /// CHANGE EMAIL
   Future<bool> changeEmail({
     required String currentPassword,
     required String newEmail,
@@ -517,7 +530,6 @@ Future<bool> changeUsername({
       final uid = user.uid;
       final oldEmail = user.email!;
       
-      // Validate email
       if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(newEmail)) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -536,11 +548,9 @@ Future<bool> changeUsername({
         return false;
       }
       
-      // Get username before signing out
       final userDoc = await _firestore.collection('users').doc(uid).get();
       final username = userDoc.data()?['username'] as String?;
       
-      // Sign out and re-authenticate
       await _auth.signOut();
       
       UserCredential userCred = await _auth.signInWithEmailAndPassword(
@@ -548,15 +558,12 @@ Future<bool> changeUsername({
         password: currentPassword,
       ).timeout(const Duration(seconds: 15));
       
-      // Update email in Firebase Auth
       await userCred.user!.verifyBeforeUpdateEmail(newEmail).timeout(
-  const Duration(seconds: 15),
-);
+        const Duration(seconds: 15),
+      );
 
-      // Send verification email
       await userCred.user!.sendEmailVerification();
       
-      // Update Firestore
       final batch = _firestore.batch();
       
       batch.update(
@@ -626,7 +633,7 @@ Future<bool> changeUsername({
     }
   }
 
-/// UPDATE DISPLAY NAME
+  /// UPDATE DISPLAY NAME
   Future<bool> updateDisplayName({
     required String displayName,
     required BuildContext context,
@@ -662,540 +669,499 @@ Future<bool> changeUsername({
     }
   }
 
-
- /// UPDATE PROFILE PICTURE - Upload to Firebase Storage
-
-Future<String> updateProfilePicture(
-  String uid,
-  String imagePath,
-) async {
-  try {
-    final file = File(imagePath);
-
-    final bytes = await file.readAsBytes();
-
-    String base64Image = base64Encode(bytes);
-
-    await _firestore.collection('users').doc(uid).update({
-      'profilePicture': base64Image,
-    });
-
-    return base64Image;
-  } catch (e) {
-    print("Upload error: $e");
-    rethrow;
+  /// UPDATE PROFILE PICTURE
+  Future<String> updateProfilePicture(
+    String uid,
+    String imagePath,
+  ) async {
+    try {
+      final file = File(imagePath);
+      final bytes = await file.readAsBytes();
+      String base64Image = base64Encode(bytes);
+      await _firestore.collection('users').doc(uid).update({
+        'profilePicture': base64Image,
+      });
+      return base64Image;
+    } catch (e) {
+      print("Upload error: $e");
+      rethrow;
+    }
   }
-}
 
-
-Future<Map<String, dynamic>?> getUserProfile() async {
-  try {
-    final user = _auth.currentUser;
-    
-    if (user == null) {
-      print('No user logged in');
+  Future<Map<String, dynamic>?> getUserProfile() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        print('No user logged in');
+        return null;
+      }
+      final uid = user.uid;
+      final doc = await _firestore.collection('users').doc(uid).get();
+      if (doc.exists) {
+        return doc.data();
+      }
+      return null;
+    } catch (e) {
+      print('Error getting user profile: $e');
       return null;
     }
-
-    final uid = user.uid;
-    final doc = await _firestore.collection('users').doc(uid).get();
-    
-    if (doc.exists) {
-      return doc.data();
-    }
-    
-    return null;
-    
-  } catch (e) {
-    print('Error getting user profile: $e');
-    return null;
-  }
-}
-
-Future<int> getTodayScreenedCount() async {
-  final user = _auth.currentUser;
-  if (user == null) return 0;
-
-  final now = DateTime.now();
-  final startOfDay = DateTime(now.year, now.month, now.day);
-  final endOfDay = startOfDay.add(const Duration(days: 1));
-
-  final snapshot = await _firestore
-      .collection('users')
-      .doc(user.uid)
-      .collection('homepageData')
-      .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
-      .where('createdAt', isLessThan: Timestamp.fromDate(endOfDay))
-      .get();
-
-  return snapshot.docs.length;
-}
-
-
-/// Save patient data to barangay-specific patient list
-Future<String> savePatientToBarangay(Map<String, dynamic> patientData) async {
-  final user = _auth.currentUser;
-  if (user == null) {
-    throw FirebaseAuthException(
-      code: 'no-current-user',
-      message: 'No authenticated user found',
-    );
   }
 
-  print('💾 Saving patient to barangay...');
-
-   print('💾 Saving patient to barangay...');
-  
-  // ── ADD THIS BLOCK ──────────────────────────────────────────
-  final userDocDebug = await _firestore.collection('users').doc(user.uid).get();
-  print('🔍 User UID: ${user.uid}');
-  print('🔍 User doc exists: ${userDocDebug.exists}');
-  print('🔍 User doc fields: ${userDocDebug.data()?.keys.toList()}');
-  print('🔍 barangayId: ${userDocDebug.data()?['barangayId']}');
-  // ── END ADD ─────────────────────────────────────────────────
-  
-  // Get user's barangay
-  final userDoc = await _firestore.collection('users').doc(user.uid).get();
-  final barangayId = userDoc.data()?['barangayId'] as String?;
-
-  if (barangayId == null || barangayId.isEmpty) {
-    print('❌ User has no barangay assigned');
-    throw Exception('User has no barangay assigned');
-  }
-
-  print('✅ User barangayId: $barangayId');
-
-  // Save patient to barangay's patients collection
-  final patientRef = _firestore
-      .collection('barangays')
-      .doc(barangayId)
-      .collection('patients')
-      .doc(); // auto-generate ID
-
-  final payload = {
-    ...patientData,
-    'createdAt': FieldValue.serverTimestamp(),
-    'createdBy': user.uid,
-    'createdByName': userDoc.data()?['fullName'] ?? userDoc.data()?['username'] ?? 'Unknown',
-    'barangayId': barangayId,
-    'barangay': userDoc.data()?['barangay'] ?? '',
-    'isDeleted': false,  // ← REQUIRED by Firestore rules
-    'lastModifiedBy': user.uid,  // ← Add this for future updates
-    'lastModifiedAt': FieldValue.serverTimestamp(),
-  };
-
-  await patientRef.set(payload);
-  print('✅ Patient saved with ID: ${patientRef.id}');
-  
-  return patientRef.id;
-}
-
-
-/// Get all patients from user's barangay
-Future<List<Map<String, dynamic>>> getPatientsFromBarangay() async {
-  final user = _auth.currentUser;
-  if (user == null) {
-    print('❌ No user logged in');
-    return [];
-  }
-
-  try {
-    print('📋 Getting patients from barangay...');
-    
-    // Get user's barangay
-    final userDoc = await _firestore.collection('users').doc(user.uid).get();
-    final barangayId = userDoc.data()?['barangayId'] as String?;
-
-    if (barangayId == null || barangayId.isEmpty) {
-      print('❌ User has no barangayId');
-      return [];
-    }
-
-    print('✅ User barangayId: $barangayId');
-
-    // Get all patients from this barangay (excluding deleted ones)
-    final snapshot = await _firestore
-        .collection('barangays')
-        .doc(barangayId)
-        .collection('patients')
-        .where('isDeleted', isEqualTo: false)  // ← Filter out deleted patients
-        .orderBy('createdAt', descending: true)
-        .get();
-
-    print('✅ Found ${snapshot.docs.length} patients');
-
-    return snapshot.docs.map((doc) {
-      final data = doc.data();
-      data['id'] = doc.id;
-      return data;
-    }).toList();
-    
-  } catch (e) {
-    print('❌ Error getting patients from barangay: $e');
-    return [];
-  }
-}
-
-/// Get archived patients (5+ years) from user's barangay.
-/// Fetches non-deleted patients and filters for isArchived == true.
-Future<List<Map<String, dynamic>>> getArchivedPatientsFromBarangay() async {
-  final patients = await getPatientsFromBarangay();
-  return patients.where((p) => p['isArchived'] == true).toList();
-}
-
-/// Get today's screened count from barangay
-Future<int> getTodayScreenedCountFromBarangay() async {
-  final user = _auth.currentUser;
-  if (user == null) {
-    print('❌ No user logged in');
-    return 0;
-  }
-
-  try {
-    final userDoc = await _firestore.collection('users').doc(user.uid).get();
-    final barangayId = userDoc.data()?['barangayId'] as String?;
-
-    if (barangayId == null || barangayId.isEmpty) {
-      print('❌ No barangayId found');
-      return 0;
-    }
-
-    print('📊 Counting today\'s screenings for barangayId: $barangayId');
+  Future<int> getTodayScreenedCount() async {
+    final user = _auth.currentUser;
+    if (user == null) return 0;
 
     final now = DateTime.now();
     final startOfDay = DateTime(now.year, now.month, now.day);
     final endOfDay = startOfDay.add(const Duration(days: 1));
 
     final snapshot = await _firestore
-        .collection('barangays')
-        .doc(barangayId)
-        .collection('patients')
-        .where('isDeleted', isEqualTo: false)  // ← Only count non-deleted
+        .collection('users')
+        .doc(user.uid)
+        .collection('homepageData')
         .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
         .where('createdAt', isLessThan: Timestamp.fromDate(endOfDay))
         .get();
 
-    print('✅ Today\'s count: ${snapshot.docs.length}');
     return snapshot.docs.length;
+  }
+
+  /// Save patient data to barangay-specific patient list
+  Future<String> savePatientToBarangay(Map<String, dynamic> patientData) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw FirebaseAuthException(
+        code: 'no-current-user',
+        message: 'No authenticated user found',
+      );
+    }
+
+    print('💾 Saving patient to barangay...');
+  
+    final userDocDebug = await _firestore.collection('users').doc(user.uid).get();
+    print('🔍 User UID: ${user.uid}');
+    print('🔍 User doc exists: ${userDocDebug.exists}');
+    print('🔍 User doc fields: ${userDocDebug.data()?.keys.toList()}');
+    print('🔍 barangayId: ${userDocDebug.data()?['barangayId']}');
+  
+    final userDoc = await _firestore.collection('users').doc(user.uid).get();
+    final barangayId = userDoc.data()?['barangayId'] as String?;
+
+    if (barangayId == null || barangayId.isEmpty) {
+      print('❌ User has no barangay assigned');
+      throw Exception('User has no barangay assigned');
+    }
+
+    print('✅ User barangayId: $barangayId');
+
+    final patientRef = _firestore
+        .collection('barangays')
+        .doc(barangayId)
+        .collection('patients')
+        .doc();
+
+    final payload = {
+      ...patientData,
+      'createdAt': FieldValue.serverTimestamp(),
+      'createdBy': user.uid,
+      'createdByName': userDoc.data()?['fullName'] ?? userDoc.data()?['username'] ?? 'Unknown',
+      'barangayId': barangayId,
+      'barangay': userDoc.data()?['barangay'] ?? '',
+      'isDeleted': false,
+      'lastModifiedBy': user.uid,
+      'lastModifiedAt': FieldValue.serverTimestamp(),
+    };
+
+    await patientRef.set(payload);
+    print('✅ Patient saved with ID: ${patientRef.id}');
     
-  } catch (e) {
-    print('❌ Error counting today\'s screenings: $e');
-    return 0;
-  }
-}
-
-// ============================================================================
-// PATIENT ASSESSMENTS - Barangay shared
-// ============================================================================
-
-/// Save assessment to barangay patient's assessments subcollection
-Future<String> saveAssessmentToBarangayPatient({
-  required String patientId,
-  required Map<String, dynamic> assessmentData,
-}) async {
-  final user = _auth.currentUser;
-  if (user == null) {
-    throw FirebaseAuthException(
-      code: 'no-current-user',
-      message: 'No authenticated user found',
-    );
+    return patientRef.id;
   }
 
-  // Get user's barangay
-  final userDoc = await _firestore.collection('users').doc(user.uid).get();
-  final barangayId = userDoc.data()?['barangayId'] as String?;
-
-  if (barangayId == null || barangayId.isEmpty) {
-    throw Exception('User has no barangay assigned');
-  }
-
-  // Create assessment document
-  final assessmentRef = _firestore
-      .collection('barangays')
-      .doc(barangayId)
-      .collection('patients')
-      .doc(patientId)
-      .collection('assessments')
-      .doc(); // auto-generate ID
-
-  final payload = {
-    ...assessmentData,
-    'createdAt': FieldValue.serverTimestamp(),
-    'createdBy': user.uid,
-    'createdByName': userDoc.data()?['fullName'] ?? userDoc.data()?['username'] ?? 'Unknown',
-    'barangayId': barangayId,
-  };
-
-  await assessmentRef.set(payload);
-  return assessmentRef.id;
-}
-
-/// Get all assessments for a specific patient
-Future<List<Map<String, dynamic>>> getAssessmentsForBarangayPatient(String patientId) async {
-  final user = _auth.currentUser;
-  if (user == null) return [];
-
-  // Get user's barangay
-  final userDoc = await _firestore.collection('users').doc(user.uid).get();
-  final barangayId = userDoc.data()?['barangayId'] as String?;
-
-  if (barangayId == null) return [];
-
-  // Get all assessments for this patient
-  final snapshot = await _firestore
-      .collection('barangays')
-      .doc(barangayId)
-      .collection('patients')
-      .doc(patientId)
-      .collection('assessments')
-      .orderBy('createdAt', descending: false) // ascending for chronological order
-      .get();
-
-  return snapshot.docs.map((doc) {
-    final data = doc.data();
-    data['id'] = doc.id;
-    return data;
-  }).toList();
-}
-
-/// Update an existing assessment
-Future<void> updateAssessmentInBarangayPatient({
-  required String patientId,
-  required String assessmentId,
-  required Map<String, dynamic> updatedData,
-}) async {
-  final user = _auth.currentUser;
-  if (user == null) {
-    throw FirebaseAuthException(
-      code: 'no-current-user',
-      message: 'No authenticated user found',
-    );
-  }
-
-  // Get user's barangay
-  final userDoc = await _firestore.collection('users').doc(user.uid).get();
-  final barangayId = userDoc.data()?['barangayId'] as String?;
-
-  if (barangayId == null || barangayId.isEmpty) {
-    throw Exception('User has no barangay assigned');
-  }
-
-  // Update the assessment record
-  await _firestore
-      .collection('barangays')
-      .doc(barangayId)
-      .collection('patients')
-      .doc(patientId)
-      .collection('assessments')
-      .doc(assessmentId)
-      .update({
-    ...updatedData,
-    'updatedAt': FieldValue.serverTimestamp(),
-    'lastModifiedBy': user.uid,
-    'lastModifiedByName': userDoc.data()?['fullName'] ?? userDoc.data()?['username'] ?? 'Unknown',
-  });
-}
-
-// Add this method to your existing FirestoreService class
-
-// In firestore_service.dart, add this method:
-// ============================================================================
-// ADD THIS METHOD TO YOUR FirestoreService class
-// Replace the existing getRecentAssessments() method with this one
-// ============================================================================
-
-Future<List<Map<String, dynamic>>> getRecentAssessments({int limit = 50}) async {
-  try {
-    print('📋 getRecentAssessments() called');
-    
+  /// Get all patients from user's barangay
+  Future<List<Map<String, dynamic>>> getPatientsFromBarangay() async {
     final user = _auth.currentUser;
     if (user == null) {
       print('❌ No user logged in');
       return [];
     }
 
-    print('✅ User UID: ${user.uid}');
-    
-    // Get user's barangay
-    final userDoc = await _firestore.collection('users').doc(user.uid).get();
-    
-    if (!userDoc.exists) {
-      print('❌ User document does not exist');
-      return [];
-    }
-    
-    final userData = userDoc.data()!;
-    print('📄 User data: $userData');
-    
-    // Use 'barangayId' field (NOT 'barangay')
-    final barangayId = userData['barangayId'] as String?;
-
-    if (barangayId == null || barangayId.isEmpty) {
-      print('❌ User has no barangayId assigned');
-      print('   Available fields: ${userData.keys.toList()}');
-      return [];
-    }
-
-    print('✅ User barangayId: $barangayId');
-
-    // Get recent patients from the barangay's patient list
-    final querySnapshot = await _firestore
-        .collection('barangays')
-        .doc(barangayId)
-        .collection('patients')
-        .where('isDeleted', isEqualTo: false)  // ← Filter out deleted patients
-        .orderBy('createdAt', descending: true)  // ← Use 'createdAt' NOT 'timestamp'
-        .limit(limit)
-        .get();
-
-    print('✅ Found ${querySnapshot.docs.length} patient records');
-
-    final notifications = querySnapshot.docs.map((doc) {
-      final data = doc.data();
+    try {
+      print('📋 Getting patients from barangay...');
       
-      // Debug: Print first record to see structure
-      if (doc == querySnapshot.docs.first) {
-        print('📝 Sample patient data structure:');
-        print('   Has demographic: ${data.containsKey('demographic')}');
-        print('   Has createdAt: ${data.containsKey('createdAt')}');
-        print('   Has timestamp: ${data.containsKey('timestamp')}');
-        print('   Keys: ${data.keys.toList()}');
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+      final barangayId = userDoc.data()?['barangayId'] as String?;
+
+      if (barangayId == null || barangayId.isEmpty) {
+        print('❌ User has no barangayId');
+        return [];
       }
+
+      print('✅ User barangayId: $barangayId');
+
+      final snapshot = await _firestore
+          .collection('barangays')
+          .doc(barangayId)
+          .collection('patients')
+          .where('isDeleted', isEqualTo: false)
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      print('✅ Found ${snapshot.docs.length} patients');
+
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        data['id'] = doc.id;
+        return data;
+      }).toList();
       
-      return {
-        'id': doc.id,
-        'firstName': data['demographic']?['firstName'] ?? '',
-        'middleName': data['demographic']?['middleName'] ?? '',
-        'lastName': data['demographic']?['lastName'] ?? '',
-        'age': data['demographic']?['age'] ?? '',
-        'sex': data['demographic']?['sex'] ?? '',
-        'timestamp': data['createdAt'],  // ← Use 'createdAt' as the timestamp
-        'synced': true,
-      };
-    }).toList();
-    
-    print('✅ Returning ${notifications.length} notifications');
-    return notifications;
-    
-  } catch (e, stackTrace) {
-    print('❌ Error fetching recent assessments: $e');
-    print('Stack trace: $stackTrace');
-    return [];
-  }
-}
-
-/// Create a notification when a patient is added
-Future<void> createPatientNotification({
-  required String barangayId,
-  required String patientId,
-  required Map<String, dynamic> patientData,
-}) async {
-  final user = _auth.currentUser;
-  if (user == null) return;
-
-  try {
-    final userDoc = await _firestore.collection('users').doc(user.uid).get();
-    final creatorName = userDoc.data()?['fullName'] ?? 
-                       userDoc.data()?['username'] ?? 
-                       user.email ?? 
-                       'Unknown';
-
-    // Create notification in barangay's notifications collection
-    await _firestore
-        .collection('barangays')
-        .doc(barangayId)
-        .collection('notifications')
-        .add({
-      'type': 'new_patient',
-      'patientId': patientId,
-      'patientName': '${patientData['demographic']?['firstName'] ?? ''} ${patientData['demographic']?['middleName'] ?? ''} ${patientData['demographic']?['lastName'] ?? ''}',
-      'patientAge': patientData['demographic']?['age'] ?? '',
-      'patientSex': patientData['demographic']?['sex'] ?? '',
-      'createdBy': user.uid,
-      'createdByName': creatorName,
-      'createdAt': FieldValue.serverTimestamp(),
-      'barangayId': barangayId,
-      'read': false,
-    });
-
-    print('✅ Notification created for barangay: $barangayId');
-  } catch (e) {
-    print('❌ Error creating notification: $e');
-  }
-}
-
-/// Get notifications for the user's barangay
-Future<List<Map<String, dynamic>>> getBarangayNotifications({int limit = 50}) async {
-  final user = _auth.currentUser;
-  if (user == null) {
-    print('❌ No user logged in');
-    return [];
+    } catch (e) {
+      print('❌ Error getting patients from barangay: $e');
+      return [];
+    }
   }
 
-  try {
-    // Get user's barangay
+  /// Get archived patients (5+ years) from user's barangay.
+  Future<List<Map<String, dynamic>>> getArchivedPatientsFromBarangay() async {
+    final patients = await getPatientsFromBarangay();
+    return patients.where((p) => p['isArchived'] == true).toList();
+  }
+
+  /// Get today's screened count from barangay
+  Future<int> getTodayScreenedCountFromBarangay() async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      print('❌ No user logged in');
+      return 0;
+    }
+
+    try {
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+      final barangayId = userDoc.data()?['barangayId'] as String?;
+
+      if (barangayId == null || barangayId.isEmpty) {
+        print('❌ No barangayId found');
+        return 0;
+      }
+
+      print('📊 Counting today\'s screenings for barangayId: $barangayId');
+
+      final now = DateTime.now();
+      final startOfDay = DateTime(now.year, now.month, now.day);
+      final endOfDay = startOfDay.add(const Duration(days: 1));
+
+      final snapshot = await _firestore
+          .collection('barangays')
+          .doc(barangayId)
+          .collection('patients')
+          .where('isDeleted', isEqualTo: false)
+          .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
+          .where('createdAt', isLessThan: Timestamp.fromDate(endOfDay))
+          .get();
+
+      print('✅ Today\'s count: ${snapshot.docs.length}');
+      return snapshot.docs.length;
+      
+    } catch (e) {
+      print('❌ Error counting today\'s screenings: $e');
+      return 0;
+    }
+  }
+
+  // ── PATIENT ASSESSMENTS - Barangay shared ──────────────────────────────────
+
+  /// Save assessment to barangay patient's assessments subcollection
+  Future<String> saveAssessmentToBarangayPatient({
+    required String patientId,
+    required Map<String, dynamic> assessmentData,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw FirebaseAuthException(
+        code: 'no-current-user',
+        message: 'No authenticated user found',
+      );
+    }
+
     final userDoc = await _firestore.collection('users').doc(user.uid).get();
     final barangayId = userDoc.data()?['barangayId'] as String?;
 
     if (barangayId == null || barangayId.isEmpty) {
-      print('❌ User has no barangayId');
-      return [];
+      throw Exception('User has no barangay assigned');
     }
 
-    print('📋 Getting notifications for barangay: $barangayId');
+    final assessmentRef = _firestore
+        .collection('barangays')
+        .doc(barangayId)
+        .collection('patients')
+        .doc(patientId)
+        .collection('assessments')
+        .doc();
 
-    // Get notifications from barangay
+    final payload = {
+      ...assessmentData,
+      'createdAt': FieldValue.serverTimestamp(),
+      'createdBy': user.uid,
+      'createdByName': userDoc.data()?['fullName'] ?? userDoc.data()?['username'] ?? 'Unknown',
+      'barangayId': barangayId,
+    };
+
+    await assessmentRef.set(payload);
+    return assessmentRef.id;
+  }
+
+  /// Get all assessments for a specific patient
+  Future<List<Map<String, dynamic>>> getAssessmentsForBarangayPatient(String patientId) async {
+    final user = _auth.currentUser;
+    if (user == null) return [];
+
+    final userDoc = await _firestore.collection('users').doc(user.uid).get();
+    final barangayId = userDoc.data()?['barangayId'] as String?;
+
+    if (barangayId == null) return [];
+
     final snapshot = await _firestore
         .collection('barangays')
         .doc(barangayId)
-        .collection('notifications')
-        .orderBy('createdAt', descending: true)
-        .limit(limit)
+        .collection('patients')
+        .doc(patientId)
+        .collection('assessments')
+        .orderBy('createdAt', descending: false)
         .get();
-
-    print('✅ Found ${snapshot.docs.length} notifications');
 
     return snapshot.docs.map((doc) {
       final data = doc.data();
       data['id'] = doc.id;
       return data;
     }).toList();
-  } catch (e) {
-    print('❌ Error getting notifications: $e');
-    return [];
   }
-}
 
-/// Mark notification as read
-Future<void> markNotificationAsRead(String notificationId) async {
-  final user = _auth.currentUser;
-  if (user == null) return;
+  /// Update an existing assessment
+  Future<void> updateAssessmentInBarangayPatient({
+    required String patientId,
+    required String assessmentId,
+    required Map<String, dynamic> updatedData,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw FirebaseAuthException(
+        code: 'no-current-user',
+        message: 'No authenticated user found',
+      );
+    }
 
-  try {
     final userDoc = await _firestore.collection('users').doc(user.uid).get();
     final barangayId = userDoc.data()?['barangayId'] as String?;
 
-    if (barangayId == null) return;
+    if (barangayId == null || barangayId.isEmpty) {
+      throw Exception('User has no barangay assigned');
+    }
 
     await _firestore
         .collection('barangays')
         .doc(barangayId)
-        .collection('notifications')
-        .doc(notificationId)
-        .update({'read': true});
-  } catch (e) {
-    print('❌ Error marking notification as read: $e');
+        .collection('patients')
+        .doc(patientId)
+        .collection('assessments')
+        .doc(assessmentId)
+        .update({
+      ...updatedData,
+      'updatedAt': FieldValue.serverTimestamp(),
+      'lastModifiedBy': user.uid,
+      'lastModifiedByName': userDoc.data()?['fullName'] ?? userDoc.data()?['username'] ?? 'Unknown',
+    });
   }
-}
 
+  /// Get recent assessments / patient notifications
+  /// ── UPDATED: now includes visitDate and visitTime fields ──
+  Future<List<Map<String, dynamic>>> getRecentAssessments({int limit = 50}) async {
+    try {
+      print('📋 getRecentAssessments() called');
+      
+      final user = _auth.currentUser;
+      if (user == null) {
+        print('❌ No user logged in');
+        return [];
+      }
 
+      print('✅ User UID: ${user.uid}');
+      
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+      
+      if (!userDoc.exists) {
+        print('❌ User document does not exist');
+        return [];
+      }
+      
+      final userData = userDoc.data()!;
+      print('📄 User data: $userData');
+      
+      final barangayId = userData['barangayId'] as String?;
 
-// ============================================================================
-// ADD THESE METHODS TO YOUR FirestoreService class
-// Paste them just before the last closing } of the class
-// ============================================================================
+      if (barangayId == null || barangayId.isEmpty) {
+        print('❌ User has no barangayId assigned');
+        print('   Available fields: ${userData.keys.toList()}');
+        return [];
+      }
 
-  /// Get upcoming calendar events for the user's barangay (today and future)
+      print('✅ User barangayId: $barangayId');
+
+      final querySnapshot = await _firestore
+          .collection('barangays')
+          .doc(barangayId)
+          .collection('patients')
+          .where('isDeleted', isEqualTo: false)
+          .orderBy('createdAt', descending: true)
+          .limit(limit)
+          .get();
+
+      print('✅ Found ${querySnapshot.docs.length} patient records');
+
+      final notifications = querySnapshot.docs.map((doc) {
+        final data = doc.data();
+        
+        if (doc == querySnapshot.docs.first) {
+          print('📝 Sample patient data structure:');
+          print('   Has demographic: ${data.containsKey('demographic')}');
+          print('   Has createdAt: ${data.containsKey('createdAt')}');
+          print('   Has visitDate: ${data.containsKey('visitDate')}');
+          print('   Has visitTime: ${data.containsKey('visitTime')}');
+          print('   Keys: ${data.keys.toList()}');
+        }
+        
+        return {
+          'id':         doc.id,
+          'firstName':  data['demographic']?['firstName']  ?? '',
+          'middleName': data['demographic']?['middleName'] ?? '',
+          'lastName':   data['demographic']?['lastName']   ?? '',
+          'age':        data['demographic']?['age']        ?? '',
+          'sex':        data['demographic']?['sex']        ?? '',
+          'timestamp':  data['createdAt'],
+          // ── NEW: visit date & time ────────────────────────────────
+          'visitDate':  data['visitDate'] ?? '',
+          'visitTime':  data['visitTime'] ?? '',
+          // ─────────────────────────────────────────────────────────
+          'synced':     true,
+        };
+      }).toList();
+      
+      print('✅ Returning ${notifications.length} notifications');
+      return notifications;
+      
+    } catch (e, stackTrace) {
+      print('❌ Error fetching recent assessments: $e');
+      print('Stack trace: $stackTrace');
+      return [];
+    }
+  }
+
+  /// Create a notification when a patient is added
+  /// ── UPDATED: now includes visitDate and visitTime in the notification ──
+  Future<void> createPatientNotification({
+    required String barangayId,
+    required String patientId,
+    required Map<String, dynamic> patientData,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    try {
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+      final creatorName = userDoc.data()?['fullName'] ?? 
+                         userDoc.data()?['username'] ?? 
+                         user.email ?? 
+                         'Unknown';
+
+      await _firestore
+          .collection('barangays')
+          .doc(barangayId)
+          .collection('notifications')
+          .add({
+        'type':         'new_patient',
+        'patientId':    patientId,
+        'patientName':  '${patientData['demographic']?['firstName'] ?? ''} ${patientData['demographic']?['middleName'] ?? ''} ${patientData['demographic']?['lastName'] ?? ''}',
+        'patientAge':   patientData['demographic']?['age'] ?? '',
+        'patientSex':   patientData['demographic']?['sex'] ?? '',
+        // ── NEW: visit date & time ────────────────────────────────
+        'visitDate':    patientData['visitDate'] ?? '',
+        'visitTime':    patientData['visitTime'] ?? '',
+        // ─────────────────────────────────────────────────────────
+        'createdBy':     user.uid,
+        'createdByName': creatorName,
+        'createdAt':     FieldValue.serverTimestamp(),
+        'barangayId':    barangayId,
+        'read':          false,
+      });
+
+      print('✅ Notification created for barangay: $barangayId');
+    } catch (e) {
+      print('❌ Error creating notification: $e');
+    }
+  }
+
+  /// Get notifications for the user's barangay
+  Future<List<Map<String, dynamic>>> getBarangayNotifications({int limit = 50}) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      print('❌ No user logged in');
+      return [];
+    }
+
+    try {
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+      final barangayId = userDoc.data()?['barangayId'] as String?;
+
+      if (barangayId == null || barangayId.isEmpty) {
+        print('❌ User has no barangayId');
+        return [];
+      }
+
+      print('📋 Getting notifications for barangay: $barangayId');
+
+      final snapshot = await _firestore
+          .collection('barangays')
+          .doc(barangayId)
+          .collection('notifications')
+          .orderBy('createdAt', descending: true)
+          .limit(limit)
+          .get();
+
+      print('✅ Found ${snapshot.docs.length} notifications');
+
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        data['id'] = doc.id;
+        return data;
+      }).toList();
+    } catch (e) {
+      print('❌ Error getting notifications: $e');
+      return [];
+    }
+  }
+
+  /// Mark notification as read
+  Future<void> markNotificationAsRead(String notificationId) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    try {
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+      final barangayId = userDoc.data()?['barangayId'] as String?;
+
+      if (barangayId == null) return;
+
+      await _firestore
+          .collection('barangays')
+          .doc(barangayId)
+          .collection('notifications')
+          .doc(notificationId)
+          .update({'read': true});
+    } catch (e) {
+      print('❌ Error marking notification as read: $e');
+    }
+  }
+
+  /// Get upcoming calendar events for the user's barangay
   Stream<List<Map<String, dynamic>>> getUpcomingEventsStream({int limit = 3}) async* {
     final user = _auth.currentUser;
     if (user == null) {
@@ -1307,14 +1273,7 @@ Future<void> markNotificationAsRead(String notificationId) async {
         .delete();
   }
 
-
-  // ============================================================================
-// ADD THESE 2 METHODS TO YOUR FirestoreService class
-// Paste just before the last closing } of the class
-// ============================================================================
-
   /// Called when a calendar event is saved — creates a notification entry
-  /// in barangays/{barangayId}/calendarNotifications
   Future<void> createCalendarEventNotification({
     required String barangayId,
     required String eventId,
@@ -1336,18 +1295,18 @@ Future<void> markNotificationAsRead(String notificationId) async {
           .doc(barangayId)
           .collection('calendarNotifications')
           .add({
-        'type': 'new_event',
-        'eventId': eventId,
-        'eventTitle': eventData['title'] ?? '',
-        'eventTime': eventData['time'] ?? '',
-        'eventDate': eventData['date'],
+        'type':             'new_event',
+        'eventId':          eventId,
+        'eventTitle':       eventData['title'] ?? '',
+        'eventTime':        eventData['time'] ?? '',
+        'eventDate':        eventData['date'],
         'eventDescription': eventData['description'] ?? '',
-        'colorValue': eventData['colorValue'] ?? 0xFFF5A962,
-        'createdBy': user.uid,
-        'createdByName': creatorName,
-        'createdAt': FieldValue.serverTimestamp(),
-        'barangayId': barangayId,
-        'read': false,
+        'colorValue':       eventData['colorValue'] ?? 0xFFF5A962,
+        'createdBy':        user.uid,
+        'createdByName':    creatorName,
+        'createdAt':        FieldValue.serverTimestamp(),
+        'barangayId':       barangayId,
+        'read':             false,
       });
 
       print('✅ Calendar event notification created');
@@ -1410,89 +1369,79 @@ Future<void> markNotificationAsRead(String notificationId) async {
     }
   }
 
+  Future<Map<String, int>> getTodayStatusCounts() async {
+    final user = _auth.currentUser;
+    if (user == null) return {};
 
-Future<Map<String, int>> getTodayStatusCounts() async {
-  final user = _auth.currentUser;
-  if (user == null) return {};
+    try {
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+      final barangayId = userDoc.data()?['barangayId'] as String?;
+      if (barangayId == null || barangayId.isEmpty) return {};
 
-  try {
-    final userDoc = await _firestore.collection('users').doc(user.uid).get();
-    final barangayId = userDoc.data()?['barangayId'] as String?;
-    if (barangayId == null || barangayId.isEmpty) return {};
+      final now = DateTime.now();
+      final startOfDay = DateTime(now.year, now.month, now.day);
+      final endOfDay = startOfDay.add(const Duration(days: 1));
 
-    final now = DateTime.now();
-    final startOfDay = DateTime(now.year, now.month, now.day);
-    final endOfDay = startOfDay.add(const Duration(days: 1));
+      final snapshot = await _firestore
+          .collection('barangays')
+          .doc(barangayId)
+          .collection('patients')
+          .where('isDeleted', isEqualTo: false)
+          .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
+          .where('createdAt', isLessThan: Timestamp.fromDate(endOfDay))
+          .get();
 
-    final snapshot = await _firestore
-        .collection('barangays')
-        .doc(barangayId)
-        .collection('patients')
-        .where('isDeleted', isEqualTo: false)
-        .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
-        .where('createdAt', isLessThan: Timestamp.fromDate(endOfDay))
-        .get();
+      final counts = {
+        'Underweight': 0,
+        'Overweight': 0,
+        'Stunted': 0,
+        'At Risk': 0,
+      };
 
-    final counts = {
-      'Underweight': 0,
-      'Overweight': 0,
-      'Stunted': 0,
-      'At Risk': 0,
-    };
+      for (final doc in snapshot.docs) {
+        final anthropometric = doc.data()['anthropometric'] as Map<String, dynamic>?;
+        if (anthropometric == null) continue;
 
-    for (final doc in snapshot.docs) {
-      final anthropometric = doc.data()['anthropometric'] as Map<String, dynamic>?;
-      if (anthropometric == null) continue;
+        final wfa = (anthropometric['weightForAge']    as String? ?? '').toLowerCase();
+        final hfa = (anthropometric['heightForAge']    as String? ?? '').toLowerCase();
+        final wfh = (anthropometric['weightForHeight'] as String? ?? '').toLowerCase();
+        final bmi = (anthropometric['bmi']             as String? ?? '').toLowerCase();
 
-      final wfa  = (anthropometric['weightForAge']    as String? ?? '').toLowerCase();
-      final hfa  = (anthropometric['heightForAge']    as String? ?? '').toLowerCase();
-      final wfh  = (anthropometric['weightForHeight'] as String? ?? '').toLowerCase();
-      final bmi  = (anthropometric['bmi']             as String? ?? '').toLowerCase();
-
-      // ── Underweight (includes severely underweight) ───────────────
-      if (wfa.contains('underweight') || bmi.contains('underweight')) {
-        counts['Underweight'] = counts['Underweight']! + 1;
+        if (wfa.contains('underweight') || bmi.contains('underweight')) {
+          counts['Underweight'] = counts['Underweight']! + 1;
+        }
+        if (wfa.contains('overweight') || wfa.contains('obese') ||
+            wfh.contains('overweight') || wfh.contains('obese') ||
+            bmi.contains('overweight') || bmi.contains('obese')) {
+          counts['Overweight'] = counts['Overweight']! + 1;
+        }
+        if (hfa.contains('stunted')) {
+          counts['Stunted'] = counts['Stunted']! + 1;
+        }
+        if (wfh.contains('wasted') ||
+            wfa.contains('at risk') ||
+            bmi.contains('at risk') ||
+            wfh.contains('at risk')) {
+          counts['At Risk'] = counts['At Risk']! + 1;
+        }
       }
 
-      // ── Overweight / Obese (includes "at risk of overweight") ─────
-      // Matches: "overweight", "obese", "at risk of overweight"
-      if (wfa.contains('overweight') || wfa.contains('obese') ||
-          wfh.contains('overweight') || wfh.contains('obese') ||
-          bmi.contains('overweight') || bmi.contains('obese')) {
-        counts['Overweight'] = counts['Overweight']! + 1;
-      }
+      print('✅ Status counts: $counts');
+      return counts;
 
-      // ── Stunted (includes severely stunted) ───────────────────────
-      if (hfa.contains('stunted')) {
-        counts['Stunted'] = counts['Stunted']! + 1;
-      }
-
-      // ── At Risk (wasted / severe wasting / at risk of overweight) ─
-      if (wfh.contains('wasted') ||
-          wfa.contains('at risk') ||
-          bmi.contains('at risk') ||
-          wfh.contains('at risk')) {
-        counts['At Risk'] = counts['At Risk']! + 1;
-      }
+    } catch (e) {
+      print('❌ Error getting status counts: $e');
+      return {};
     }
-
-    print('✅ Status counts: $counts');
-    return counts;
-
-  } catch (e) {
-    print('❌ Error getting status counts: $e');
-    return {};
   }
-}
 
- double? _extractZScore(String? raw) {
+  double? _extractZScore(String? raw) {
     if (raw == null || raw.isEmpty) return null;
     final match = RegExp(r'^-?\d+(\.\d+)?').firstMatch(raw.trim());
     if (match == null) return null;
     return double.tryParse(match.group(0)!);
   }
 
-  // Extract BMI z-score from strings like "18.2 | 0.10 (Normal)".
   double? _extractBmiZScore(String? raw) {
     if (raw == null || raw.isEmpty) return null;
     final trimmed = raw.trim();
@@ -1505,110 +1454,6 @@ Future<Map<String, int>> getTodayStatusCounts() async {
     return double.tryParse(match.group(0)!);
   }
 
-  /// Overall status counts for ALL non-deleted patients in the user's barangay.
-  /// Uses WHO SD thresholds — same logic as _buildAssessmentRemarks.
- /* Future<Map<String, int>> getStatusCounts() async {
-    final user = _auth.currentUser;
-    if (user == null) return {};
-
-    try {
-      final userDoc =
-          await _firestore.collection('users').doc(user.uid).get();
-      final barangayId = userDoc.data()?['barangayId'] as String?;
-      if (barangayId == null || barangayId.isEmpty) return {};
-
-      debugPrint('📊 getStatusCounts() for barangayId: $barangayId');
-
-      final snapshot = await _firestore
-          .collection('barangays')
-          .doc(barangayId)
-          .collection('patients')
-          .where('isDeleted', isEqualTo: false)
-          .get();
-
-      final counts = {
-        'Underweight': 0,
-        'Overweight/Obese': 0,
-        'Stunted': 0,
-        'At Risk': 0,
-        'Normal': 0,
-      };
-
-      for (final doc in snapshot.docs) {
-        final anthropometric =
-            doc.data()['anthropometric'] as Map<String, dynamic>?;
-        if (anthropometric == null) continue;
-
-        final double? wfa =
-            _extractZScore(anthropometric['weightForAge']?.toString());
-        final double? hfa =
-            _extractZScore(anthropometric['heightForAge']?.toString());
-        final double? wfh =
-            _extractZScore(anthropometric['weightForHeight']?.toString());
-        final double? bmi =
-            _extractZScore(anthropometric['bmi']?.toString());
-
-        // Skip docs with no z-scores at all
-        if (wfa == null && hfa == null && wfh == null && bmi == null) {
-          continue;
-        }
-
-        final tags = <String>{};
-
-        // Weight-for-Age: Underweight < -2 SD | At Risk -2 to -1 SD
-        if (wfa != null) {
-          if (wfa < -2) {
-            tags.add('Underweight');
-          } else if (wfa >= -2 && wfa < -1) {
-            tags.add('At Risk');
-          }
-        }
-
-        // Height-for-Age: Stunted < -2 SD | At Risk -2 to -1 SD
-        if (hfa != null) {
-          if (hfa < -2) {
-            tags.add('Stunted');
-          } else if (hfa >= -2 && hfa < -1) {
-            tags.add('At Risk');
-          }
-        }
-
-        // Weight-for-Height: Overweight/Obese > +1 SD | At Risk -2 to -1 SD
-        if (wfh != null) {
-          if (wfh > 1) {
-            tags.add('Overweight/Obese');
-          } else if (wfh >= -2 && wfh < -1) {
-            tags.add('At Risk');
-          }
-        }
-
-        // BMI: Overweight/Obese > +2 SD | At Risk -2 to -1 SD
-        if (bmi != null) {
-          if (bmi > 2) {
-            tags.add('Overweight/Obese');
-          } else if (bmi >= -2 && bmi < -1) {
-            tags.add('At Risk');
-          }
-        }
-
-        if (tags.isEmpty) {
-          // All z-scores within healthy range → Normal
-          counts['Normal'] = counts['Normal']! + 1;
-        } else {
-          // A patient can belong to multiple statuses
-          for (final tag in tags) {
-            counts[tag] = counts[tag]! + 1;
-          }
-        }
-      }
-
-      debugPrint('✅ Status counts: $counts');
-      return counts;
-    } catch (e) {
-      debugPrint('❌ Error getting status counts: $e');
-      return {};
-    }
-  }*/
   Future<Map<String, int>> getStatusCounts() async {
     final user = _auth.currentUser;
     if (user == null) return {};
@@ -1627,8 +1472,6 @@ Future<Map<String, int>> getTodayStatusCounts() async {
           .where('isDeleted', isEqualTo: false)
           .get();
 
-      // Group barangay patients by first/last name (same as PatientListTab)
-      // and keep only the most recent record per child. Skip archived.
       final Map<String, Map<String, dynamic>> latestByKey = {};
 
       for (final doc in snapshot.docs) {
@@ -1645,15 +1488,15 @@ Future<Map<String, int>> getTodayStatusCounts() async {
           demographic = <String, dynamic>{};
         }
 
-        final firstName = (demographic['firstName'] ?? '').toString();
+        final firstName  = (demographic['firstName']  ?? '').toString();
         final middleName = (demographic['middleName'] ?? '').toString();
-        final lastName = (demographic['lastName'] ?? '').toString();
+        final lastName   = (demographic['lastName']   ?? '').toString();
         final key =
             '${firstName.toLowerCase().trim()}_${middleName.toLowerCase().trim()}_${lastName.toLowerCase().trim()}';
         if (key.isEmpty || key == '_') continue;
 
         final createdAt = data['createdAt'] as Timestamp?;
-        final existing = latestByKey[key];
+        final existing  = latestByKey[key];
         if (existing == null) {
           latestByKey[key] = data;
         } else {
@@ -1669,14 +1512,14 @@ Future<Map<String, int>> getTodayStatusCounts() async {
       }
 
       final counts = {
-        'Underweight': 0,
+        'Underweight':     0,
         'Overweight/Obese': 0,
-        'Stunted': 0,
-        'At Risk': 0,
-        'Normal': 0,
+        'Stunted':         0,
+        'At Risk':         0,
+        'Normal':          0,
       };
 
-      void _applyStatusFromData(Map<String, dynamic> data) {
+      void applyStatusFromData(Map<String, dynamic> data) {
         final rawAnthro = data['anthropometric'];
         Map<String, dynamic>? anthropometric;
         if (rawAnthro is Map<String, dynamic>) {
@@ -1688,40 +1531,25 @@ Future<Map<String, int>> getTodayStatusCounts() async {
         }
         if (anthropometric == null) return;
 
-        final double? wfa =
-            _extractZScore(anthropometric['weightForAge']?.toString());
-        final double? hfa =
-            _extractZScore(anthropometric['heightForAge']?.toString());
-        final double? wfh =
-            _extractZScore(anthropometric['weightForHeight']?.toString());
-        final double? bmi =
-            _extractBmiZScore(anthropometric['bmi']?.toString());
+        final double? wfa = _extractZScore(anthropometric['weightForAge']?.toString());
+        final double? hfa = _extractZScore(anthropometric['heightForAge']?.toString());
+        final double? wfh = _extractZScore(anthropometric['weightForHeight']?.toString());
+        final double? bmi = _extractBmiZScore(anthropometric['bmi']?.toString());
 
-        // Skip records with no usable z-scores.
         if (wfa == null && hfa == null && wfh == null && bmi == null) return;
 
-        // Same priority as _buildAssessmentRemarks / PatientListTab.
-
-        // Priority 1: Underweight (Weight-for-Age < -2 SD)
         if (wfa != null && wfa < -2) {
           counts['Underweight'] = counts['Underweight']! + 1;
           return;
         }
-
-        // Priority 2: Stunted (Height-for-Age < -2 SD)
         if (hfa != null && hfa < -2) {
           counts['Stunted'] = counts['Stunted']! + 1;
           return;
         }
-
-        // Priority 3: Overweight/Obese (Weight-for-Height > +1 SD or BMI > +2 SD)
         if ((wfh != null && wfh > 1) || (bmi != null && bmi > 2)) {
-          counts['Overweight/Obese'] =
-              counts['Overweight/Obese']! + 1;
+          counts['Overweight/Obese'] = counts['Overweight/Obese']! + 1;
           return;
         }
-
-        // Priority 4: At Risk (any indicator -2 to -1 SD)
         final atRisk = (wfa != null && wfa >= -2 && wfa < -1) ||
             (hfa != null && hfa >= -2 && hfa < -1) ||
             (wfh != null && wfh >= -2 && wfh < -1) ||
@@ -1730,17 +1558,13 @@ Future<Map<String, int>> getTodayStatusCounts() async {
           counts['At Risk'] = counts['At Risk']! + 1;
           return;
         }
-
-        // Priority 5: Normal
         counts['Normal'] = counts['Normal']! + 1;
       }
 
-      // Apply status for each barangay child (grouped by name).
       for (final data in latestByKey.values) {
-        _applyStatusFromData(data);
+        applyStatusFromData(data);
       }
 
-      // Also include homepageData-only patients (same rule as PatientListTab).
       final homeSnapshot = await _firestore
           .collection('users')
           .doc(user.uid)
@@ -1763,14 +1587,14 @@ Future<Map<String, int>> getTodayStatusCounts() async {
           demographic = <String, dynamic>{};
         }
 
-        final firstName = (demographic['firstName'] ?? '').toString();
+        final firstName  = (demographic['firstName']  ?? '').toString();
         final middleName = (demographic['middleName'] ?? '').toString();
-        final lastName = (demographic['lastName'] ?? '').toString();
+        final lastName   = (demographic['lastName']   ?? '').toString();
         final key =
             '${firstName.toLowerCase().trim()}_${middleName.toLowerCase().trim()}_${lastName.toLowerCase().trim()}';
         if (key.isEmpty || key == '_' || existingKeys.contains(key)) continue;
 
-        _applyStatusFromData(data);
+        applyStatusFromData(data);
       }
 
       debugPrint('✅ Status counts: $counts');
@@ -1781,5 +1605,3 @@ Future<Map<String, int>> getTodayStatusCounts() async {
     }
   }
 }
-
-

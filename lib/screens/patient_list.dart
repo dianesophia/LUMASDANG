@@ -529,6 +529,8 @@ class _PatientListTabState extends State<PatientListTab> {
               fatherContact: demographic['fatherContact'] ?? '',
               createdBy: mostRecent['createdByName'] ?? 'Unknown',
               barangayId: '',
+              visitDate: mostRecent['visitDate'] ?? '',   // ← ADD
+              visitTime: mostRecent['visitTime'] ?? '',   // ← ADD
               nextFollowUpDate: null,
               followUpNotes: (mostRecent['followUpNotes'] as String?) ?? '',
             );
@@ -651,6 +653,8 @@ class _PatientListTabState extends State<PatientListTab> {
           fatherContact: demographic['fatherContact'] ?? '',
           createdBy: data['createdByName'] ?? 'Unknown',
           barangayId: barangayId,
+          visitDate: data['visitDate'] ?? '',   // ← THIS WAS MISSING
+          visitTime: data['visitTime'] ?? '',
           nextFollowUpDate: nextFollowUpTs?.toDate(),
           followUpNotes: followUpNotes,
         );
@@ -717,6 +721,8 @@ class _PatientListTabState extends State<PatientListTab> {
             fatherContact: demographic['fatherContact'] ?? '',
             createdBy: data['createdByName'] ?? 'Unknown',
             barangayId: barangayId,
+            visitDate: data['visitDate'] ?? '',   // ← ADD
+            visitTime: data['visitTime'] ?? '',   // ← ADD
             nextFollowUpDate: nextFollowUpTs?.toDate(),
             followUpNotes: followUpNotes,
           ),
@@ -1586,6 +1592,15 @@ class _PatientListTabState extends State<PatientListTab> {
                     '${patient.age} months old',
                   ),
                   _detailRow(
+                      Icons.calendar_today_outlined,
+                      'Last Visit',
+                      '${patient.lastVisit.month}/${patient.lastVisit.day}/${patient.lastVisit.year}'),
+                  // ── ADD THESE TWO ──────────────────────────────────────
+                  if (patient.visitDate.isNotEmpty)
+                    _detailRow(Icons.event_outlined, 'Visit Date', patient.visitDate),
+                  if (patient.visitTime.isNotEmpty)
+                    _detailRow(Icons.schedule_outlined, 'Visit Time', patient.visitTime),
+                  // ───────────────────────────────────────────────────────
                     Icons.calendar_today_outlined,
                     'Last Visit',
                     '${patient.lastVisit.month}/${patient.lastVisit.day}/${patient.lastVisit.year}',
@@ -1937,6 +1952,12 @@ class Patient {
   final String createdBy;
   final String barangayId;
   final bool isArchived;
+  final String visitDate;   // ← ADD
+  final String visitTime;
+  
+  
+
+  
   final DateTime? nextFollowUpDate;
   final String followUpNotes;
 
@@ -1959,6 +1980,8 @@ class Patient {
     this.createdBy = 'Unknown',
     this.barangayId = '',
     this.isArchived = false,
+    this.visitDate = '',    // ← ADD
+    this.visitTime = '',
     this.nextFollowUpDate,
     this.followUpNotes = '',
   });
