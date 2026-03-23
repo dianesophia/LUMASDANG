@@ -85,6 +85,37 @@ Lumasdang solves all of these problems in one easy-to-use app.
 - **Trends & Analytics**: Visual charts showing patient progress over time
 - **Export to Excel**: Download data in spreadsheet format
 
+### 11. **OPT Plus Reporting** 
+- **Government Reporting**: Generate OPT Plus summary reports for government submission
+- **Age Band Analysis**: Automatic categorization of children by age groups (0-5, 6-11, 12-23, 24-35, 36-47, 48-59 months)
+- **Nutritional Indicators**: Calculate counts for wasted/stunted children, overweight/obesity, and other health indicators
+- **Excel Template Integration**: Uses official OPT Plus Excel templates for standardized reporting
+
+### 12. **Lumasdang Records System**
+- **Comprehensive Patient Records**: Generate complete patient records in Excel format
+- **Barangay-Level Data**: Organize and export data by barangay (local community)
+- **Assessment History**: Include all historical assessments for each child
+- **Standardized Format**: Uses official Lumasdang records template for consistency
+
+### 13. **Advanced Security Features**
+- **Password Change**: Securely update account password with authentication
+- **Username Management**: Change username with availability checking
+- **Email Updates**: Update email address with verification process
+- **Display Name Customization**: Personalize how your name appears in the app
+- **Profile Picture Upload**: Add and update profile photos with base64 encoding
+
+### 14. **Enhanced Notification System**
+- **Real-time Notifications**: Get instant updates about new patients and assessments
+- **Offline Notifications**: View notifications even without internet connection
+- **Filtered Views**: Filter notifications by type (patients, assessments, system updates)
+- **Calendar Integration**: Link notifications to calendar events and appointments
+
+### 15. **Multi-User Collaboration**
+- **Barangay-Based Sharing**: Share patient data within your barangay/clinic
+- **User Management**: Multiple healthcare workers can collaborate on patient records
+- **Audit Trail**: Track who created and modified patient data
+- **Role-Based Access**: Different permission levels for different user types
+
 ---
 
 ## 🛠️ Tools & Technologies Used
@@ -114,9 +145,17 @@ Lumasdang solves all of these problems in one easy-to-use app.
 | **Growth Standards** | WHO growth measurement library | Calculates accurate nutritional status based on international standards |
 | **Connectivity Plus** | Internet detection | Checks if phone is connected to internet |
 | **Share Plus** | Data sharing | Allows sharing patient records with other people |
-| **Excel** | Spreadsheet format | Exports data to Excel files for backup |
+| **Excel** | Spreadsheet format | Exports data to Excel files for backup and reporting |
 | **URL Launcher** | Link opener | Opens web links and makes phone calls |
 | **Provider** | State management | Keeps app UI updated when data changes |
+| **Image Picker** | Camera access | Allows taking photos for patient profiles |
+| **Image Compress** | Photo optimization | Reduces image file sizes for efficient storage |
+| **Local Auth** | Biometric authentication | Enables fingerprint/face recognition for secure login |
+| **Secure Storage** | Encrypted local storage | Safely stores sensitive data like passwords and tokens |
+| **HTTP** | Network requests | Handles API calls and external data fetching |
+| **UUID** | Unique identifiers | Generates unique IDs for records and documents |
+| **Archive** | File compression | Creates ZIP files for data export and backup |
+| **XML** | Data parsing | Processes XML data for reporting templates |
 
 ### **User Interface**
 | Tool | What It Is | Why It's Used |
@@ -557,6 +596,6 @@ Special thanks to healthcare workers who tested and provided feedback!
 
 ---
 
-**Version**: 1.0.0  
-**Last Updated**: February 2026  
-**Supported Platforms**: Android 5.0+, iOS 11.0+
+**Version**: 1.2.0  
+**Last Updated**: March 2026  
+**Supported Platforms**: Android 5.0+
