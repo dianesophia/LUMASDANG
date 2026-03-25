@@ -63,7 +63,7 @@ class _VaccinationFormState extends State<VaccinationForm> {
     'Hepatitis B',
     'OPV',
     'IPV',
-    'DTwP/DTaP-Hib-IPV',
+    'DTwP/DTaP-Hib',
     'PCV',
     'RV',
     'Influenza',
@@ -84,7 +84,7 @@ class _VaccinationFormState extends State<VaccinationForm> {
     'Hepatitis B':       [28, 56],      // birth → 1mo → 6mo
     'OPV':               [28, 56, 91],  // 6wks → 10wks → 14wks → 9mo
     'IPV':               [28, 56],      // 6wks → 10wks → 14wks
-    'DTwP/DTaP-Hib-IPV': [28, 56, 365],// 6wks → 10wks → 14wks → booster
+    'DTwP/DTaP-Hib':     [28, 56, 365],// 6wks → 10wks → 14wks → booster
     'PCV':               [28, 56, 91],
     'RV':                [28, 56],
     'Influenza':         [28],          // 2 doses then yearly
