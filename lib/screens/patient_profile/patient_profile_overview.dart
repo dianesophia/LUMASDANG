@@ -335,10 +335,16 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
             await LocalDbService.instance.getAllRecords(includeDeleted: false);
 
         for (final record in localRecords) {
-          final rawData = record['data'] as Map<String, dynamic>?;
-          if (rawData == null) continue;
-
-          final data = Map<String, dynamic>.from(rawData);
+          // Older cached records may store nested maps as Map<dynamic, dynamic>.
+          // Avoid direct casts that crash with "Map<dynamic,dynamic> not a subtype".
+          final rawData = record['data'];
+          Map<String, dynamic>? data;
+          if (rawData is Map<String, dynamic>) {
+            data = rawData;
+          } else if (rawData is Map) {
+            data = Map<String, dynamic>.from(rawData as Map);
+          }
+          if (data == null) continue;
           final demographic = data['demographic'] ?? {};
           final firstName = (demographic['firstName'] ?? '').toString();
           final lastName = (demographic['lastName'] ?? '').toString();
@@ -503,8 +509,15 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
   // ── Tab bodies ─────────────────────────────────────────────────────────────
   Widget _buildProfileTab() {
     final patient = widget.patient;
-    final Map<String, dynamic>? latestDemo =
-        _assessments.isNotEmpty ? _assessments.last['demographic'] as Map<String, dynamic>? : null;
+    Map<String, dynamic>? latestDemo;
+    if (_assessments.isNotEmpty) {
+      final demoRaw = _assessments.last['demographic'];
+      if (demoRaw is Map<String, dynamic>) {
+        latestDemo = demoRaw;
+      } else if (demoRaw is Map) {
+        latestDemo = Map<String, dynamic>.from(demoRaw as Map);
+      }
+    }
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
@@ -592,7 +605,15 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
         return ParentContactTab(
           patient: widget.patient,
           latestDemographic: _assessments.isNotEmpty
-              ? _assessments.last['demographic'] as Map<String, dynamic>?
+              ? (() {
+                  final demoRaw = _assessments.last['demographic'];
+                  if (demoRaw is Map<String, dynamic>) {
+                    return demoRaw;
+                  } else if (demoRaw is Map) {
+                    return Map<String, dynamic>.from(demoRaw as Map);
+                  }
+                  return null;
+                })()
               : null,
           preferPhoneCall: _preferPhoneCall,
           preferSMS: _preferSMS,

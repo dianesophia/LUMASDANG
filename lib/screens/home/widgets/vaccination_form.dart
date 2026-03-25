@@ -1,39 +1,140 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'vaccine_dose_selector.dart';
 
 // ── Column definition ─────────────────────────────────────────────────────────
 class _AgeCol {
-  final String key;   // unique key used in data map
-  final String label; // display label
+  final String key;
+  final String label;
   const _AgeCol(this.key, this.label);
 }
 
 // ── Age-group section for the spanning header ─────────────────────────────────
 class _AgeGroup {
   final String label;
-  final Color  color;
-  final int    colCount;
+  final Color color;
+  final int colCount;
   const _AgeGroup(this.label, this.color, this.colCount);
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared mapping: vaccine display name → camelCase Firestore key
+// Must match the keys used in VaccinationStatusSection._vaccines
+// ─────────────────────────────────────────────────────────────────────────────
+const Map<String, String> kVaccineNameToKey = {
+  'BCG':            'bcg',
+  'Hepatitis B':    'hepatitisB',
+  'Pentavalent':    'pentavalent',
+  'Oral Polio':     'oralPolio',
+  'IPV':            'ipv',
+  'Phenumococcal':  'phenumococcal',
+  'Rotavirus':      'rotavirus',
+  'Measles':        'measles',
+  'MMR':            'mmr',
+  'Hepatitis A':    'hepatitisA',
+  'Chickenpox':     'chickenpox',
+  'Typhoid':        'typhoid',
+  'Pneumo 23':      'pneumo23',
+  'FLU':            'flu',
+  'OPV':            'opv',
+  'DTwP/DTaP-Hib':  'dtapHib',
+  'PCV':            'pcv',
+  'Influenza':      'influenza',
+  'MMR/MR':         'mmrMr',
+  'Measles/MMR':    'measlesMmr',
+  'JEV':            'jev',
+  'Varicella':      'varicella',
+  'Rabies':         'rabies',
+  'Meningococcal':  'meningococcal',
+  'Cholera':        'cholera',
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Ordered dose labels per vaccine — the LAST administered dose label is what
+// VaccinationStatusSection displays. Order matters: last in list = "most done".
+// These must match VaccinationStatusSection._vaccines[*].possibleDoses.
+// ─────────────────────────────────────────────────────────────────────────────
+const Map<String, List<String>> kVaccineDoseLabels = {
+  'BCG':           ['1st dose'],
+  'Hepatitis B':   ['1st dose', '2nd dose', '3rd dose'],
+  'Pentavalent':   ['1st dose', '2nd dose', '3rd dose'],
+  'Oral Polio':    ['1st dose', '2nd dose', '3rd dose', 'Booster'],
+  'IPV':           ['1st dose', '2nd dose', '3rd dose'],
+  'Phenumococcal': ['1st dose', '2nd dose', '3rd dose', 'Booster'],
+  'Rotavirus':     ['1st dose', '2nd dose', '3rd dose'],
+  'Measles':       ['1st dose'],
+  'MMR':           ['1st dose', '2nd dose'],
+  'Hepatitis A':   ['1st dose', '2nd dose'],
+  'Chickenpox':    ['1st dose', '2nd dose'],
+  'Typhoid':       ['See annotations'],
+  'Pneumo 23':     ['See annotations'],
+  'FLU':           ['1st dose', '2nd dose'],
+  'OPV':           ['1st dose', '2nd dose', '3rd dose', 'Booster'],
+  'DTwP/DTaP-Hib': ['1st dose', '2nd dose', '3rd dose', '1st booster'],
+  'PCV':           ['1st dose', '2nd dose', '3rd dose', 'Booster'],
+  'Influenza':     ['1st dose', '2nd dose'],
+  'MMR/MR':        ['1st dose MMR', '2nd dose MMR'],
+  'Measles/MMR':   ['Measles', '1st dose MMR', '2nd dose MMR'],
+  'JEV':           ['1st dose', '2nd dose'],
+  'Varicella':     ['1st dose', '2nd dose'],
+  'Rabies':        ['Rabies series'],
+  'Meningococcal': ['See annotations'],
+  'Cholera':       ['See annotations'],
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Computes the dose label to store in Firestore for a given vaccine.
+// We look at all columns that have a recorded dose, count how many are ticked,
+// and return the corresponding label from kVaccineDoseLabels.
+// ─────────────────────────────────────────────────────────────────────────────
+String _computeDoseLabel(String vaccineName, Map<String, String?> doses) {
+  final labels = kVaccineDoseLabels[vaccineName] ?? [];
+  if (labels.isEmpty) return 'Pending';
+
+  // Count how many column slots have a dose recorded
+  final count = doses.values.where((d) => d != null).length;
+  if (count == 0) return 'Pending';
+
+  // Return the label matching the count (clamped to last label)
+  final idx = (count - 1).clamp(0, labels.length - 1);
+  return labels[idx];
+}
+
 class VaccinationForm extends StatefulWidget {
+  final String? patientId;
+  final String? barangayId;
+  final String? firstName;
+  final String? lastName;
+  /// useSharedStorage=true  → barangays/{bid}/patients/{pid}/vaccination/record
+  /// useSharedStorage=false → users/{uid}/vaccinationStatus/{patientKey}
+  final bool useSharedStorage;
   final Function(Map<String, dynamic>)? onDataChanged;
-  const VaccinationForm({super.key, this.onDataChanged});
+
+  const VaccinationForm({
+    super.key,
+    this.patientId,
+    this.barangayId,
+    this.firstName,
+    this.lastName,
+    this.useSharedStorage = false,
+    this.onDataChanged,
+  });
 
   @override
   State<VaccinationForm> createState() => _VaccinationFormState();
 }
 
 class _VaccinationFormState extends State<VaccinationForm> {
-  // ── Theme ─────────────────────────────────────────────────────────────────
+  // ── Theme ──────────────────────────────────────────────────────────────────
   static const Color _primary    = Color(0xFFF5A962);
   static const Color _surface    = Colors.white;
   static const Color _surfaceAlt = Color(0xFFFAFAFA);
   static const Color _border     = Color(0xFFEEEEEE);
   static const Color _textColor  = Color(0xFF1A1A1A);
 
-  // ── Age columns (matches the image columns) ───────────────────────────────
+  // ── Age columns ────────────────────────────────────────────────────────────
   static const _cols = <_AgeCol>[
     _AgeCol('BIRTH',   'Birth'),
     _AgeCol('1MO',     '1 mo.'),
@@ -51,141 +152,115 @@ class _VaccinationFormState extends State<VaccinationForm> {
     _AgeCol('2-5YR',   '2-5 yrs.'),
   ];
 
-  // ── Age-group spanning headers ────────────────────────────────────────────
+  // ── Age-group spanning headers ─────────────────────────────────────────────
   static const _ageGroups = <_AgeGroup>[
-    _AgeGroup('INFANCY',         Color(0xFFADD8E6), 10), // cols 0-9
-    _AgeGroup('EARLY CHILDHOOD', Color(0xFFFFB6C1),  4), // cols 10-13
+    _AgeGroup('INFANCY',         Color(0xFFADD8E6), 10),
+    _AgeGroup('EARLY CHILDHOOD', Color(0xFFFFB6C1),  4),
   ];
 
-  // ── All vaccines ──────────────────────────────────────────────────────────
+  // ── All vaccines ───────────────────────────────────────────────────────────
   static const _vaccineNames = [
-    'BCG',
-    'Hepatitis B',
-    'OPV',
-    'IPV',
-    'DTwP/DTaP-Hib',
-    'PCV',
-    'RV',
-    'Influenza',
-    'MMR/MR',
-    'Measles/MMR',
-    'JEV',
-    'Varicella',
-    'Hepatitis A',
-    'Rabies',
-    'Meningococcal',
-    'Cholera',
-    'Typhoid',
+    'BCG', 'Hepatitis B', 'Pentavalent', 'Oral Polio', 'IPV',
+    'Phenumococcal', 'Rotavirus', 'Measles', 'MMR', 'Hepatitis A',
+    'Chickenpox', 'Typhoid', 'Pneumo 23', 'FLU', 'OPV', 'DTwP/DTaP-Hib',
+    'PCV', 'Influenza', 'MMR/MR', 'Measles/MMR', 'JEV', 'Varicella',
+    'Rabies', 'Meningococcal', 'Cholera',
   ];
 
-  // ── Next-dose intervals (days between consecutive doses) ─────────────────
+  // ── Next-dose intervals (days between consecutive doses) ──────────────────
   static const Map<String, List<int>> _intervals = {
-    'BCG':               [],            // single dose
-    'Hepatitis B':       [28, 56],      // birth → 1mo → 6mo
-    'OPV':               [28, 56, 91],  // 6wks → 10wks → 14wks → 9mo
-    'IPV':               [28, 56],      // 6wks → 10wks → 14wks
-    'DTwP/DTaP-Hib':     [28, 56, 365],// 6wks → 10wks → 14wks → booster
-    'PCV':               [28, 56, 91],
-    'RV':                [28, 56],
-    'Influenza':         [28],          // 2 doses then yearly
-    'MMR/MR':            [168],         // 9mo → 15-18mo
-    'Measles/MMR':       [168],
-    'JEV':               [168],
-    'Varicella':         [84],
-    'Hepatitis A':       [180],
-    'Rabies':            [7, 21],
-    'Meningococcal':     [],
-    'Cholera':           [],
-    'Typhoid':           [],
+    'BCG':            [],
+    'Hepatitis B':    [28, 150],
+    'Pentavalent':    [28, 28],
+    'Oral Polio':     [28, 28, 105],
+    'IPV':            [28, 28],
+    'Phenumococcal':  [28, 28, 105],
+    'Rotavirus':      [28, 28],
+    'Measles':        [],
+    'MMR':            [91],
+    'Hepatitis A':    [180],
+    'Chickenpox':     [91],
+    'Typhoid':        [],
+    'Pneumo 23':      [],
+    'FLU':            [28],
+    'OPV':            [28, 28, 105],
+    'DTwP/DTaP-Hib':  [28, 28, 365],
+    'PCV':            [28, 28, 105],
+    'Influenza':      [28],
+    'MMR/MR':         [91],
+    'Measles/MMR':    [91, 182],
+    'JEV':            [420],
+    'Varicella':      [91],
+    'Rabies':         [7, 21],
+    'Meningococcal':  [],
+    'Cholera':        [],
   };
 
-  // ── Which columns are valid for each vaccine ──────────────────────────────
-  // Map<vaccineName, Map<colKey, possibleDoses>>
+  // ── Schedule (which columns are valid per vaccine) ─────────────────────────
   static const Map<String, Map<String, List<String>>> _schedule = {
-    'BCG': {
-      'BIRTH': ['1st dose'],
-    },
-    'Hepatitis B': {
-      'BIRTH': ['1st dose'],
-      '1MO':   ['2nd dose'],
-      '6MO':   ['3rd dose'],
-    },
-    'OPV': {
-      '6WKS':  ['1st dose'],
-      '10WKS': ['2nd dose'],
-      '14WKS': ['3rd dose'],
-      '9MO':   ['Booster'],
-    },
-    'IPV': {
-      '6WKS':  ['1st dose'],
-      '10WKS': ['2nd dose'],
-      '14WKS': ['3rd dose'],
-    },
-    'DTwP/DTaP-Hib-IPV': {
-      '6WKS':  ['1st dose'],
-      '10WKS': ['2nd dose'],
-      '14WKS': ['3rd dose'],
-      '15MO':  ['1st booster'],
-    },
-    'PCV': {
-      '6WKS':  ['1st dose'],
-      '10WKS': ['2nd dose'],
-      '14WKS': ['3rd dose'],
-      '9MO':   ['Booster'],
-    },
-    'RV': {
-      '6WKS':  ['1st dose'],
-      '10WKS': ['2nd dose'],
-      '14WKS': ['3rd dose'],
-    },
-    'Influenza': {
-      '6MO':    ['1st dose'],
-    },
-    'MMR/MR': {
-      '9MO':    ['1st dose MMR'],
-      '12MO':   ['2nd dose MMR'],
-    },
-    'Measles/MMR': {
-      '6MO':    ['Measles'],
-      '9MO':    ['1st dose MMR'],
-      '15MO':   ['2nd dose MMR'],
-    },
-    'JEV': {
-      '9MO':    ['1st dose'],
-      '19-23MO':['2nd dose'],
-    },
-    'Varicella': {
-      '12MO':   ['1st dose'],
-      '15MO':   ['2nd dose'],
-    },
-    'Hepatitis A': {
-      '12MO':   ['1st dose'],
-      '18MO':   ['2nd dose'],
-    },
-    'Rabies': {
-      '2-5YR':  ['Rabies series'],
-    },
-    'Meningococcal': {
-      '9MO':    ['See annotations'],
-      '12MO':   ['See annotations'],
-      '2-5YR':  ['See annotations'],
-    },
-    'Cholera': {
-      '2-5YR':  ['See annotations'],
-    },
-    'Typhoid': {
-      '2-5YR':  ['See annotations'],
-    },
+    'BCG':           {'BIRTH':  ['1st dose']},
+    'Hepatitis B':   {'BIRTH': ['1st dose'], '1MO': ['2nd dose'], '6MO': ['3rd dose']},
+    'Pentavalent':   {'6WKS': ['1st dose'], '10WKS': ['2nd dose'], '14WKS': ['3rd dose']},
+    'Oral Polio':    {'6WKS': ['1st dose'], '10WKS': ['2nd dose'], '14WKS': ['3rd dose'], '9MO': ['Booster']},
+    'IPV':           {'6WKS': ['1st dose'], '10WKS': ['2nd dose'], '14WKS': ['3rd dose']},
+    'Phenumococcal': {'6WKS': ['1st dose'], '10WKS': ['2nd dose'], '14WKS': ['3rd dose'], '9MO': ['Booster']},
+    'Rotavirus':     {'6WKS': ['1st dose'], '10WKS': ['2nd dose'], '14WKS': ['3rd dose']},
+    'Measles':       {'6MO':  ['1st dose']},
+    'MMR':           {'12MO': ['1st dose'], '15MO': ['2nd dose']},
+    'Hepatitis A':   {'12MO': ['1st dose'], '18MO': ['2nd dose']},
+    'Chickenpox':    {'12MO': ['1st dose'], '15MO': ['2nd dose']},
+    'Typhoid':       {'2-5YR': ['See annotations']},
+    'Pneumo 23':     {'2-5YR': ['See annotations']},
+    'FLU':           {'6MO': ['1st dose'], '9MO': ['2nd dose']},
+    'OPV':           {'6WKS': ['1st dose'], '10WKS': ['2nd dose'], '14WKS': ['3rd dose'], '9MO': ['Booster']},
+    'DTwP/DTaP-Hib': {'6WKS': ['1st dose'], '10WKS': ['2nd dose'], '14WKS': ['3rd dose'], '15MO': ['1st booster']},
+    'PCV':           {'6WKS': ['1st dose'], '10WKS': ['2nd dose'], '14WKS': ['3rd dose'], '9MO': ['Booster']},
+    'Influenza':     {'6MO': ['1st dose'], '9MO': ['2nd dose']},
+    'MMR/MR':        {'9MO': ['1st dose MMR'], '12MO': ['2nd dose MMR']},
+    'Measles/MMR':   {'6MO': ['Measles'], '9MO': ['1st dose MMR'], '15MO': ['2nd dose MMR']},
+    'JEV':           {'9MO': ['1st dose'], '19-23MO': ['2nd dose']},
+    'Varicella':     {'12MO': ['1st dose'], '15MO': ['2nd dose']},
+    'Rabies':        {'2-5YR': ['Rabies series']},
+    'Meningococcal': {'9MO': ['See annotations'], '12MO': ['See annotations'], '2-5YR': ['See annotations']},
+    'Cholera':       {'2-5YR': ['See annotations']},
   };
 
-  // ── State ─────────────────────────────────────────────────────────────────
-  // doses[vaccine][colKey] = dose label | null
-  final Map<String, Map<String, String?>>            _doses           = {};
-  // dateControllers[vaccine][colKey] = TextEditingController
+  // ── State ──────────────────────────────────────────────────────────────────
+  final Map<String, Map<String, String?>>               _doses           = {};
   final Map<String, Map<String, TextEditingController>> _dateControllers = {};
-  // computed next-dose per vaccine
-  final Map<String, String>                          _nextDoseDates   = {};
-  final Set<String>                                  _expandedRows    = {};
+  final Map<String, String>                             _nextDoseDates   = {};
+  final Set<String>                                     _expandedRows    = {};
+  bool _saving = false;
+
+  // ── Firestore helpers ──────────────────────────────────────────────────────
+  String get _patientKey {
+    final f = (widget.firstName ?? '').trim().toLowerCase();
+    final l = (widget.lastName  ?? '').trim().toLowerCase();
+    return '${f}_$l';
+  }
+
+  DocumentReference? get _firestoreRef {
+    if (widget.useSharedStorage) {
+      final pid = widget.patientId;
+      final bid = widget.barangayId;
+      if (pid == null || pid.isEmpty || bid == null || bid.isEmpty) return null;
+      return FirebaseFirestore.instance
+          .collection('barangays')
+          .doc(bid)
+          .collection('patients')
+          .doc(pid)
+          .collection('vaccination')
+          .doc('record');
+    } else {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null || uid.isEmpty) return null;
+      return FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('vaccinationStatus')
+          .doc(_patientKey);
+    }
+  }
 
   @override
   void initState() {
@@ -216,15 +291,13 @@ class _VaccinationFormState extends State<VaccinationForm> {
     super.dispose();
   }
 
-  // ── Next-dose calculation ─────────────────────────────────────────────────
+  // ── Next-dose calculation ──────────────────────────────────────────────────
   void _recalcNextDose(String vaccine) {
     final iv = _intervals[vaccine] ?? [];
     if (iv.isEmpty) {
       setState(() => _nextDoseDates.remove(vaccine));
       return;
     }
-
-    // Find most recently administered dose that has a date
     String? lastDate;
     for (final colKey in _cols.map((c) => c.key).toList().reversed) {
       final dose = _doses[vaccine]?[colKey];
@@ -238,15 +311,12 @@ class _VaccinationFormState extends State<VaccinationForm> {
       setState(() => _nextDoseDates.remove(vaccine));
       return;
     }
-
     final doseCount = _doses[vaccine]!.values.where((d) => d != null).length;
     final ivIdx = doseCount - 1;
-
     if (ivIdx >= iv.length) {
       setState(() => _nextDoseDates[vaccine] = 'All doses complete ✓');
       return;
     }
-
     try {
       final last = DateFormat('MM-dd-yyyy').parse(lastDate);
       final next = last.add(Duration(days: iv[ivIdx]));
@@ -257,7 +327,7 @@ class _VaccinationFormState extends State<VaccinationForm> {
     }
   }
 
-  // ── Dose changed ──────────────────────────────────────────────────────────
+  // ── Dose changed ───────────────────────────────────────────────────────────
   void _onDoseChanged(String vaccine, String colKey, String? dose) {
     setState(() {
       _doses[vaccine]![colKey] = dose;
@@ -273,7 +343,7 @@ class _VaccinationFormState extends State<VaccinationForm> {
     _notifyParent();
   }
 
-  // ── Notify parent ─────────────────────────────────────────────────────────
+  // ── Notify parent (legacy callback, kept for compatibility) ────────────────
   void _notifyParent() {
     if (widget.onDataChanged == null) return;
     final data = <String, dynamic>{};
@@ -294,7 +364,101 @@ class _VaccinationFormState extends State<VaccinationForm> {
     widget.onDataChanged!(data);
   }
 
-  // ── Date picker ───────────────────────────────────────────────────────────
+  // ── Save to Firestore ──────────────────────────────────────────────────────
+  // Writes the same schema that VaccinationStatusSection reads:
+  //   { 'hepatitisB': '2nd dose', 'bcg': '1st dose', … }
+  // plus date fields and metadata.
+  Future<void> _saveToFirestore() async {
+    final ref = _firestoreRef;
+    if (ref == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Cannot save: missing patient or user info.'),
+        backgroundColor: Colors.redAccent,
+      ));
+      return;
+    }
+
+    setState(() => _saving = true);
+
+    try {
+      final now         = DateTime.now();
+      final currentUser = FirebaseAuth.instance.currentUser;
+      String userName   = 'Unknown';
+
+      if (currentUser != null) {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUser.uid)
+            .get();
+        userName = userDoc.data()?['fullName'] ??
+            userDoc.data()?['username'] ??
+            currentUser.email ??
+            'Unknown';
+      }
+
+      // Build the payload in the schema VaccinationStatusSection expects
+      final payload = <String, dynamic>{
+        'firstName':          widget.firstName ?? '',
+        'lastName':           widget.lastName  ?? '',
+        'lastReviewDate':     Timestamp.fromDate(now),
+        'updatedAt':          Timestamp.fromDate(now),
+        'lastModifiedBy':     currentUser?.uid ?? '',
+        'lastModifiedByName': userName,
+      };
+
+      for (final name in _vaccineNames) {
+        final firestoreKey = kVaccineNameToKey[name];
+        if (firestoreKey == null) continue;
+
+        // Derive the current dose label
+        final doseLabel = _computeDoseLabel(name, _doses[name]!);
+        payload[firestoreKey] = doseLabel;
+
+        // Also persist per-column dates under a nested 'dates' map
+        // (used for next-dose calculation when re-loading the form)
+        final dateMap = <String, String>{};
+        for (final colKey in (_schedule[name]?.keys ?? <String>[])) {
+          final date = _dateControllers[name]?[colKey]?.text.trim();
+          if (date != null && date.isNotEmpty) {
+            dateMap[colKey] = date;
+          }
+        }
+        if (dateMap.isNotEmpty) {
+          payload['${firestoreKey}_dates'] = dateMap;
+        }
+
+        // Next dose date
+        final nd = _nextDoseDates[name];
+        if (nd != null) {
+          payload['${firestoreKey}_nextDose'] = nd;
+        }
+      }
+
+      await ref.set(payload, SetOptions(merge: true));
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: const Text('Vaccination record saved.'),
+          backgroundColor: const Color(0xFFF08030),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12)),
+        ));
+      }
+    } catch (e) {
+      debugPrint('Error saving vaccination form: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Failed to save: $e'),
+          backgroundColor: Colors.redAccent,
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  // ── Date picker ────────────────────────────────────────────────────────────
   Future<void> _pickDate(TextEditingController ctrl) async {
     FocusScope.of(context).requestFocus(FocusNode());
     DateTime init = DateTime.now();
@@ -332,11 +496,11 @@ class _VaccinationFormState extends State<VaccinationForm> {
     } catch (_) { return false; }
   }
 
-  // ── Column width constants ────────────────────────────────────────────────
+  // ── Column width constants ─────────────────────────────────────────────────
   static const double _nameColW = 110.0;
   static const double _cellW    = 64.0;
 
-  // ── Build ─────────────────────────────────────────────────────────────────
+  // ── Build ──────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -355,7 +519,7 @@ class _VaccinationFormState extends State<VaccinationForm> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Section header with info button ───────────────────────────
+          // ── Section header ─────────────────────────────────────────────
           Row(
             children: [
               Container(
@@ -416,7 +580,7 @@ class _VaccinationFormState extends State<VaccinationForm> {
           ),
           const SizedBox(height: 10),
 
-          // ── Info banner ───────────────────────────────────────────────
+          // ── Info banner ────────────────────────────────────────────────
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
@@ -476,7 +640,7 @@ class _VaccinationFormState extends State<VaccinationForm> {
           ),
           const SizedBox(height: 12),
 
-          // ── Scrollable table ──────────────────────────────────────────
+          // ── Scrollable table ───────────────────────────────────────────
           Container(
             decoration: BoxDecoration(
               color: _surface,
@@ -489,13 +653,10 @@ class _VaccinationFormState extends State<VaccinationForm> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Age-group spanning header row
                   _buildGroupHeaderRow(),
                   Container(height: 1, color: _border),
-                  // Age column labels row
                   _buildColLabelRow(),
                   Container(height: 1.5, color: _border),
-                  // Vaccine rows
                   for (int vi = 0; vi < _vaccineNames.length; vi++) ...[
                     _buildVaccineRow(_vaccineNames[vi], vi),
                     if (_expandedRows.contains(_vaccineNames[vi]))
@@ -508,17 +669,28 @@ class _VaccinationFormState extends State<VaccinationForm> {
             ),
           ),
 
-          // ── Upcoming / Scheduled Doses Summary ────────────────────────
+          // ── Upcoming / Scheduled Doses Summary ─────────────────────────
           _buildUpcomingSummary(),
+
+          // NOTE: In this app flow the vaccination data is persisted by
+          // `HomePage` when the user taps "Save Assessment".
+          const SizedBox(height: 20),
+          Text(
+            'Vaccination record will be saved when you tap "Save Assessment".',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Colors.black.withOpacity(0.55),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  // ── Upcoming / Scheduled Doses Summary panel ─────────────────────────────
+  // ── Upcoming / Scheduled Doses Summary ────────────────────────────────────
   Widget _buildUpcomingSummary() {
-    // Collect all vaccines that have a computed next dose date
-    final pending = <Map<String, dynamic>>[];
+    final pending  = <Map<String, dynamic>>[];
     final complete = <String>[];
 
     for (final name in _vaccineNames) {
@@ -527,16 +699,14 @@ class _VaccinationFormState extends State<VaccinationForm> {
       if (next == 'All doses complete ✓') {
         complete.add(name);
       } else {
-        final overdue = _isOverdue(next);
         pending.add({
-          'vaccine':  name,
-          'date':     next,
-          'overdue':  overdue,
+          'vaccine': name,
+          'date':    next,
+          'overdue': _isOverdue(next),
         });
       }
     }
 
-    // Sort: overdue first, then by date
     pending.sort((a, b) {
       if (a['overdue'] && !b['overdue']) return -1;
       if (!a['overdue'] && b['overdue']) return 1;
@@ -547,29 +717,24 @@ class _VaccinationFormState extends State<VaccinationForm> {
       } catch (_) { return 0; }
     });
 
-    // Nothing to show
     if (pending.isEmpty && complete.isEmpty) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 14),
-
-        // ── Section header ──────────────────────────────────────────────
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
             color: const Color(0xFF2E8B7B).withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: const Color(0xFF2E8B7B).withValues(alpha: 0.2),
-              width: 1,
+              color: const Color(0xFF2E8B7B).withValues(alpha: 0.2), width: 1,
             ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Title
               Row(children: [
                 Container(
                   padding: const EdgeInsets.all(6),
@@ -590,40 +755,28 @@ class _VaccinationFormState extends State<VaccinationForm> {
                             fontSize: 11, fontWeight: FontWeight.w800,
                             color: Color(0xFF2E8B7B), letterSpacing: 0.8,
                           )),
-                      Text(
-                        'Auto-calculated from administered dates',
-                        style: TextStyle(
-                          fontSize: 10, color: Colors.black45,
-                        ),
-                      ),
+                      Text('Auto-calculated from administered dates',
+                          style: TextStyle(fontSize: 10, color: Colors.black45)),
                     ],
                   ),
                 ),
               ]),
-
-              // Pending dose rows
               if (pending.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 ...pending.map((item) {
-                  final vaccine = item['vaccine'] as String;
-                  final date    = item['date']    as String;
-                  final overdue = item['overdue'] as bool;
+                  final vaccine     = item['vaccine'] as String;
+                  final date        = item['date']    as String;
+                  final overdue     = item['overdue'] as bool;
                   final accentColor = overdue
                       ? const Color(0xFFEF4444)
                       : const Color(0xFFF5A962);
-
-                  // Calculate how many days away
                   String daysLabel = '';
                   try {
-                    final d = DateFormat('MMM dd, yyyy').parse(date);
+                    final d    = DateFormat('MMM dd, yyyy').parse(date);
                     final diff = d.difference(DateTime.now()).inDays;
-                    if (overdue) {
-                      daysLabel = '${diff.abs()} day(s) overdue';
-                    } else if (diff == 0) {
-                      daysLabel = 'Due today';
-                    } else {
-                      daysLabel = 'In $diff day(s)';
-                    }
+                    daysLabel  = overdue
+                        ? '${diff.abs()} day(s) overdue'
+                        : diff == 0 ? 'Due today' : 'In $diff day(s)';
                   } catch (_) {}
 
                   return Container(
@@ -634,19 +787,14 @@ class _VaccinationFormState extends State<VaccinationForm> {
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: accentColor.withValues(alpha: 0.4),
-                        width: 1.2,
-                      ),
+                          color: accentColor.withValues(alpha: 0.4), width: 1.2),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.04),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
+                            color: Colors.black.withValues(alpha: 0.04),
+                            blurRadius: 4, offset: const Offset(0, 2)),
                       ],
                     ),
                     child: Row(children: [
-                      // Status dot
                       Container(
                         width: 36, height: 36,
                         decoration: BoxDecoration(
@@ -663,17 +811,15 @@ class _VaccinationFormState extends State<VaccinationForm> {
                         ),
                       ),
                       const SizedBox(width: 10),
-                      // Vaccine + date
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(vaccine,
                                 style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF1A1A1A),
-                                )),
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF1A1A1A))),
                             const SizedBox(height: 2),
                             Row(children: [
                               Icon(Icons.calendar_today_outlined,
@@ -691,7 +837,6 @@ class _VaccinationFormState extends State<VaccinationForm> {
                           ],
                         ),
                       ),
-                      // Days badge
                       if (daysLabel.isNotEmpty)
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -702,8 +847,7 @@ class _VaccinationFormState extends State<VaccinationForm> {
                           ),
                           child: Text(daysLabel,
                               style: const TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w700,
+                                fontSize: 9, fontWeight: FontWeight.w700,
                                 color: Colors.white,
                               )),
                         ),
@@ -711,8 +855,6 @@ class _VaccinationFormState extends State<VaccinationForm> {
                   );
                 }),
               ],
-
-              // Complete vaccines row
               if (complete.isNotEmpty) ...[
                 const SizedBox(height: 4),
                 Container(
@@ -723,9 +865,8 @@ class _VaccinationFormState extends State<VaccinationForm> {
                     color: const Color(0xFF2E8B7B).withValues(alpha: 0.06),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
-                      color: const Color(0xFF2E8B7B).withValues(alpha: 0.25),
-                      width: 1,
-                    ),
+                        color: const Color(0xFF2E8B7B).withValues(alpha: 0.25),
+                        width: 1),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -739,9 +880,9 @@ class _VaccinationFormState extends State<VaccinationForm> {
                           children: [
                             const Text('All doses complete',
                                 style: TextStyle(
-                                  fontSize: 11, fontWeight: FontWeight.w700,
-                                  color: Color(0xFF2E8B7B),
-                                )),
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF2E8B7B))),
                             const SizedBox(height: 3),
                             Wrap(
                               spacing: 6, runSpacing: 4,
@@ -775,11 +916,10 @@ class _VaccinationFormState extends State<VaccinationForm> {
     );
   }
 
-  // ── Group header row (INFANCY / EARLY CHILDHOOD) ─────────────────────────
+  // ── Group header row ───────────────────────────────────────────────────────
   Widget _buildGroupHeaderRow() {
     return Row(
       children: [
-        // Vaccine name column header
         Container(
           width: _nameColW,
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
@@ -807,7 +947,7 @@ class _VaccinationFormState extends State<VaccinationForm> {
     );
   }
 
-  // ── Column label row ──────────────────────────────────────────────────────
+  // ── Column label row ───────────────────────────────────────────────────────
   Widget _buildColLabelRow() {
     return Row(
       children: [
@@ -837,7 +977,7 @@ class _VaccinationFormState extends State<VaccinationForm> {
     return const Color(0xFFFFB6C1);
   }
 
-  // ── Vaccine row ───────────────────────────────────────────────────────────
+  // ── Vaccine row ────────────────────────────────────────────────────────────
   Widget _buildVaccineRow(String name, int rowIdx) {
     final hasAny     = _doses[name]!.values.any((d) => d != null);
     final isExpanded = _expandedRows.contains(name);
@@ -856,7 +996,6 @@ class _VaccinationFormState extends State<VaccinationForm> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Vaccine name cell — min height matches data cell outerH (42)
             ConstrainedBox(
               constraints: const BoxConstraints(
                   minWidth: _nameColW, maxWidth: _nameColW, minHeight: 42),
@@ -877,7 +1016,6 @@ class _VaccinationFormState extends State<VaccinationForm> {
                               ),
                               softWrap: true,
                               maxLines: 3),
-                          // Next-dose compact hint (when collapsed)
                           if (nextDate != null && !isExpanded) ...[
                             const SizedBox(height: 3),
                             Container(
@@ -939,29 +1077,22 @@ class _VaccinationFormState extends State<VaccinationForm> {
                 ),
               ),
             ),
-            // Dose cells
-            for (int ci = 0; ci < _cols.length; ci++) ...[
+            for (int ci = 0; ci < _cols.length; ci++)
               _buildCell(name, _cols[ci].key, ci, rowIdx),
-            ],
           ],
         ),
       ),
     );
   }
 
-  // ── Individual dose cell ──────────────────────────────────────────────────
+  // ── Individual dose cell ───────────────────────────────────────────────────
   Widget _buildCell(
       String vaccine, String colKey, int colIndex, int rowIdx) {
-    final possibleDoses =
-        _schedule[vaccine]?[colKey] ?? <String>[];
+    final possibleDoses = _schedule[vaccine]?[colKey] ?? <String>[];
     final selectedDose  = _doses[vaccine]?[colKey];
     final groupColor    = _groupColorFor(colIndex);
+    const double outerH = 42.0;
 
-    // Every cell occupies exactly the same fixed space
-    // so rows always align perfectly regardless of content.
-    const double outerH = 42.0; // row height for all cells
-
-    // Empty cell — vaccine not applicable for this age/column
     if (possibleDoses.isEmpty) {
       return SizedBox(
         width: _cellW,
@@ -1027,7 +1158,6 @@ class _VaccinationFormState extends State<VaccinationForm> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Handle
             Center(
               child: Container(
                 width: 36, height: 4,
@@ -1038,7 +1168,6 @@ class _VaccinationFormState extends State<VaccinationForm> {
               ),
             ),
             const SizedBox(height: 12),
-            // Title
             Row(children: [
               Container(
                 padding: const EdgeInsets.all(6),
@@ -1071,7 +1200,6 @@ class _VaccinationFormState extends State<VaccinationForm> {
             const SizedBox(height: 14),
             const Divider(height: 1),
             const SizedBox(height: 12),
-            // Dose options
             if (selectedDose != null) ...[
               _sheetOption(
                 ctx: ctx, label: 'Clear selection',
@@ -1123,9 +1251,7 @@ class _VaccinationFormState extends State<VaccinationForm> {
               : const Color(0xFFFAFAFA),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isSelected
-                ? _primary
-                : const Color(0xFFEEEEEE),
+            color: isSelected ? _primary : const Color(0xFFEEEEEE),
             width: isSelected ? 1.5 : 1,
           ),
         ),
@@ -1136,9 +1262,7 @@ class _VaccinationFormState extends State<VaccinationForm> {
             child: Text(label,
                 style: TextStyle(
                   fontSize: 13,
-                  fontWeight: isSelected
-                      ? FontWeight.w700
-                      : FontWeight.w500,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                   color: color,
                 )),
           ),
@@ -1170,9 +1294,9 @@ class _VaccinationFormState extends State<VaccinationForm> {
         .toList();
     if (activeCols.isEmpty) return const SizedBox.shrink();
 
-    final iv          = _intervals[vaccine] ?? [];
-    final nextDate    = _nextDoseDates[vaccine];
-    final isComplete  = nextDate == 'All doses complete ✓';
+    final iv         = _intervals[vaccine] ?? [];
+    final nextDate   = _nextDoseDates[vaccine];
+    final isComplete = nextDate == 'All doses complete ✓';
 
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
@@ -1180,7 +1304,6 @@ class _VaccinationFormState extends State<VaccinationForm> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Section label
           Row(children: [
             const Icon(Icons.calendar_today_outlined,
                 size: 12, color: Color(0xFFF5A962)),
@@ -1194,28 +1317,22 @@ class _VaccinationFormState extends State<VaccinationForm> {
             ),
           ]),
           const SizedBox(height: 10),
-
-          // One card per administered dose
           Wrap(
             spacing: 10, runSpacing: 12,
             children: activeCols.asMap().entries.map((entry) {
-              final doseIdx = entry.key; // 0-based index among active cols
-              final col     = entry.value;
-              final dose    = _doses[vaccine]![col.key]!;
-              final ctrl    = _dateControllers[vaccine]![col.key]!;
+              final doseIdx    = entry.key;
+              final col        = entry.value;
+              final dose       = _doses[vaccine]![col.key]!;
+              final ctrl       = _dateControllers[vaccine]![col.key]!;
               final dateEntered = ctrl.text.trim();
 
-              // ── Calculate next dose for THIS specific dose ──────────
-              // ivIdx = doseIdx (after the 1st recorded dose use interval[0], etc.)
               String? thisNextDate;
               bool    thisIsDue    = false;
               bool    thisComplete = false;
 
               if (iv.isEmpty) {
-                // Single-dose vaccine — no next dose
                 thisComplete = true;
               } else if (doseIdx >= iv.length) {
-                // This is the last dose
                 thisComplete = true;
               } else if (dateEntered.isNotEmpty) {
                 try {
@@ -1237,7 +1354,6 @@ class _VaccinationFormState extends State<VaccinationForm> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // ── Dose badge ────────────────────────────────────
                     Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 3),
@@ -1254,8 +1370,6 @@ class _VaccinationFormState extends State<VaccinationForm> {
                       ),
                     ),
                     const SizedBox(height: 5),
-
-                    // ── Date administered picker ───────────────────────
                     GestureDetector(
                       onTap: () async {
                         await _pickDate(ctrl);
@@ -1294,8 +1408,6 @@ class _VaccinationFormState extends State<VaccinationForm> {
                         ),
                       ),
                     ),
-
-                    // ── Next dose — shown directly below the date ─────
                     const SizedBox(height: 6),
                     Container(
                       width: double.infinity,
@@ -1305,8 +1417,7 @@ class _VaccinationFormState extends State<VaccinationForm> {
                         color: nextColor.withValues(alpha: 0.07),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: nextColor.withValues(alpha: 0.3),
-                          width: 1,
+                          color: nextColor.withValues(alpha: 0.3), width: 1,
                         ),
                       ),
                       child: Row(
@@ -1326,14 +1437,10 @@ class _VaccinationFormState extends State<VaccinationForm> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  thisComplete
-                                      ? 'Last dose'
-                                      : 'Next dose',
+                                  thisComplete ? 'Last dose' : 'Next dose',
                                   style: TextStyle(
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w700,
-                                    color: nextColor,
-                                    letterSpacing: 0.3,
+                                    fontSize: 9, fontWeight: FontWeight.w700,
+                                    color: nextColor, letterSpacing: 0.3,
                                   ),
                                 ),
                                 const SizedBox(height: 1),
@@ -1344,8 +1451,7 @@ class _VaccinationFormState extends State<VaccinationForm> {
                                           ? 'Enter date above to calculate'
                                           : thisNextDate ?? '—',
                                   style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
+                                    fontSize: 11, fontWeight: FontWeight.w700,
                                     color: thisComplete
                                         ? const Color(0xFF2E8B7B)
                                         : dateEntered.isEmpty
@@ -1366,8 +1472,6 @@ class _VaccinationFormState extends State<VaccinationForm> {
               );
             }).toList(),
           ),
-
-          // ── Overall complete banner (only shown when all doses done) ─
           if (isComplete) ...[
             const SizedBox(height: 10),
             Container(
@@ -1378,9 +1482,8 @@ class _VaccinationFormState extends State<VaccinationForm> {
                 color: const Color(0xFF2E8B7B).withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
-                  color: const Color(0xFF2E8B7B).withValues(alpha: 0.3),
-                  width: 1.2,
-                ),
+                    color: const Color(0xFF2E8B7B).withValues(alpha: 0.3),
+                    width: 1.2),
               ),
               child: const Row(children: [
                 Icon(Icons.check_circle_outline,
@@ -1399,7 +1502,7 @@ class _VaccinationFormState extends State<VaccinationForm> {
     );
   }
 
-  // ── Helper widgets ────────────────────────────────────────────────────────
+  // ── Helper widgets ─────────────────────────────────────────────────────────
   Widget _bannerStep({required IconData icon, required String text}) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1416,7 +1519,7 @@ class _VaccinationFormState extends State<VaccinationForm> {
     );
   }
 
-  // ── Info dialog ───────────────────────────────────────────────────────────
+  // ── Info dialog ────────────────────────────────────────────────────────────
   void _showInfoDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -1436,8 +1539,7 @@ class _VaccinationFormState extends State<VaccinationForm> {
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       colors: [Color(0xFFF5A962), Color(0xFFF08030)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+                      begin: Alignment.topLeft, end: Alignment.bottomRight,
                     ),
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -1454,31 +1556,29 @@ class _VaccinationFormState extends State<VaccinationForm> {
                 ),
                 GestureDetector(
                   onTap: () => Navigator.pop(ctx),
-                  child: const Icon(Icons.close,
-                      size: 18, color: Colors.black38),
+                  child: const Icon(Icons.close, size: 18, color: Colors.black38),
                 ),
               ]),
               const SizedBox(height: 16),
-              _infoStep('1', Icons.touch_app_outlined,
-                  'Tap a cell in the table',
+              _infoStep('1', Icons.touch_app_outlined, 'Tap a cell in the table',
                   'Tap any coloured cell to record the dose given. '
                   'Grey cells are not applicable for that vaccine at that age.'),
               const SizedBox(height: 10),
-              _infoStep('2', Icons.calendar_month_outlined,
-                  'Enter the date given',
+              _infoStep('2', Icons.calendar_month_outlined, 'Enter the date given',
                   'After recording a dose, tap the vaccine name row to expand '
                   'and enter the date the dose was administered.'),
               const SizedBox(height: 10),
-              _infoStep('3', Icons.auto_awesome_outlined,
-                  'Next dose is auto-calculated',
+              _infoStep('3', Icons.auto_awesome_outlined, 'Next dose is auto-calculated',
                   'Once a date is entered, the next dose date is automatically '
-                  'computed using the standard PH EPI schedule. A reminder '
-                  'notification is sent to your barangay team on the due date.'),
+                  'computed using the standard PH EPI schedule.'),
               const SizedBox(height: 10),
-              _infoStep('4', Icons.swap_horiz,
-                  'Scroll the table sideways',
-                  'The table spans from Birth to 13-18 years. '
-                  'Scroll left/right to see all age columns.'),
+              _infoStep(
+                '4',
+                Icons.save_rounded,
+                'Tap Save to update the status card',
+                'Press "Save Assessment" at the bottom. The Vaccination '
+                'Status card will reflect the new dose labels.',
+              ),
               const SizedBox(height: 16),
               const Divider(),
               const SizedBox(height: 12),
@@ -1489,35 +1589,6 @@ class _VaccinationFormState extends State<VaccinationForm> {
                   )),
               const SizedBox(height: 10),
               ..._scheduleRows(),
-              const SizedBox(height: 16),
-              const Divider(),
-              const SizedBox(height: 10),
-              const Text('COLUMN COLOURS',
-                  style: TextStyle(
-                    fontSize: 10, fontWeight: FontWeight.w800,
-                    color: Color(0xFFF5A962), letterSpacing: 0.8,
-                  )),
-              const SizedBox(height: 8),
-              _colorLegendRow(const Color(0xFFADD8E6),
-                  'Infancy', 'Birth to 12 months'),
-              const SizedBox(height: 6),
-              _colorLegendRow(const Color(0xFFFFB6C1),
-                  'Early Childhood', '15 months to 2-5 years'),
-              const SizedBox(height: 16),
-              const Text('DOSE STATUS COLOURS',
-                  style: TextStyle(
-                    fontSize: 10, fontWeight: FontWeight.w800,
-                    color: Color(0xFFF5A962), letterSpacing: 0.8,
-                  )),
-              const SizedBox(height: 8),
-              _colorLegendRow(const Color(0xFFF5A962),
-                  'Upcoming', 'Next dose scheduled in the future'),
-              const SizedBox(height: 6),
-              _colorLegendRow(const Color(0xFFEF4444),
-                  'Overdue', 'Next dose date has already passed'),
-              const SizedBox(height: 6),
-              _colorLegendRow(const Color(0xFF2E8B7B),
-                  'Complete', 'All doses done'),
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
@@ -1554,8 +1625,7 @@ class _VaccinationFormState extends State<VaccinationForm> {
           child: Center(
             child: Text(num,
                 style: const TextStyle(
-                  fontSize: 12, fontWeight: FontWeight.w800,
-                  color: Colors.white,
+                  fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white,
                 )),
           ),
         ),
@@ -1589,24 +1659,33 @@ class _VaccinationFormState extends State<VaccinationForm> {
 
   List<Widget> _scheduleRows() {
     const rows = [
-      ['BCG',               '1 dose',  'Birth'],
-      ['Hepatitis B',       '3 doses', 'Birth, 1 mo, 6 mos'],
-      ['OPV',               '3+1',     '6, 10, 14 wks + 9 mo booster'],
-      ['IPV',               '3 doses', '6, 10, 14 wks'],
-      ['DTwP/DTaP-Hib-IPV', '3+1',     '6, 10, 14 wks + 15 mo booster'],
-      ['PCV',               '3+1',     '6, 10, 14 wks + 9 mo'],
-      ['RV',                '3 doses', '6, 10, 14 wks'],
-      ['Influenza',         '1 dose',  '6 mos'],
-      ['MMR/MR',            '2 doses', '9 mo, 12 mo'],
-      ['Measles/MMR',       '3 doses', '6 mo, 9 mo, 15 mo'],
-      ['JEV',               '2 doses', '9 mo, 19-23 mos'],
-      ['Varicella',         '2 doses', '12 mo, 15 mo'],
-      ['Hepatitis A',       '2 doses', '12 mo, 18 mo'],
-      ['Rabies',            'Series',  '2-5 yrs'],
-      ['Meningococcal',     'Note',    'See annotations'],
-      ['Cholera',           'Note',    'See annotations'],
-      ['Typhoid',           'Note',    'See annotations'],
+      ['BCG',            '1 dose',      'Birth'],
+      ['Hepatitis B',    '3 doses',     'Birth, 1 mo, 6 mos'],
+      ['Pentavalent',    '3 doses',     '6, 10, 14 wks'],
+      ['Oral Polio',     '3+Booster',   '6, 10, 14 wks + Booster'],
+      ['IPV',            '3 doses',     '6, 10, 14 wks'],
+      ['Phenumococcal',  '3+Booster',   '6, 10, 14 wks + Booster'],
+      ['Rotavirus',      '3 doses',     '6, 10, 14 wks'],
+      ['Measles',        '1 dose',      '9 mo'],
+      ['MMR',            '2 doses',     '12 mo, 15 mo'],
+      ['Hepatitis A',    '2 doses',     '12 mo, 18 mo'],
+      ['Chickenpox',     '2 doses',     '12 mo, 15 mo'],
+      ['Typhoid',        'Note',        'See annotations'],
+      ['Pneumo 23',      'Note',        'See annotations'],
+      ['FLU',            '2 doses',     'Yearly'],
+      ['OPV',            '3+Booster',   '6, 10, 14 wks + Booster'],
+      ['DTwP/DTaP-Hib',  '3+Booster',  '6, 10, 14 wks + 15 mo Booster'],
+      ['PCV',            '3+Booster',   '6, 10, 14 wks + Booster'],
+      ['Influenza',      '2 doses',     'Yearly'],
+      ['MMR/MR',         '2 doses',     '9 mo, 12 mo'],
+      ['Measles/MMR',    '3 doses',     '6 mo, 9 mo, 15 mo'],
+      ['JEV',            '2 doses',     '9 mo, 19-23 mos'],
+      ['Varicella',      '2 doses',     '12 mo, 15 mo'],
+      ['Rabies',         'Series',      'See schedule'],
+      ['Meningococcal',  'Note',        'See annotations'],
+      ['Cholera',        'Note',        'See annotations'],
     ];
+
     return rows.map((r) => Container(
           margin: const EdgeInsets.only(bottom: 4),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
@@ -1625,8 +1704,7 @@ class _VaccinationFormState extends State<VaccinationForm> {
                   )),
             ),
             Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 7, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
               decoration: BoxDecoration(
                 color: const Color(0xFFF5A962).withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(6),
@@ -1646,24 +1724,5 @@ class _VaccinationFormState extends State<VaccinationForm> {
             ),
           ]),
         )).toList();
-  }
-
-  Widget _colorLegendRow(Color color, String label, String desc) {
-    return Row(children: [
-      Container(
-        width: 12, height: 12,
-        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-      ),
-      const SizedBox(width: 8),
-      Text('$label — ',
-          style: TextStyle(
-            fontSize: 12, fontWeight: FontWeight.w700, color: color,
-          )),
-      Expanded(
-        child: Text(desc,
-            style: const TextStyle(
-                fontSize: 12, color: Color(0xFF666666))),
-      ),
-    ]);
   }
 }

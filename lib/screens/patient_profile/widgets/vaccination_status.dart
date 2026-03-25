@@ -4,9 +4,14 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../../services/connectivity_service.dart';
 import 'package:flutter/foundation.dart';
 
+/// Import the shared key map from vaccination_form.dart so both files
+/// are guaranteed to use identical keys.
+///
+///   import 'vaccination_form.dart' show kVaccineNameToKey;
+///
+/// (Alternatively copy kVaccineNameToKey here if you prefer no cross-import.)
+
 /// National Immunization Program vaccines (Philippines)
-/// Keys must match what _computeLocalVaccinationStatuses() emits in
-/// patient_profile_overview.dart, which in turn matches vaccination_form.dart.
 class _Vaccine {
   final String key;
   final String displayName;
@@ -18,24 +23,34 @@ class _Vaccine {
   });
 }
 
+/// The camelCase keys here MUST match kVaccineNameToKey values in
+/// vaccination_form.dart — they are the Firestore field names.
 const _vaccines = [
-  _Vaccine(key: 'bcg',           displayName: 'BCG',                possibleDoses: ['Pending', '1st dose']),
-  _Vaccine(key: 'hepatitisB',    displayName: 'Hepatitis B',         possibleDoses: ['Pending', '1st dose', '2nd dose', '3rd dose']),
-  _Vaccine(key: 'opv',           displayName: 'OPV',                 possibleDoses: ['Pending', '1st dose', '2nd dose', '3rd dose', 'Booster']),
-  _Vaccine(key: 'ipv',           displayName: 'IPV',                 possibleDoses: ['Pending', '1st dose', '2nd dose', '3rd dose']),
-  _Vaccine(key: 'dtap',          displayName: 'DTwP/DTaP-Hib-IPV',  possibleDoses: ['Pending', '1st dose', '2nd dose', '3rd dose', '1st booster']),
-  _Vaccine(key: 'pcv',           displayName: 'PCV',                 possibleDoses: ['Pending', '1st dose', '2nd dose', '3rd dose', 'Booster']),
-  _Vaccine(key: 'rv',            displayName: 'RV',                  possibleDoses: ['Pending', '1st dose', '2nd dose', '3rd dose']),
-  _Vaccine(key: 'influenza',     displayName: 'Influenza',           possibleDoses: ['Pending', '1st dose', 'Yearly']),
-  _Vaccine(key: 'mmr',           displayName: 'MMR/MR',              possibleDoses: ['Pending', '1st dose MMR', '2nd dose MMR']),
-  _Vaccine(key: 'measlesMmr',    displayName: 'Measles/MMR',         possibleDoses: ['Pending', 'Measles', '1st dose MMR', '2nd dose MMR']),
-  _Vaccine(key: 'jev',           displayName: 'JEV',                 possibleDoses: ['Pending', '1st dose', '2nd dose']),
-  _Vaccine(key: 'varicella',     displayName: 'Varicella',           possibleDoses: ['Pending', '1st dose', '2nd dose']),
-  _Vaccine(key: 'hepatitisA',    displayName: 'Hepatitis A',         possibleDoses: ['Pending', '1st dose', '2nd dose']),
-  _Vaccine(key: 'rabies',        displayName: 'Rabies',              possibleDoses: ['Pending', 'Rabies series']),
-  _Vaccine(key: 'meningococcal', displayName: 'Meningococcal',       possibleDoses: ['Pending', 'See annotations']),
-  _Vaccine(key: 'cholera',       displayName: 'Cholera',             possibleDoses: ['Pending', 'See annotations']),
-  _Vaccine(key: 'typhoid',       displayName: 'Typhoid',             possibleDoses: ['Pending', 'See annotations']),
+  _Vaccine(key: 'bcg',           displayName: 'BCG',           possibleDoses: ['Pending', '1st dose']),
+  _Vaccine(key: 'hepatitisB',    displayName: 'Hepatitis B',   possibleDoses: ['Pending', '1st dose', '2nd dose', '3rd dose']),
+  _Vaccine(key: 'pentavalent',   displayName: 'Pentavalent',   possibleDoses: ['Pending', '1st dose', '2nd dose', '3rd dose']),
+  _Vaccine(key: 'oralPolio',     displayName: 'Oral Polio',    possibleDoses: ['Pending', '1st dose', '2nd dose', '3rd dose', 'Booster']),
+  _Vaccine(key: 'ipv',           displayName: 'IPV',           possibleDoses: ['Pending', '1st dose', '2nd dose', '3rd dose']),
+  _Vaccine(key: 'phenumococcal', displayName: 'Phenumococcal', possibleDoses: ['Pending', '1st dose', '2nd dose', '3rd dose', 'Booster']),
+  _Vaccine(key: 'rotavirus',     displayName: 'Rotavirus',     possibleDoses: ['Pending', '1st dose', '2nd dose', '3rd dose']),
+  _Vaccine(key: 'measles',       displayName: 'Measles',       possibleDoses: ['Pending', '1st dose']),
+  _Vaccine(key: 'mmr',           displayName: 'MMR',           possibleDoses: ['Pending', '1st dose', '2nd dose']),
+  _Vaccine(key: 'hepatitisA',    displayName: 'Hepatitis A',   possibleDoses: ['Pending', '1st dose', '2nd dose']),
+  _Vaccine(key: 'chickenpox',    displayName: 'Chickenpox',    possibleDoses: ['Pending', '1st dose', '2nd dose']),
+  _Vaccine(key: 'typhoid',       displayName: 'Typhoid',       possibleDoses: ['Pending', 'See annotations']),
+  _Vaccine(key: 'pneumo23',      displayName: 'Pneumo 23',     possibleDoses: ['Pending', 'See annotations']),
+  _Vaccine(key: 'flu',           displayName: 'FLU',           possibleDoses: ['Pending', '1st dose', '2nd dose']),
+  _Vaccine(key: 'opv',           displayName: 'OPV',           possibleDoses: ['Pending', '1st dose', '2nd dose', '3rd dose', 'Booster']),
+  _Vaccine(key: 'dtapHib',       displayName: 'DTwP/DTaP-Hib', possibleDoses: ['Pending', '1st dose', '2nd dose', '3rd dose', '1st booster']),
+  _Vaccine(key: 'pcv',           displayName: 'PCV',           possibleDoses: ['Pending', '1st dose', '2nd dose', '3rd dose', 'Booster']),
+  _Vaccine(key: 'influenza',     displayName: 'Influenza',     possibleDoses: ['Pending', '1st dose', '2nd dose']),
+  _Vaccine(key: 'mmrMr',         displayName: 'MMR/MR',        possibleDoses: ['Pending', '1st dose MMR', '2nd dose MMR']),
+  _Vaccine(key: 'measlesMmr',    displayName: 'Measles/MMR',   possibleDoses: ['Pending', 'Measles', '1st dose MMR', '2nd dose MMR']),
+  _Vaccine(key: 'jev',           displayName: 'JEV',           possibleDoses: ['Pending', '1st dose', '2nd dose']),
+  _Vaccine(key: 'varicella',     displayName: 'Varicella',     possibleDoses: ['Pending', '1st dose', '2nd dose']),
+  _Vaccine(key: 'rabies',        displayName: 'Rabies',        possibleDoses: ['Pending', 'Rabies series']),
+  _Vaccine(key: 'meningococcal', displayName: 'Meningococcal', possibleDoses: ['Pending', 'See annotations']),
+  _Vaccine(key: 'cholera',       displayName: 'Cholera',       possibleDoses: ['Pending', 'See annotations']),
 ];
 
 /// Vaccination Status card — styled to match ProfileInfoCard.
@@ -66,7 +81,7 @@ class VaccinationStatusSection extends StatefulWidget {
 
 class _VaccinationStatusSectionState
     extends State<VaccinationStatusSection> {
-  // ─── Design Tokens ──────────────────────────────────────────────────────────
+  // ─── Design Tokens ───────────────────────────────────────────────────────
   static const Color _orange      = Color(0xFFF08030);
   static const Color _orangeLight = Color(0xFFF5A962);
   static const Color _surface     = Color(0xFFFFFFFF);
@@ -90,15 +105,38 @@ class _VaccinationStatusSectionState
             offset: const Offset(0, 6)),
       ];
 
-  // ─── State ──────────────────────────────────────────────────────────────────
-  Map<String, String> _statuses = {};
-  DateTime? _lastReviewDate;
-  String? _lastModifiedByName;
-  bool _loading = true;
+  // ─── State ───────────────────────────────────────────────────────────────
+  Map<String, String> _statuses  = {};
+  DateTime?           _lastReviewDate;
+  String?             _lastModifiedByName;
+  bool                _loading = true;
 
-  // ─── Firestore ──────────────────────────────────────────────────────────────
+  // ─── Firestore path ───────────────────────────────────────────────────────
   String get _patientKey =>
       '${widget.firstName.trim().toLowerCase()}_${widget.lastName.trim().toLowerCase()}';
+
+  DocumentReference? get _firestoreRef {
+    if (widget.useSharedStorage) {
+      final pid = widget.patientId;
+      final bid = widget.barangayId;
+      if (pid == null || pid.isEmpty || bid == null || bid.isEmpty) return null;
+      return FirebaseFirestore.instance
+          .collection('barangays')
+          .doc(bid)
+          .collection('patients')
+          .doc(pid)
+          .collection('vaccination')
+          .doc('record');
+    } else {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null || uid.isEmpty) return null;
+      return FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('vaccinationStatus')
+          .doc(_patientKey);
+    }
+  }
 
   @override
   void initState() {
@@ -113,13 +151,13 @@ class _VaccinationStatusSectionState
         widget.localStatuses != null &&
         widget.localStatuses!.isNotEmpty) {
       setState(() {
-        _statuses = Map<String, String>.from(widget.localStatuses!);
+        _statuses       = Map<String, String>.from(widget.localStatuses!);
         _lastReviewDate = widget.localLastReviewDate;
-        _loading = false;
+        _loading        = false;
       });
       return;
     }
-    _fetchVaccination();
+    await _fetchVaccination();
   }
 
   @override
@@ -139,112 +177,111 @@ class _VaccinationStatusSectionState
         widget.localStatuses != null &&
         widget.localStatuses!.isNotEmpty) {
       setState(() {
-        _statuses = Map<String, String>.from(widget.localStatuses!);
-        _lastReviewDate =
-            widget.localLastReviewDate ?? _lastReviewDate;
-        _loading = false;
+        _statuses       = Map<String, String>.from(widget.localStatuses!);
+        _lastReviewDate = widget.localLastReviewDate ?? _lastReviewDate;
+        _loading        = false;
       });
     }
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // Fetch & parse — understands both the OLD schema (boolean / nested
+  // 'statuses' map) and the NEW schema written by VaccinationForm.
+  // ─────────────────────────────────────────────────────────────────────────
   Future<void> _fetchVaccination() async {
+    final ref = _firestoreRef;
+    if (ref == null) {
+      setState(() {
+        _statuses = {for (final v in _vaccines) v.key: 'Pending'};
+        _loading  = false;
+      });
+      return;
+    }
+
     try {
-      DocumentReference? ref;
-      if (widget.useSharedStorage) {
-        final pid = widget.patientId;
-        final bid = widget.barangayId;
-        if (pid == null || pid.isEmpty || bid == null || bid.isEmpty) {
-          setState(() {
-            _statuses = {for (final v in _vaccines) v.key: 'Pending'};
-            _loading = false;
-          });
-          return;
-        }
-        ref = FirebaseFirestore.instance
-            .collection('barangays')
-            .doc(bid)
-            .collection('patients')
-            .doc(pid)
-            .collection('vaccination')
-            .doc('record');
-      } else {
-        final uid = FirebaseAuth.instance.currentUser?.uid;
-        if (uid == null || uid.isEmpty) {
-          setState(() {
-            _statuses = {for (final v in _vaccines) v.key: 'Pending'};
-            _loading = false;
-          });
-          return;
-        }
-        ref = FirebaseFirestore.instance
-            .collection('users')
-            .doc(uid)
-            .collection('vaccinationStatus')
-            .doc(_patientKey);
-      }
-
       final snap = await ref.get();
-      if (snap.exists) {
-        final raw = snap.data();
-        final Map<String, dynamic> data = raw is Map<String, dynamic>
-            ? raw
-            : Map<String, dynamic>.from(raw as Map);
-
-        Map<String, dynamic> source;
-        if (widget.useSharedStorage) {
-          source = data;
-        } else {
-          final rawStatuses = data['statuses'];
-          if (rawStatuses is Map<String, dynamic>) {
-            source = rawStatuses;
-          } else if (rawStatuses is Map) {
-            source = Map<String, dynamic>.from(rawStatuses);
-          } else {
-            source = <String, dynamic>{};
-          }
-        }
-
-        final Map<String, String> loaded = {};
-        for (final v in _vaccines) {
-          final value = source[v.key];
-          if (value is bool) {
-            loaded[v.key] =
-                value ? v.possibleDoses.last : 'Pending';
-          } else if (value is String) {
-            loaded[v.key] = (value == 'Completed' &&
-                    !v.possibleDoses.contains('Completed'))
-                ? v.possibleDoses.last
-                : value;
-          } else {
-            loaded[v.key] = 'Pending';
-          }
-        }
-        final Timestamp? ts = widget.useSharedStorage
-            ? data['lastReviewDate'] as Timestamp?
-            : data['updatedAt'] as Timestamp?;
-        setState(() {
-          _statuses           = loaded;
-          _lastReviewDate     = ts?.toDate();
-          _lastModifiedByName = data['lastModifiedByName'] as String?;
-          _loading            = false;
-        });
-      } else {
+      if (!snap.exists) {
         setState(() {
           _statuses = {for (final v in _vaccines) v.key: 'Pending'};
           _loading  = false;
         });
+        return;
       }
+
+      final raw  = snap.data();
+      final data = raw is Map<String, dynamic>
+          ? raw
+          : Map<String, dynamic>.from(raw as Map);
+
+      // ── Determine source map ─────────────────────────────────────────
+      // Old personal schema wraps dose data inside data['statuses'].
+      // New schema (written by VaccinationForm) and shared storage both
+      // write dose labels directly at the top level.
+      Map<String, dynamic> source;
+      if (!widget.useSharedStorage && data.containsKey('statuses')) {
+        final rawStatuses = data['statuses'];
+        source = rawStatuses is Map<String, dynamic>
+            ? rawStatuses
+            : Map<String, dynamic>.from(rawStatuses as Map? ?? {});
+      } else {
+        source = data;
+      }
+
+      // ── Parse each vaccine ───────────────────────────────────────────
+      final Map<String, String> loaded = {};
+      for (final v in _vaccines) {
+        final value = source[v.key];
+
+        if (value is String) {
+          // New schema: already a dose-label string
+          if (value == 'Pending') {
+            loaded[v.key] = 'Pending';
+          } else if (v.possibleDoses.contains(value)) {
+            loaded[v.key] = value;
+          } else if (value == 'Completed') {
+            // Legacy compat: map 'Completed' to last label
+            loaded[v.key] = v.possibleDoses.last;
+          } else {
+            // Unknown string — store as-is (display it verbatim)
+            loaded[v.key] = value;
+          }
+        } else if (value is bool) {
+          // Very old schema: boolean
+          loaded[v.key] = value ? v.possibleDoses.last : 'Pending';
+        } else {
+          loaded[v.key] = 'Pending';
+        }
+      }
+
+      // ── Timestamps ───────────────────────────────────────────────────
+      // Support both 'lastReviewDate' (shared / new) and 'updatedAt' (old).
+      final Timestamp? ts = (data['lastReviewDate'] ?? data['updatedAt']) as Timestamp?;
+
+      setState(() {
+        _statuses           = loaded;
+        _lastReviewDate     = ts?.toDate();
+        _lastModifiedByName = data['lastModifiedByName'] as String?;
+        _loading            = false;
+      });
     } catch (e) {
       debugPrint('Error fetching vaccination: $e');
       setState(() => _loading = false);
     }
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // Save from the inline Update-Record bottom sheet.
+  // Writes the same flat schema VaccinationForm uses.
+  // ─────────────────────────────────────────────────────────────────────────
   Future<void> _saveVaccination(Map<String, String> updated) async {
+    final ref = _firestoreRef;
+    if (ref == null) return;
+
     try {
-      final now = DateTime.now();
+      final now         = DateTime.now();
       final currentUser = FirebaseAuth.instance.currentUser;
-      String userName = 'Unknown';
+      String userName   = 'Unknown';
+
       if (currentUser != null) {
         final userDoc = await FirebaseFirestore.instance
             .collection('users')
@@ -256,38 +293,15 @@ class _VaccinationStatusSectionState
             'Unknown';
       }
 
-      DocumentReference? ref;
-      if (widget.useSharedStorage) {
-        final pid = widget.patientId;
-        final bid = widget.barangayId;
-        if (pid == null || pid.isEmpty || bid == null || bid.isEmpty) {
-          return;
-        }
-        ref = FirebaseFirestore.instance
-            .collection('barangays')
-            .doc(bid)
-            .collection('patients')
-            .doc(pid)
-            .collection('vaccination')
-            .doc('record');
-      } else {
-        final uid = currentUser?.uid;
-        if (uid == null || uid.isEmpty) return;
-        ref = FirebaseFirestore.instance
-            .collection('users')
-            .doc(uid)
-            .collection('vaccinationStatus')
-            .doc(_patientKey);
-      }
-
+      // Write dose labels directly at top level (same as VaccinationForm)
       await ref.set({
         'firstName':          widget.firstName,
         'lastName':           widget.lastName,
         'lastReviewDate':     Timestamp.fromDate(now),
+        'updatedAt':          Timestamp.fromDate(now),
         'lastModifiedBy':     currentUser?.uid ?? '',
         'lastModifiedByName': userName,
-        'updatedAt':          Timestamp.fromDate(now),
-        ...updated,
+        ...updated, // { 'bcg': '1st dose', 'hepatitisB': '2nd dose', … }
       }, SetOptions(merge: true));
 
       setState(() {
@@ -307,7 +321,13 @@ class _VaccinationStatusSectionState
     }
   }
 
-  // ─── Computed ────────────────────────────────────────────────────────────────
+  // ─── Refresh ──────────────────────────────────────────────────────────────
+  /// Call this from a parent widget after VaccinationForm saves, e.g.:
+  ///   final _statusKey = GlobalKey<_VaccinationStatusSectionState>();
+  ///   _statusKey.currentState?.refresh();
+  Future<void> refresh() => _fetchVaccination();
+
+  // ─── Computed ─────────────────────────────────────────────────────────────
   bool _isCompleted(String dose) =>
       dose != 'Pending' && dose.isNotEmpty;
   int get _completedCount =>
@@ -324,7 +344,7 @@ class _VaccinationStatusSectionState
     return '${m[d.month - 1]} ${d.day.toString().padLeft(2, '0')}, ${d.year}';
   }
 
-  // ─── Build ───────────────────────────────────────────────────────────────────
+  // ─── Build ────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -344,8 +364,8 @@ class _VaccinationStatusSectionState
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                   colors: [_orangeLight, _orange]),
-              borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(_r)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(_r)),
             ),
           ),
           _buildHeader(),
@@ -357,8 +377,8 @@ class _VaccinationStatusSectionState
   }
 
   Widget _buildHeader() => Padding(
-        padding: const EdgeInsets.symmetric(
-            horizontal: 20, vertical: 16),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         child: Row(children: [
           _iconBox(Icons.health_and_safety_rounded),
           const SizedBox(width: 12),
@@ -369,6 +389,15 @@ class _VaccinationStatusSectionState
                     fontWeight: FontWeight.w700,
                     color: _ink,
                     letterSpacing: -0.3)),
+          ),
+          // Refresh button — handy after VaccinationForm saves
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: _orange, size: 20),
+            tooltip: 'Refresh',
+            onPressed: () async {
+              setState(() => _loading = true);
+              await _fetchVaccination();
+            },
           ),
           if (widget.useSharedStorage) _sharedBadge(),
         ]),
@@ -384,8 +413,8 @@ class _VaccinationStatusSectionState
       );
 
   Widget _sharedBadge() => Container(
-        padding: const EdgeInsets.symmetric(
-            horizontal: 10, vertical: 4),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
               colors: [_orangeLight, _orange]),
@@ -444,7 +473,7 @@ class _VaccinationStatusSectionState
                   letterSpacing: 1.2)),
           const SizedBox(height: 10),
           ..._vaccines.map((v) {
-            final dose = _statuses[v.key] ?? 'Pending';
+            final dose      = _statuses[v.key] ?? 'Pending';
             final completed = _isCompleted(dose);
             return _vaccineRow(v.displayName, dose, completed);
           }),
@@ -554,7 +583,8 @@ class _VaccinationStatusSectionState
                   style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: _allCompleted ? _greenText : _ink),
+                      color:
+                          _allCompleted ? _greenText : _ink),
                 ),
               ]),
               Text(
@@ -583,8 +613,7 @@ class _VaccinationStatusSectionState
     );
   }
 
-  Widget _vaccineRow(
-      String name, String dose, bool completed) {
+  Widget _vaccineRow(String name, String dose, bool completed) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Container(
@@ -632,8 +661,7 @@ class _VaccinationStatusSectionState
                   style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
-                      color:
-                          completed ? _greenText : _amber)),
+                      color: completed ? _greenText : _amber)),
             ),
           ),
         ]),
@@ -712,8 +740,7 @@ class _VaccinationStatusSectionState
                         horizontal: 12, vertical: 7),
                     decoration: BoxDecoration(
                       color: _amberBg,
-                      borderRadius:
-                          BorderRadius.circular(_ri),
+                      borderRadius: BorderRadius.circular(_ri),
                       border: Border.all(
                           color: _orange.withOpacity(0.25)),
                     ),

@@ -511,35 +511,25 @@ class _HomePageState extends State<HomePage>
               .length;
         }
 
-        String doseLabelForCount(int count) {
-          if (count <= 0) return 'Pending';
-          switch (count) {
-            case 1:  return '1st dose';
-            case 2:  return '2nd dose';
-            case 3:  return '3rd dose';
-            case 4:  return '4th dose';
-            case 5:  return '5th dose';
-            default: return 'Booster';
-          }
+        String doseLabelForCount(String vaccineName, int count) {
+          final labels = kVaccineDoseLabels[vaccineName] ?? const <String>[];
+          if (count <= 0 || labels.isEmpty) return 'Pending';
+          final idx = (count - 1).clamp(0, labels.length - 1);
+          return labels[idx];
         }
 
-        String vaccineStatus(String name) =>
-            doseLabelForCount(doseCount(name));
-
-        final opvCount = doseCount('OPV');
-        final ipvCount = doseCount('IPV');
-
-        final statuses = <String, String>{
-          'bcg':            vaccineStatus('BCG'),
-          'hepatitisB':     vaccineStatus('Hepatitis B'),
-          'dptPentavalent': vaccineStatus('DTwP/DTaP-Hib-IPV'),
-          'opv':            vaccineStatus('OPV'),
-          'ipv':            vaccineStatus('IPV'),
-          'opvIpv':         doseLabelForCount(
-              opvCount > ipvCount ? opvCount : ipvCount),
-          'measlesMmr':     vaccineStatus('MMR/MR'),
-          'pcv':            vaccineStatus('PCV'),
-        };
+        // Build statuses keyed by the Firestore/profile camelCase keys.
+        // IMPORTANT: only include vaccines that have at least 1 dose selected
+        // in this form, so we don't overwrite previously-saved vaccines with
+        // `Pending`.
+        final statuses = <String, String>{};
+        for (final entry in kVaccineNameToKey.entries) {
+          final vaccineName = entry.key; // e.g. 'Hepatitis B'
+          final firestoreKey = entry.value; // e.g. 'hepatitisB'
+          final count = doseCount(vaccineName);
+          if (count <= 0) continue;
+          statuses[firestoreKey] = doseLabelForCount(vaccineName, count);
+        }
 
         final fs = FirestoreService();
         await fs.saveVaccinationStatus(
@@ -579,6 +569,59 @@ class _HomePageState extends State<HomePage>
         }
       } catch (e) {
         debugPrint('Error syncing vaccination status: $e');
+      }
+    }
+
+    // ── Update vaccination status from form changes (real-time) ──────────────────────────────────────────
+    Future<void> _updateVaccinationStatusFromForm(Map<String, dynamic> vaccinationData) async {
+      // Only update if we have patient information and vaccination data
+      if (firstNameController.text.trim().isEmpty || 
+          lastNameController.text.trim().isEmpty || 
+          vaccinationData.isEmpty) {
+        return;
+      }
+
+      try {
+        // Count columns recorded as true, ignoring _date and nextDoseDate keys.
+        int doseCount(String vaccine) {
+          final doses = vaccinationData[vaccine] as Map<String, dynamic>?;
+          if (doses == null) return 0;
+          return doses.entries
+              .where((e) =>
+                  !e.key.endsWith('_date') &&
+                  e.key != 'nextDoseDate' &&
+                  e.value == true)
+              .length;
+        }
+
+        String doseLabelForCount(String vaccineName, int count) {
+          final labels = kVaccineDoseLabels[vaccineName] ?? const <String>[];
+          if (count <= 0 || labels.isEmpty) return 'Pending';
+          final idx = (count - 1).clamp(0, labels.length - 1);
+          return labels[idx];
+        }
+
+        final statuses = <String, String>{};
+        for (final entry in kVaccineNameToKey.entries) {
+          final vaccineName = entry.key;
+          final firestoreKey = entry.value;
+          final count = doseCount(vaccineName);
+          if (count <= 0) continue;
+          statuses[firestoreKey] = doseLabelForCount(vaccineName, count);
+        }
+
+        // Save to local vaccination status for immediate update
+        final fs = FirestoreService();
+        await fs.saveVaccinationStatus(
+          firstName: firstNameController.text.trim(),
+          middleName: middleNameController.text.trim(),
+          lastName: lastNameController.text.trim(),
+          statuses: statuses,
+        );
+
+        debugPrint('Vaccination status updated from form changes');
+      } catch (e) {
+        debugPrint('Error updating vaccination status from form: $e');
       }
     }
 

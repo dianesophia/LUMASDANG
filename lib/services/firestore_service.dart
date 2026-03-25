@@ -129,63 +129,55 @@ class FirestoreService {
   /// Saves vaccination status to the barangay patient doc.
   /// ── UPDATED: profileKeys and flat map now include all 17 new vaccines ──
   Future<void> saveVaccinationStatusToBarangayPatient({
-    required String barangayId,
-    required String patientId,
-    required String firstName,
-    required String middleName,
-    required String lastName,
-    required Map<String, String> statuses,
-  }) async {
-    final user = _auth.currentUser;
-    if (user == null) return;
+  required String barangayId,
+  required String patientId,
+  required String firstName,
+  required String middleName,
+  required String lastName,
+  required Map<String, String> statuses,
+}) async {
+  final user = _auth.currentUser;
+  if (user == null) return;
 
-    // All keys expected by VaccinationStatusSection in vaccination_status.dart
-    const profileKeys = [
-      'bcg',
-      'hepatitisB',
-      'opv',
-      'ipv',
-      'dtap',
-      'pcv',
-      'rv',
-      'influenza',
-      'mmr',
-      'measlesMmr',
-      'jev',
-      'varicella',
-      'hepatitisA',
-      'rabies',
-      'meningococcal',
-      'cholera',
-      'typhoid',
-      'opvIpv',
-    ];
+  // ── Updated to match all 25 vaccines in _vaccineNames ──
+  const profileKeys = [
+    'bcg',
+    'hepatitisB',
+    'pentavalent',       // NEW
+    'oralPolio',         // NEW
+    'ipv',
+    'phenumococcal',     // NEW
+    'rotavirus',         // NEW
+    'measles',           // NEW
+    'mmr',
+    'hepatitisA',
+    'chickenpox',        // NEW
+    'typhoid',
+    'pneumo23',          // NEW
+    'flu',               // NEW
+    'opv',
+    'dtapHib',
+    'pcv',
+    'influenza',
+    'mmrMr',             // NEW
+    'measlesMmr',
+    'jev',
+    'varicella',
+    'rabies',
+    'meningococcal',
+    'cholera',
+  ];
 
-    // Start with all keys defaulting to Pending
+    // Only write vaccines that are present in `statuses`.
+    // This avoids resetting previously-saved vaccines to `Pending` when the
+    // user updates only a subset in the form.
     final flat = <String, String>{};
     for (final k in profileKeys) {
-      flat[k] = 'Pending';
+      final v = statuses[k];
+      if (v != null) flat[k] = v;
     }
 
-    // Map home-page vaccine keys → profile keys
-    flat['bcg']           = statuses['bcg']           ?? 'Pending';
-    flat['hepatitisB']    = statuses['hepatitisB']     ?? 'Pending';
-    flat['opv']           = statuses['opv']            ?? statuses['opvIpv'] ?? 'Pending';
-    flat['ipv']           = statuses['ipv']            ?? statuses['opvIpv'] ?? 'Pending';
-    flat['dtap']          = statuses['dptPentavalent'] ?? 'Pending';
-    flat['pcv']           = statuses['pcv']            ?? 'Pending';
-    flat['rv']            = statuses['rv']             ?? 'Pending';
-    flat['influenza']     = statuses['influenza']      ?? 'Pending';
-    flat['mmr']           = statuses['measlesMmr']     ?? 'Pending';
-    flat['measlesMmr']    = statuses['measlesMmr']     ?? 'Pending';
-    flat['jev']           = statuses['jev']            ?? 'Pending';
-    flat['varicella']     = statuses['varicella']      ?? 'Pending';
-    flat['hepatitisA']    = statuses['hepatitisA']     ?? 'Pending';
-    flat['rabies']        = statuses['rabies']         ?? 'Pending';
-    flat['meningococcal'] = statuses['meningococcal']  ?? 'Pending';
-    flat['cholera']       = statuses['cholera']        ?? 'Pending';
-    flat['typhoid']       = statuses['typhoid']        ?? 'Pending';
-    flat['opvIpv']        = statuses['opvIpv']         ?? 'Pending';
+  // ... rest of your method stays the same
 
     final userDoc = await _firestore.collection('users').doc(user.uid).get();
     final userName = userDoc.data()?['fullName'] ??
