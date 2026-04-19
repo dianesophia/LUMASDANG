@@ -864,105 +864,134 @@ class FirestoreService {
 
   /// Save assessment to barangay patient's assessments subcollection
   Future<String> saveAssessmentToBarangayPatient({
-    required String patientId,
-    required Map<String, dynamic> assessmentData,
-  }) async {
-    final user = _auth.currentUser;
-    if (user == null) {
-      throw FirebaseAuthException(
-        code: 'no-current-user',
-        message: 'No authenticated user found',
-      );
-    }
-
-    final userDoc = await _firestore.collection('users').doc(user.uid).get();
-    final barangayId = userDoc.data()?['barangayId'] as String?;
-
-    if (barangayId == null || barangayId.isEmpty) {
-      throw Exception('User has no barangay assigned');
-    }
-
-    final assessmentRef = _firestore
-        .collection('barangays')
-        .doc(barangayId)
-        .collection('patients')
-        .doc(patientId)
-        .collection('assessments')
-        .doc();
-
-    final payload = {
-      ...assessmentData,
-      'createdAt': FieldValue.serverTimestamp(),
-      'createdBy': user.uid,
-      'createdByName': userDoc.data()?['fullName'] ?? userDoc.data()?['username'] ?? 'Unknown',
-      'barangayId': barangayId,
-    };
-
-    await assessmentRef.set(payload);
-    return assessmentRef.id;
+  required String patientId,
+  required Map<String, dynamic> assessmentData,
+}) async {
+  final user = _auth.currentUser;
+  if (user == null) {
+    throw FirebaseAuthException(
+      code: 'no-current-user',
+      message: 'No authenticated user found',
+    );
   }
+
+  final userDoc = await _firestore.collection('users').doc(user.uid).get();
+  final barangayId = userDoc.data()?['barangayId'] as String?;
+
+  if (barangayId == null || barangayId.isEmpty) {
+    throw Exception('User has no barangay assigned');
+  }
+
+  // ✅ Convert DateTime → Timestamp
+  final sanitized = assessmentData.map((k, v) {
+    if (v is DateTime) return MapEntry(k, Timestamp.fromDate(v));
+    return MapEntry(k, v);
+  });
+
+  final assessmentRef = _firestore
+      .collection('barangays')
+      .doc(barangayId)
+      .collection('patients')
+      .doc(patientId)
+      .collection('assessments')
+      .doc();
+
+  final payload = {
+    ...sanitized,
+    'createdAt': FieldValue.serverTimestamp(),
+    'createdBy': user.uid,
+    'createdByName': userDoc.data()?['fullName'] ??
+        userDoc.data()?['username'] ??
+        'Unknown',
+    'barangayId': barangayId,
+  };
+
+  await assessmentRef.set(payload);
+  return assessmentRef.id;
+}
 
   /// Get all assessments for a specific patient
   Future<List<Map<String, dynamic>>> getAssessmentsForBarangayPatient(String patientId) async {
-    final user = _auth.currentUser;
-    if (user == null) return [];
+  final user = _auth.currentUser;
+  if (user == null) return [];
 
-    final userDoc = await _firestore.collection('users').doc(user.uid).get();
-    final barangayId = userDoc.data()?['barangayId'] as String?;
+  final userDoc = await _firestore.collection('users').doc(user.uid).get();
+  final barangayId = userDoc.data()?['barangayId'] as String?;
+  if (barangayId == null) return [];
 
-    if (barangayId == null) return [];
+  final snapshot = await _firestore
+      .collection('barangays')
+      .doc(barangayId)
+      .collection('patients')
+      .doc(patientId)
+      .collection('assessments')
+      .orderBy('createdAt', descending: false)
+      .get();
 
-    final snapshot = await _firestore
-        .collection('barangays')
-        .doc(barangayId)
-        .collection('patients')
-        .doc(patientId)
-        .collection('assessments')
-        .orderBy('createdAt', descending: false)
-        .get();
+  return snapshot.docs.map((doc) {
+    final data = doc.data();
+    data['id'] = doc.id;
 
-    return snapshot.docs.map((doc) {
-      final data = doc.data();
-      data['id'] = doc.id;
-      return data;
-    }).toList();
-  }
+    // ✅ Convert Timestamp → DateTime so AssessmentTable can use it directly
+    if (data['date'] is Timestamp) {
+      data['date'] = (data['date'] as Timestamp).toDate();
+    }
+    if (data['createdAt'] is Timestamp) {
+      data['createdAt'] = (data['createdAt'] as Timestamp).toDate();
+    }
+
+    return data;
+  }).toList();
+}
 
   /// Update an existing assessment
   Future<void> updateAssessmentInBarangayPatient({
-    required String patientId,
-    required String assessmentId,
-    required Map<String, dynamic> updatedData,
-  }) async {
-    final user = _auth.currentUser;
-    if (user == null) {
-      throw FirebaseAuthException(
-        code: 'no-current-user',
-        message: 'No authenticated user found',
-      );
-    }
-
-    final userDoc = await _firestore.collection('users').doc(user.uid).get();
-    final barangayId = userDoc.data()?['barangayId'] as String?;
-
-    if (barangayId == null || barangayId.isEmpty) {
-      throw Exception('User has no barangay assigned');
-    }
-
-    await _firestore
-        .collection('barangays')
-        .doc(barangayId)
-        .collection('patients')
-        .doc(patientId)
-        .collection('assessments')
-        .doc(assessmentId)
-        .update({
-      ...updatedData,
-      'updatedAt': FieldValue.serverTimestamp(),
-      'lastModifiedBy': user.uid,
-      'lastModifiedByName': userDoc.data()?['fullName'] ?? userDoc.data()?['username'] ?? 'Unknown',
-    });
+  required String patientId,
+  required String assessmentId,
+  required Map<String, dynamic> updatedData,
+}) async {
+  final user = _auth.currentUser;
+  if (user == null) {
+    throw FirebaseAuthException(
+      code: 'no-current-user',
+      message: 'No authenticated user found',
+    );
   }
+
+  final userDoc = await _firestore.collection('users').doc(user.uid).get();
+  final barangayId = userDoc.data()?['barangayId'] as String?;
+
+  if (barangayId == null || barangayId.isEmpty) {
+    throw Exception('User has no barangay assigned');
+  }
+
+  // ✅ Convert any DateTime values → Timestamp before writing to Firestore
+  final sanitized = updatedData.map((k, v) {
+    if (v is DateTime) return MapEntry(k, Timestamp.fromDate(v));
+    if (v is Map) {
+      return MapEntry(k, (v).map((mk, mv) =>
+          MapEntry(mk, mv is DateTime ? Timestamp.fromDate(mv) : mv)));
+    }
+    return MapEntry(k, v);
+  });
+
+  // ✅ Use set+merge so it never throws "document not found"
+  await _firestore
+      .collection('barangays')
+      .doc(barangayId)
+      .collection('patients')
+      .doc(patientId)
+      .collection('assessments')
+      .doc(assessmentId)
+      .set({
+    ...sanitized,
+    'updatedAt': FieldValue.serverTimestamp(),
+    'lastModifiedBy': user.uid,
+    'lastModifiedByName': userDoc.data()?['fullName'] ??
+        userDoc.data()?['username'] ??
+        'Unknown',
+  }, SetOptions(merge: true)); // ✅ merge so existing fields aren't wiped
+}
 
   /// Get recent assessments / patient notifications
   /// ── UPDATED: now includes visitDate and visitTime fields ──

@@ -14,7 +14,7 @@ import 'widgets/overall_nutritional_status.dart';
 import 'widgets/vaccination_status.dart';
 import 'widgets/deworming_status.dart';
 import 'widgets/parent_contact_tab.dart';
-import 'package:lumasdang/screens/shared/app_buttom_navbar.dart'; // ← adjust path if needed
+import 'package:lumasdang/screens/shared/app_buttom_navbar.dart';
 import 'package:flutter/foundation.dart';
 
 class PatientProfileOverview extends StatefulWidget {
@@ -39,7 +39,6 @@ class PatientProfileOverview extends StatefulWidget {
 
 class _PatientProfileOverviewState extends State<PatientProfileOverview>
     with SingleTickerProviderStateMixin {
-  // ── Bottom nav tab controller ──────────────────────────────────────────────
   late final TabController _tabController;
 
   List<Map<String, dynamic>> _assessments = [];
@@ -48,7 +47,6 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
 
   bool _preferPhoneCall = true;
   bool _preferSMS = false;
-
 
   @override
   void initState() {
@@ -72,20 +70,19 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
     super.dispose();
   }
 
-  
-
   // ── Contact preferences ────────────────────────────────────────────────────
   Future<void> _loadContactPreferences() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null || widget.patient.docId.isEmpty) return;
 
-      //final online = await ConnectivityService.instance.checkOnline();
-      final online = kIsWeb ? true : await ConnectivityService.instance.checkOnline();
+      final online = kIsWeb
+          ? true
+          : await ConnectivityService.instance.checkOnline();
       if (!online || LocalDbService.instance.offlineAuthenticated) {
-        // Try to load from local DB
         await LocalDbService.instance.init();
-        final all = await LocalDbService.instance.getAllRecords(includeDeleted: true);
+        final all = await LocalDbService.instance
+            .getAllRecords(includeDeleted: true);
         final match = all.firstWhere(
             (r) =>
                 (r['id'] == widget.patient.docId) ||
@@ -140,7 +137,9 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
           });
         }
       }
-    } catch (e) { debugPrint('Error loading contact preferences: $e'); }
+    } catch (e) {
+      debugPrint('Error loading contact preferences: $e');
+    }
   }
 
   Future<void> _saveContactPreferences() async {
@@ -148,52 +147,79 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
       final user = FirebaseAuth.instance.currentUser;
       if (user == null || widget.patient.docId.isEmpty) return;
 
-      //final online = await ConnectivityService.instance.checkOnline();
-      final online = kIsWeb ? true : await ConnectivityService.instance.checkOnline();
+      final online = kIsWeb
+          ? true
+          : await ConnectivityService.instance.checkOnline();
       if (!online || LocalDbService.instance.offlineAuthenticated) {
         await LocalDbService.instance.init();
-        // Update local record if exists, otherwise create a minimal record
-        final all = await LocalDbService.instance.getAllRecords(includeDeleted: true);
-        final matchIndex = all.indexWhere((r) => (r['id'] == widget.patient.docId) || (r['firestoreId'] == widget.patient.docId));
+        final all = await LocalDbService.instance
+            .getAllRecords(includeDeleted: true);
+        final matchIndex = all.indexWhere((r) =>
+            (r['id'] == widget.patient.docId) ||
+            (r['firestoreId'] == widget.patient.docId));
         if (matchIndex >= 0) {
-          // fetch the underlying box key by scanning box
           for (final key in LocalDbService.instance.box.keys) {
             final value = LocalDbService.instance.box.get(key);
             if (value is Map) {
-              if ((value['id'] == widget.patient.docId) || (value['firestoreId'] == widget.patient.docId)) {
+              if ((value['id'] == widget.patient.docId) ||
+                  (value['firestoreId'] == widget.patient.docId)) {
                 final updated = Map<String, dynamic>.from(value);
-                final data = Map<String, dynamic>.from(updated['data'] ?? {});
-                data['contactPreferences'] = {'phoneCall': _preferPhoneCall, 'sms': _preferSMS};
+                final data =
+                    Map<String, dynamic>.from(updated['data'] ?? {});
+                data['contactPreferences'] = {
+                  'phoneCall': _preferPhoneCall,
+                  'sms': _preferSMS
+                };
                 updated['data'] = data;
-                updated['lastModified'] = DateTime.now().toIso8601String();
+                updated['lastModified'] =
+                    DateTime.now().toIso8601String();
                 await LocalDbService.instance.box.put(key, updated);
                 break;
               }
             }
           }
         } else {
-          // Create a new minimal local record
-          final data = {'contactPreferences': {'phoneCall': _preferPhoneCall, 'sms': _preferSMS}};
-          await LocalDbService.instance.saveLocalRecord(data, synced: false, firestoreId: widget.patient.docId);
+          final data = {
+            'contactPreferences': {
+              'phoneCall': _preferPhoneCall,
+              'sms': _preferSMS
+            }
+          };
+          await LocalDbService.instance.saveLocalRecord(data,
+              synced: false, firestoreId: widget.patient.docId);
         }
         return;
       }
 
       await FirebaseFirestore.instance
-          .collection('users').doc(user.uid)
-          .collection('homepageData').doc(widget.patient.docId)
-          .set({'contactPreferences': {'phoneCall': _preferPhoneCall, 'sms': _preferSMS}},
+          .collection('users')
+          .doc(user.uid)
+          .collection('homepageData')
+          .doc(widget.patient.docId)
+          .set(
+              {
+            'contactPreferences': {
+              'phoneCall': _preferPhoneCall,
+              'sms': _preferSMS
+            }
+          },
               SetOptions(merge: true));
-    } catch (e) { debugPrint('Error saving contact preferences: $e'); }
+    } catch (e) {
+      debugPrint('Error saving contact preferences: $e');
+    }
   }
 
   // ── Assessment fetching ────────────────────────────────────────────────────
-  Map<String, dynamic> _extractAssessment(Map<String, dynamic> data, String docId) {
+  Map<String, dynamic> _extractAssessment(
+      Map<String, dynamic> data, String docId) {
     final anthropometric = data['anthropometric'] ?? {};
     final createdAt = data['createdAt'];
     DateTime? measurementDate;
-    final dateOfMeasurement = anthropometric['dateOfMeasurement']?.toString() ?? '';
-    if (dateOfMeasurement.isNotEmpty) measurementDate = _parseDate(dateOfMeasurement);
+    final dateOfMeasurement =
+        anthropometric['dateOfMeasurement']?.toString() ?? '';
+    if (dateOfMeasurement.isNotEmpty) {
+      measurementDate = _parseDate(dateOfMeasurement);
+    }
     if (measurementDate == null && createdAt != null) {
       if (createdAt is Timestamp) {
         measurementDate = createdAt.toDate();
@@ -204,6 +230,7 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
       }
     }
     return {
+      'id': data['id'] ?? docId,
       'date': measurementDate,
       'height': anthropometric['height'] ?? '',
       'weight': anthropometric['weight'] ?? '',
@@ -217,11 +244,10 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
       'oral': data['oral'],
       'deworming': data['deworming'],
       'vaccination': data['vaccination'],
-      'allergies': data['allergies'],        // ← ADDED
+      'allergies': data['allergies'],
       'demographic': data['demographic'],
       'familyPlanning': data['familyPlanning'],
       'nutritionEnvironment': data['nutritionEnvironment'],
-      'allergies': data['allergies'],
       'vitaminA': data['vitaminA'],
       'docId': docId,
       'dewormingOnly': data['dewormingOnly'] == true,
@@ -237,11 +263,9 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
     return '$first $last' == '$patientFirst $patientLast';
   }
 
-  // ── FIXED: new vaccine names + doseCount instead of hardcoded column keys ──
   Map<String, String>? _computeLocalVaccinationStatuses() {
     if (_assessments.isEmpty) return null;
 
-    // Find the most recent assessment that has vaccination data.
     Map<String, dynamic>? latest;
     for (var i = _assessments.length - 1; i >= 0; i--) {
       if (_assessments[i]['vaccination'] != null) {
@@ -261,8 +285,6 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
       return null;
     }
 
-    // Count columns recorded as true, ignoring _date and nextDoseDate keys.
-    // Works with any column key names — future-proof.
     int doseCount(String vaccine) {
       final raw = vaccination[vaccine];
       Map<String, dynamic>? doses;
@@ -283,12 +305,18 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
     String doseLabelForCount(int count) {
       if (count <= 0) return 'Pending';
       switch (count) {
-        case 1:  return '1st dose';
-        case 2:  return '2nd dose';
-        case 3:  return '3rd dose';
-        case 4:  return '4th dose';
-        case 5:  return '5th dose';
-        default: return 'Booster';
+        case 1:
+          return '1st dose';
+        case 2:
+          return '2nd dose';
+        case 3:
+          return '3rd dose';
+        case 4:
+          return '4th dose';
+        case 5:
+          return '5th dose';
+        default:
+          return 'Booster';
       }
     }
 
@@ -298,26 +326,25 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
     final opvCount = doseCount('OPV');
     final ipvCount = doseCount('IPV');
 
-    // Keys here must match _vaccines keys in VaccinationStatusSection.
     return <String, String>{
-      'bcg':           vaccineStatus('BCG'),
-      'hepatitisB':    vaccineStatus('Hepatitis B'),
-      'opv':           vaccineStatus('OPV'),
-      'ipv':           vaccineStatus('IPV'),
-      'dtap':          vaccineStatus('DTwP/DTaP-Hib-IPV'),
-      'pcv':           vaccineStatus('PCV'),
-      'rv':            vaccineStatus('RV'),
-      'influenza':     vaccineStatus('Influenza'),
-      'mmr':           vaccineStatus('MMR/MR'),
-      'measlesMmr':    vaccineStatus('Measles/MMR'),
-      'jev':           vaccineStatus('JEV'),
-      'varicella':     vaccineStatus('Varicella'),
-      'hepatitisA':    vaccineStatus('Hepatitis A'),
-      'rabies':        vaccineStatus('Rabies'),
+      'bcg': vaccineStatus('BCG'),
+      'hepatitisB': vaccineStatus('Hepatitis B'),
+      'opv': vaccineStatus('OPV'),
+      'ipv': vaccineStatus('IPV'),
+      'dtap': vaccineStatus('DTwP/DTaP-Hib-IPV'),
+      'pcv': vaccineStatus('PCV'),
+      'rv': vaccineStatus('RV'),
+      'influenza': vaccineStatus('Influenza'),
+      'mmr': vaccineStatus('MMR/MR'),
+      'measlesMmr': vaccineStatus('Measles/MMR'),
+      'jev': vaccineStatus('JEV'),
+      'varicella': vaccineStatus('Varicella'),
+      'hepatitisA': vaccineStatus('Hepatitis A'),
+      'rabies': vaccineStatus('Rabies'),
       'meningococcal': vaccineStatus('Meningococcal'),
-      'cholera':       vaccineStatus('Cholera'),
-      'typhoid':       vaccineStatus('Typhoid'),
-      'opvIpv':        doseLabelForCount(
+      'cholera': vaccineStatus('Cholera'),
+      'typhoid': vaccineStatus('Typhoid'),
+      'opvIpv': doseLabelForCount(
           opvCount > ipvCount ? opvCount : ipvCount),
     };
   }
@@ -328,15 +355,13 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
       final user = FirebaseAuth.instance.currentUser;
       final List<Map<String, dynamic>> matched = [];
 
-      // 1) Always load local cached assessments (offline‑first)
+      // 1) Always load local cached assessments (offline-first)
       try {
         await LocalDbService.instance.init();
-        final localRecords =
-            await LocalDbService.instance.getAllRecords(includeDeleted: false);
+        final localRecords = await LocalDbService.instance
+            .getAllRecords(includeDeleted: false);
 
         for (final record in localRecords) {
-          // Older cached records may store nested maps as Map<dynamic, dynamic>.
-          // Avoid direct casts that crash with "Map<dynamic,dynamic> not a subtype".
           final rawData = record['data'];
           Map<String, dynamic>? data;
           if (rawData is Map<String, dynamic>) {
@@ -361,15 +386,13 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
 
           if (!matchesByName) continue;
 
-          // Attach a createdAt value usable by _extractAssessment.
           final createdAtString =
               (record['lastModified'] ?? record['timestamp'])?.toString();
           if (createdAtString != null) {
             data['createdAt'] = createdAtString;
           }
 
-          final docId =
-              (record['firestoreId'] as String?) ??
+          final docId = (record['firestoreId'] as String?) ??
               (record['id'] as String?) ??
               widget.patient.docId;
 
@@ -379,12 +402,12 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
         debugPrint('[ProfileOverview] Error loading local assessments: $e');
       }
 
-      // If there is no Firebase user, we can still show the local data.
       if (user == null) {
         final finalList = List<Map<String, dynamic>>.from(matched)
           ..sort((a, b) =>
-              (a['date'] as DateTime?)
-                  ?.compareTo(b['date'] as DateTime? ?? DateTime(1970)) ?? 0);
+              (a['date'] as DateTime?)?.compareTo(
+                  b['date'] as DateTime? ?? DateTime(1970)) ??
+              0);
         setState(() {
           _assessments = finalList;
           _loading = false;
@@ -393,23 +416,25 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
       }
 
       // 2) When online, enrich with Firestore data
-      //final online = await ConnectivityService.instance.checkOnline();
-      final online = kIsWeb ? true : await ConnectivityService.instance.checkOnline();
+      final online = kIsWeb
+          ? true
+          : await ConnectivityService.instance.checkOnline();
       if (online) {
         if (widget.isSharedPatient && widget.sharedPatientId != null) {
           final assessments = await firestoreService
               .getAssessmentsForBarangayPatient(widget.sharedPatientId!);
           matched.addAll(
-            assessments.map((a) => _extractAssessment(a, a['id'])).toList(),
+            assessments
+                .map((a) => _extractAssessment(a, a['id'] ?? ''))
+                .toList(),
           );
         } else {
-          // Barangay‑level shared assessments for this patient
           try {
             final barangayAssessments = await firestoreService
                 .getAssessmentsForBarangayPatient(widget.patient.docId);
             matched.addAll(
               barangayAssessments
-                  .map((a) => _extractAssessment(a, a['id']))
+                  .map((a) => _extractAssessment(a, a['id'] ?? ''))
                   .toList(),
             );
           } catch (e) {
@@ -417,7 +442,6 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
                 '[ProfileOverview] Error fetching barangay assessments: $e');
           }
 
-          // Legacy user‑scoped homepageData assessments
           try {
             final snapshot = await FirebaseFirestore.instance
                 .collection('users')
@@ -429,8 +453,10 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
             for (var doc in snapshot.docs) {
               final data = doc.data();
               final demographic = data['demographic'] ?? {};
-              final firstName = (demographic['firstName'] ?? '').toString();
-              final lastName = (demographic['lastName'] ?? '').toString();
+              final firstName =
+                  (demographic['firstName'] ?? '').toString();
+              final lastName =
+                  (demographic['lastName'] ?? '').toString();
               final nameField = (demographic['name'] ?? '').toString();
               if (doc.id == widget.patient.docId) {
                 fallbackByDocId = data;
@@ -439,9 +465,11 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
                 matched.add(_extractAssessment(data, doc.id));
               } else if (nameField.isNotEmpty) {
                 final parts = nameField.trim().split(RegExp(r'\s+'));
-                final derivedFirst = parts.isNotEmpty ? parts.first : '';
-                final derivedLast =
-                    parts.length > 1 ? parts.sublist(1).join(' ') : '';
+                final derivedFirst =
+                    parts.isNotEmpty ? parts.first : '';
+                final derivedLast = parts.length > 1
+                    ? parts.sublist(1).join(' ')
+                    : '';
                 if (_namesMatch(derivedFirst, derivedLast)) {
                   matched.add(_extractAssessment(data, doc.id));
                 }
@@ -449,8 +477,8 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
             }
 
             if (matched.isEmpty && fallbackByDocId != null) {
-              matched.add(
-                  _extractAssessment(fallbackByDocId, widget.patient.docId));
+              matched.add(_extractAssessment(
+                  fallbackByDocId, widget.patient.docId));
             }
           } catch (e) {
             debugPrint(
@@ -459,17 +487,19 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
         }
       }
 
-      // 3) De‑duplicate and sort all sources together
+      // 3) De-duplicate and sort
       final patientDocId = widget.patient.docId;
       final unique = <String, Map<String, dynamic>>{};
       for (var a in matched) {
-        final dateMs = (a['date'] as DateTime?)?.millisecondsSinceEpoch ?? 0;
+        final dateMs =
+            (a['date'] as DateTime?)?.millisecondsSinceEpoch ?? 0;
         final contentKey = '$dateMs-${a['weight']}-${a['height']}';
         final existing = unique[contentKey];
         if (existing == null) {
           unique[contentKey] = a;
         } else {
-          final existingIsFromFirestore = existing['docId'] != patientDocId;
+          final existingIsFromFirestore =
+              existing['docId'] != patientDocId;
           final currentIsFromFirestore = a['docId'] != patientDocId;
           if (currentIsFromFirestore && !existingIsFromFirestore) {
             unique[contentKey] = a;
@@ -478,8 +508,9 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
       }
       final finalList = unique.values.toList()
         ..sort((a, b) =>
-            (a['date'] as DateTime?)
-                ?.compareTo(b['date'] as DateTime? ?? DateTime(1970)) ?? 0);
+            (a['date'] as DateTime?)?.compareTo(
+                b['date'] as DateTime? ?? DateTime(1970)) ??
+            0);
 
       setState(() {
         _assessments = finalList;
@@ -503,7 +534,9 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
         }
       }
       return DateTime.tryParse(dateStr);
-    } catch (_) { return null; }
+    } catch (_) {
+      return null;
+    }
   }
 
   // ── Tab bodies ─────────────────────────────────────────────────────────────
@@ -529,16 +562,207 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
             latestDemographic: latestDemo,
           ),
           const SizedBox(height: 20),
+
           AssessmentTable(
             patientId: widget.sharedPatientId ?? widget.patient.docId,
             assessments: _assessments
-                .where((a) =>
-                    a['dewormingOnly'] != true)
+                .where((a) => a['dewormingOnly'] != true)
                 .toList(),
             loading: _loading,
             onAddAssessment: _showAddAssessmentSheet,
             saveNewAssessment: null,
+
+            // ── DELETE ──────────────────────────────────────────────────────
+            onDeleteAssessment: (assessmentId, patientId) async {
+              if (assessmentId.isEmpty) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Cannot delete: this assessment was created '
+                        'offline and has not been synced yet.',
+                      ),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                }
+                return;
+              }
+
+              try {
+                final userDoc = await FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(FirebaseAuth.instance.currentUser!.uid)
+                    .get();
+                final barangayId =
+                    userDoc.data()?['barangayId'] as String?;
+
+                if (barangayId == null || barangayId.isEmpty) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content:
+                            Text('Cannot delete: no barangay assigned.'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                  return;
+                }
+
+                await FirebaseFirestore.instance
+                    .collection('barangays')
+                    .doc(barangayId)
+                    .collection('patients')
+                    .doc(patientId)
+                    .collection('assessments')
+                    .doc(assessmentId)
+                    .delete();
+
+                await LocalDbService.instance.init();
+                await LocalDbService.instance
+                    .softDeleteByFirestoreId(assessmentId);
+
+                if (mounted) {
+                  // ✅ Remove directly from local list — instant UI update
+                  setState(() {
+                    _assessments.removeWhere(
+                      (a) =>
+                          a['id']?.toString() == assessmentId ||
+                          a['docId']?.toString() == assessmentId,
+                    );
+                  });
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Assessment deleted.'),
+                      backgroundColor: Color(0xFF2E8B7B),
+                    ),
+                  );
+                }
+              } catch (e) {
+                debugPrint('Error deleting assessment: $e');
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to delete: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+
+            // ── EDIT ────────────────────────────────────────────────────────
+            onEditAssessment: (updated, assessmentId, patientId) async {
+              if (assessmentId.isEmpty) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Cannot edit: this assessment was created '
+                        'offline and has not been synced yet.',
+                      ),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                }
+                return;
+              }
+
+              try {
+                final firestoreService = FirestoreService();
+
+                String formattedDate = '';
+                if (updated['date'] is DateTime) {
+                  final d = updated['date'] as DateTime;
+                  formattedDate =
+                      '${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')}/${d.year}';
+                }
+
+                final patient = widget.patient;
+                final result = AnthropometricCalculator.calculate(
+                  weightStr: updated['weight']?.toString() ?? '',
+                  heightStr: updated['height']?.toString() ?? '',
+                  ageStr: patient.dateOfBirth.trim().isNotEmpty &&
+                          formattedDate.trim().isNotEmpty
+                      ? ''
+                      : patient.age.toString(),
+                  sexStr: patient.sex,
+                  dobStr: patient.dateOfBirth,
+                  measurementDateStr: formattedDate,
+                );
+
+                final anthropometricPayload = {
+                  'dateOfMeasurement': formattedDate,
+                  'height': updated['height']?.toString() ?? '',
+                  'weight': updated['weight']?.toString() ?? '',
+                  'muac': updated['muac']?.toString() ?? '',
+                  'weightForAge':
+                      result?.weightForAge ?? updated['weightForAge'] ?? '',
+                  'heightForAge':
+                      result?.heightForAge ?? updated['heightForAge'] ?? '',
+                  'weightForHeight':
+                      result?.weightForHeight ?? updated['weightForHeight'] ?? '',
+                  'bmi': result?.bmi ?? updated['bmi'] ?? '',
+                };
+
+                await firestoreService.updateAssessmentInBarangayPatient(
+                  patientId: patientId,
+                  assessmentId: assessmentId,
+                  updatedData: {'anthropometric': anthropometricPayload},
+                );
+
+                await LocalDbService.instance.init();
+                await LocalDbService.instance
+                    .updateAssessmentByFirestoreId(
+                  firestoreId: assessmentId,
+                  anthropometric: anthropometricPayload,
+                );
+
+                if (mounted) {
+                  // ✅ Replace in-place — no duplicate, matches by id or docId
+                  setState(() {
+                    final index = _assessments.indexWhere(
+                      (a) =>
+                          a['id']?.toString() == assessmentId ||
+                          a['docId']?.toString() == assessmentId,
+                    );
+                    if (index != -1) {
+                      _assessments[index] = {
+                        ..._assessments[index],
+                        'height': anthropometricPayload['height'],
+                        'weight': anthropometricPayload['weight'],
+                        'muac': anthropometricPayload['muac'],
+                        'date': updated['date'],
+                        'weightForAge': anthropometricPayload['weightForAge'],
+                        'heightForAge': anthropometricPayload['heightForAge'],
+                        'weightForHeight':
+                            anthropometricPayload['weightForHeight'],
+                        'bmi': anthropometricPayload['bmi'],
+                      };
+                    }
+                  });
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Assessment updated.'),
+                      backgroundColor: Color(0xFF2E8B7B),
+                    ),
+                  );
+                }
+              } catch (e) {
+                debugPrint('Error editing assessment: $e');
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to update: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
           ),
+
           const SizedBox(height: 20),
           TrendsSection(assessments: _assessments),
           const SizedBox(height: 20),
@@ -563,34 +787,6 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
             onEditTap: _showEditDewormingSheet,
           ),
           const SizedBox(height: 24),
-
-          // ── Return button ─────────────────────────────────────────────
-          /*GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.18),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                    color: Colors.white.withOpacity(0.35), width: 1),
-              ),
-              /*child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.arrow_back_ios_new_rounded,
-                      color: Colors.white, size: 16),
-                  SizedBox(width: 8),
-                  Text('Return to Dashboard',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14)),
-                ],
-              ),*/
-            ),
-          ),*/
           const SizedBox(height: 24),
         ],
       ),
@@ -635,9 +831,6 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // ── BOTTOM NAV BAR ────────────────────────────────────────────────────
-      //bottomNavigationBar: AppBottomNavBar(controller: _tabController),
-
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -646,7 +839,7 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
             colors: [
               Color(0xFF2E8B7B),
               Color(0xFF5CAA7F),
-              Color(0xFF8BC88A)
+              Color(0xFF8BC88A),
             ],
           ),
         ),
@@ -673,7 +866,7 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
     );
   }
 
-  // ── Top bar with inline tab switcher ──────────────────────────────────────
+  // ── Top bar ────────────────────────────────────────────────────────────────
   Widget _buildTopBar() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -692,7 +885,8 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
                       color: Colors.white.withOpacity(0.2),
                       shape: BoxShape.circle,
                       border: Border.all(
-                          color: Colors.white.withOpacity(0.35), width: 1.2),
+                          color: Colors.white.withOpacity(0.35),
+                          width: 1.2),
                     ),
                     child: const Icon(Icons.arrow_back_ios_new_rounded,
                         color: Colors.white, size: 16),
@@ -714,8 +908,8 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
               ),
               if (widget.isSharedPatient)
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(10),
@@ -797,696 +991,148 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
     );
   }
 
-
-void _showEditDewormingSheet() {
-  Map<String, dynamic>? latestWithDeworming;
-  for (var i = _assessments.length - 1; i >= 0; i--) {
-    if (_assessments[i]['deworming'] != null) {
-      latestWithDeworming = _assessments[i];
-      break;
+  // ── Edit Deworming ─────────────────────────────────────────────────────────
+  void _showEditDewormingSheet() {
+    Map<String, dynamic>? latestWithDeworming;
+    for (var i = _assessments.length - 1; i >= 0; i--) {
+      if (_assessments[i]['deworming'] != null) {
+        latestWithDeworming = _assessments[i];
+        break;
+      }
     }
-  }
-  final raw = latestWithDeworming?['deworming'];
-  final Map<String, dynamic> existing = raw is Map<String, dynamic>
-      ? raw
-      : (raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{});
+    final raw = latestWithDeworming?['deworming'];
+    final Map<String, dynamic> existing = raw is Map<String, dynamic>
+        ? raw
+        : (raw is Map
+            ? Map<String, dynamic>.from(raw)
+            : <String, dynamic>{});
 
-  final dateLastCtrl = TextEditingController(
-    text: (existing['dateOfLastDeworming'] ?? '').toString().trim(),
-  );
-  const List<String> _dewormingDrugs = ['Albendazole', 'Mebendazole'];
-  final existingDrug = (existing['drugGiven'] ?? '').toString().trim();
-  String? selectedDrug =
-      _dewormingDrugs.contains(existingDrug) ? existingDrug : null;
-  final adverseCtrl = TextEditingController(
-    text: (existing['adverseReactions'] ?? '').toString().trim(),
-  );
-  final nextDateCtrl = TextEditingController(
-    text: (existing['nextDewormingDate'] ?? '').toString().trim(),
-  );
-  bool isNA = existing['isNA'] == true;
-  bool saving = false;
-  String? errorMessage;
-
-  const kOrange = Color(0xFFF08030);
-  const kSurface = Color(0xFFFFFFFF);
-  const kSurfaceDim = Color(0xFFFAFAFA);
-  const kBorder = Color(0xFFE8E8ED);
-  const kInk = Color(0xFF1C1C1E);
-  const kInkMid = Color(0xFF6C6C70);
-  const kRCard = 18.0;
-  const kRInner = 12.0;
-
-  Widget buildField({
-    required BuildContext ctx,
-    required TextEditingController controller,
-    required String label,
-    required String hint,
-    required IconData icon,
-    TextInputType keyboardType = TextInputType.text,
-    VoidCallback? onTap,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 2, bottom: 6),
-          child: Text(
-            label,
-            style: const TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              color: kInkMid,
-              letterSpacing: 1.0,
-            ),
-          ),
-        ),
-        TextFormField(
-          controller: controller,
-          keyboardType: keyboardType,
-          readOnly: onTap != null,
-          onTap: onTap,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: kInk,
-          ),
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w400,
-              color: kInkMid.withOpacity(0.55),
-            ),
-            prefixIcon: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
-              child: Container(
-                padding: const EdgeInsets.all(7),
-                decoration: BoxDecoration(
-                  color: kOrange.withOpacity(0.10),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, size: 15, color: kOrange),
-              ),
-            ),
-            prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
-            filled: true,
-            fillColor: kSurfaceDim,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(kRInner),
-              borderSide: const BorderSide(color: kBorder, width: 1),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(kRInner),
-              borderSide: const BorderSide(color: kBorder, width: 1),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(kRInner),
-              borderSide: const BorderSide(color: kOrange, width: 2),
-            ),
-          ),
-        ),
-      ],
+    final dateLastCtrl = TextEditingController(
+      text: (existing['dateOfLastDeworming'] ?? '').toString().trim(),
     );
-  }
-
-  showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (ctx) {
-      return StatefulBuilder(
-        builder: (ctx, setSheetState) {
-          return Container(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(ctx).viewInsets.bottom,
-            ),
-            decoration: BoxDecoration(
-              color: kSurface,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(kRCard)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.07),
-                  blurRadius: 20,
-                  offset: const Offset(0, -6),
-                ),
-              ],
-            ),
-            clipBehavior: Clip.hardEdge,
-            child: SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: kOrange.withOpacity(0.10),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(Icons.medication_liquid_rounded, color: kOrange, size: 22),
-                        ),
-                        const SizedBox(width: 12),
-                        const Text(
-                          'Edit Deworming Status',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: kInk,
-                            letterSpacing: -0.3,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    CheckboxListTile(
-                      value: isNA,
-                      onChanged: (v) => setSheetState(() => isNA = v ?? false),
-                      title: const Text(
-                        'Not applicable',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: kInk,
-                        ),
-                      ),
-                      activeColor: kOrange,
-                      contentPadding: EdgeInsets.zero,
-                      controlAffinity: ListTileControlAffinity.leading,
-                    ),
-                    const SizedBox(height: 12),
-                    buildField(
-                      ctx: ctx,
-                      controller: dateLastCtrl,
-                      label: 'DATE OF LAST DEWORMING',
-                      hint: 'MM / DD / YYYY',
-                      icon: Icons.calendar_today_outlined,
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: ctx,
-                          initialDate: DateTime.now(),
-                          firstDate: DateTime(2020),
-                          lastDate: DateTime.now(),
-                          builder: (c, child) => Theme(
-                            data: Theme.of(c).copyWith(
-                              colorScheme: const ColorScheme.light(
-                                primary: kOrange,
-                                onPrimary: Colors.white,
-                                surface: Colors.white,
-                              ),
-                            ),
-                            child: child!,
-                          ),
-                        );
-                        if (picked != null) {
-                          dateLastCtrl.text =
-                              '${picked.month.toString().padLeft(2, '0')}/${picked.day.toString().padLeft(2, '0')}/${picked.year}';
-                          setSheetState(() {});
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 10),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.only(left: 2, bottom: 6),
-                          child: Text(
-                            'MEDICATION GIVEN',
-                            style: const TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: kInkMid,
-                              letterSpacing: 1.0,
-                            ),
-                          ),
-                        ),
-                        DropdownButtonFormField<String?>(
-                          value: selectedDrug,
-                          decoration: InputDecoration(
-                            prefixIcon: Padding(
-                              padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
-                              child: Container(
-                                padding: const EdgeInsets.all(7),
-                                decoration: BoxDecoration(
-                                  color: kOrange.withOpacity(0.10),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Icon(Icons.vaccines_rounded, size: 15, color: kOrange),
-                              ),
-                            ),
-                            prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
-                            filled: true,
-                            fillColor: kSurfaceDim,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(kRInner),
-                              borderSide: const BorderSide(color: kBorder, width: 1),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(kRInner),
-                              borderSide: const BorderSide(color: kBorder, width: 1),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(kRInner),
-                              borderSide: const BorderSide(color: kOrange, width: 2),
-                            ),
-                          ),
-                          hint: const Text(
-                            'Select medication',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: kInkMid,
-                            ),
-                          ),
-                          items: _dewormingDrugs
-                              .map((String drug) => DropdownMenuItem<String?>(
-                                    value: drug,
-                                    child: Text(
-                                      drug,
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                        color: kInk,
-                                      ),
-                                    ),
-                                  ))
-                              .toList(),
-                          onChanged: (String? value) =>
-                              setSheetState(() => selectedDrug = value),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    buildField(
-                      ctx: ctx,
-                      controller: adverseCtrl,
-                      label: 'ADVERSE REACTIONS (if any)',
-                      hint: 'Leave blank if none',
-                      icon: Icons.warning_amber_rounded,
-                    ),
-                    const SizedBox(height: 10),
-                    buildField(
-                      ctx: ctx,
-                      controller: nextDateCtrl,
-                      label: 'NEXT DEWORMING DATE',
-                      hint: 'MM / DD / YYYY',
-                      icon: Icons.event_rounded,
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: ctx,
-                          initialDate: DateTime.now(),
-                          firstDate: DateTime.now(),
-                          lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
-                          builder: (c, child) => Theme(
-                            data: Theme.of(c).copyWith(
-                              colorScheme: const ColorScheme.light(
-                                primary: kOrange,
-                                onPrimary: Colors.white,
-                                surface: Colors.white,
-                              ),
-                            ),
-                            child: child!,
-                          ),
-                        );
-                        if (picked != null) {
-                          nextDateCtrl.text =
-                              '${picked.month.toString().padLeft(2, '0')}/${picked.day.toString().padLeft(2, '0')}/${picked.year}';
-                          setSheetState(() {});
-                        }
-                      },
-                    ),
-                    if (errorMessage != null) ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        errorMessage!,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Colors.red,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: saving
-                            ? null
-                            : () async {
-                                setSheetState(() => errorMessage = null);
-                                final deworming = {
-                                  'dateOfLastDeworming': dateLastCtrl.text.trim(),
-                                  'isNA': isNA,
-                                  'drugGiven': selectedDrug ?? '',
-                                  'adverseReactions': adverseCtrl.text.trim(),
-                                  'nextDewormingDate': nextDateCtrl.text.trim(),
-                                };
-                                setSheetState(() => saving = true);
-                                try {
-                                  final patient = widget.patient;
-                                  final firestore = FirestoreService();
-
-                                  // ── Helper: builds a full deworming-only assessment payload ──
-                                  // ✅ FIX: added 'isDeleted': false — required by Firestore rules
-                                  Map<String, dynamic> buildDewormingPayload(
-                                      Map<String, dynamic> dewormingData) {
-                                    final now = DateTime.now();
-                                    final dateStr =
-                                        '${now.month.toString().padLeft(2, '0')}/${now.day.toString().padLeft(2, '0')}/${now.year}';
-                                    return {
-                                      'demographic': {
-                                        'firstName': patient.firstName,
-                                        'lastName': patient.lastName,
-                                        'age': patient.age.toString(),
-                                        'sex': patient.sex,
-                                        'address': patient.address,
-                                        'dateOfBirth': patient.dateOfBirth,
-                                        'mother': patient.motherName,
-                                        'motherContact': patient.motherContact,
-                                        'father': patient.fatherName,
-                                        'fatherContact': patient.fatherContact,
-                                      },
-                                      'anthropometric': {
-                                        'dateOfMeasurement': dateStr,
-                                        'weight': '',
-                                        'height': '',
-                                        'muac': '',
-                                        'weightForAge': '',
-                                        'weightForHeight': '',
-                                        'heightForAge': '',
-                                        'bmi': '',
-                                      },
-                                      'healthStatus': {
-                                        'diarrhea': false,
-                                        'fever': false,
-                                        'cough': false,
-                                        'other': false,
-                                        'medications': false,
-                                      },
-                                      'dietary': {
-                                        'purelyBreastfed': null,
-                                        'cfAge': '',
-                                        'cfFrequency': '',
-                                        'cfFoods': '',
-                                        'mealFrequency': '',
-                                      },
-                                      'deworming': dewormingData,
-                                      'oral': {'overallRisk': null},
-                                      'dewormingOnly': true,
-                                      'isDeleted': false, // ✅ FIX: required by Firestore rules
-                                    };
-                                  }
-
-                                  // ✅ FIX: fetch the real Firestore assessment ID directly
-                                  String? assessmentId;
-                                  try {
-                                    final freshAssessments = await firestore
-                                        .getAssessmentsForBarangayPatient(patient.docId);
-                                    if (freshAssessments.isNotEmpty) {
-                                      assessmentId =
-                                          freshAssessments.last['id'] as String?;
-                                    }
-                                  } catch (e) {
-                                    debugPrint(
-                                        '[Deworming] Could not fetch fresh assessments: $e');
-                                  }
-
-                                  final canUpdate = assessmentId != null &&
-                                      assessmentId.isNotEmpty;
-
-                                  bool saved = false;
-                                  if (canUpdate) {
-                                    try {
-                                      await firestore.updateAssessmentInBarangayPatient(
-                                        patientId: patient.docId,
-                                        assessmentId: assessmentId!,
-                                        updatedData: {'deworming': deworming},
-                                      );
-                                      saved = true;
-                                      debugPrint(
-                                          '[Deworming] ✅ Updated existing assessment: $assessmentId');
-                                    } catch (e) {
-                                      debugPrint(
-                                          '[Deworming] Update failed ($e), will create new assessment.');
-                                      if (e.toString().contains('not-found') ||
-                                          e.toString().contains('NOT_FOUND')) {
-                                        // Doc was deleted on Firestore — fall through to create
-                                      } else {
-                                        rethrow;
-                                      }
-                                    }
-                                  }
-
-                                  if (!saved) {
-                                    // No existing Firestore assessment, or update failed — create new
-                                    await firestore.saveAssessmentToBarangayPatient(
-                                      patientId: patient.docId,
-                                      assessmentData: buildDewormingPayload(deworming),
-                                    );
-                                    debugPrint(
-                                        '[Deworming] ✅ Created new deworming-only assessment.');
-                                  }
-
-                                  if (mounted) {
-                                    setState(() => _loading = true);
-                                    await _fetchAssessments();
-                                  }
-                                  if (ctx.mounted) Navigator.pop(ctx);
-                                  if (mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Deworming status updated.'),
-                                        backgroundColor: Color(0xFF2E8B7B),
-                                      ),
-                                    );
-                                  }
-                                } catch (e) {
-                                  debugPrint('Error saving deworming: $e');
-                                  setSheetState(() {
-                                    saving = false;
-                                    errorMessage = 'Failed to save. Try again.';
-                                  });
-                                }
-                              },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: saving ? kOrange.withOpacity(0.6) : kOrange,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30),
-                          ),
-                          elevation: 0,
-                        ),
-                        child: saving
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.5,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Text(
-                                'Save',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      style: TextButton.styleFrom(foregroundColor: kInkMid),
-                      child: const Text(
-                        'Cancel',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      );
-    },
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  _showAddAssessmentSheet — consistent with VaccinationStatusSection style
-// ─────────────────────────────────────────────────────────────────────────────
-
-void _showAddAssessmentSheet() {
-  // ── ADDED: visit date & time controllers ──────────────────────────────────
-  final visitDateCtrl = TextEditingController();
-  final visitTimeCtrl = TextEditingController();
-
-  final dateCtrl   = TextEditingController();
-  final weightCtrl = TextEditingController();
-  final heightCtrl = TextEditingController();
-  final muacCtrl   = TextEditingController();
-
-  bool    saving       = false;
-  String? errorMessage;
-
-  // ── Design Tokens (matches VaccinationStatusSection) ──────────────────────
-  const kOrange       = Color(0xFFF08030);
-  const kOrangeLight  = Color(0xFFF5A962);
-  const kAmberBg      = Color(0xFFFFF6EE);
-  const kSurface      = Color(0xFFFFFFFF);
-  const kSurfaceDim   = Color(0xFFFAFAFA);
-  const kBorder       = Color(0xFFE8E8ED);
-  const kInk          = Color(0xFF1C1C1E);
-  const kInkMid       = Color(0xFF6C6C70);
-  const kRCard        = 18.0;
-  const kRInner       = 12.0;
-
-  // ── Shared field builder ───────────────────────────────────────────────────
-  Widget buildField({
-    required BuildContext ctx,
-    required TextEditingController controller,
-    required String label,
-    required String hint,
-    required IconData icon,
-    TextInputType keyboardType = TextInputType.text,
-    VoidCallback? onTap,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 2, bottom: 6),
-          child: Text(
-            label,
-            style: const TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              color: kInkMid,
-              letterSpacing: 1.0,
-            ),
-          ),
-        ),
-        TextFormField(
-          controller: controller,
-          keyboardType: keyboardType,
-          readOnly: onTap != null,
-          onTap: onTap,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: kInk,
-          ),
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w400,
-              color: kInkMid.withOpacity(0.55),
-            ),
-            prefixIcon: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
-              child: Container(
-                padding: const EdgeInsets.all(7),
-                decoration: BoxDecoration(
-                  color: kOrange.withOpacity(0.10),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, size: 15, color: kOrange),
-              ),
-            ),
-            prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
-            filled: true,
-            fillColor: kSurfaceDim,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(kRInner),
-              borderSide: const BorderSide(color: kBorder, width: 1),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(kRInner),
-              borderSide: const BorderSide(color: kBorder, width: 1),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(kRInner),
-              borderSide: const BorderSide(color: kOrange, width: 2),
-            ),
-          ),
-        ),
-      ],
+    const List<String> dewormingDrugs = ['Albendazole', 'Mebendazole'];
+    final existingDrug = (existing['drugGiven'] ?? '').toString().trim();
+    String? selectedDrug =
+        dewormingDrugs.contains(existingDrug) ? existingDrug : null;
+    final adverseCtrl = TextEditingController(
+      text: (existing['adverseReactions'] ?? '').toString().trim(),
     );
-  }
+    final nextDateCtrl = TextEditingController(
+      text: (existing['nextDewormingDate'] ?? '').toString().trim(),
+    );
+    bool isNA = existing['isNA'] == true;
+    bool saving = false;
+    String? errorMessage;
 
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (ctx) {
-      return StatefulBuilder(
-        builder: (ctx, setSheetState) {
-          return Container(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(ctx).viewInsets.bottom,
-            ),
-            decoration: BoxDecoration(
-              color: kSurface,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(kRCard)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.07),
-                  blurRadius: 20,
-                  offset: const Offset(0, -6),
-                ),
-              ],
-            ),
-            clipBehavior: Clip.hardEdge,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
+    const kOrange = Color(0xFFF08030);
+    const kSurface = Color(0xFFFFFFFF);
+    const kSurfaceDim = Color(0xFFFAFAFA);
+    const kBorder = Color(0xFFE8E8ED);
+    const kInk = Color(0xFF1C1C1E);
+    const kInkMid = Color(0xFF6C6C70);
+    const kRCard = 18.0;
+    const kRInner = 12.0;
 
-                // ── Orange accent bar (matches card top accent) ────────────
-                Container(
-                  height: 5,
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [kOrangeLight, kOrange],
-                    ),
+    Widget buildField({
+      required BuildContext ctx,
+      required TextEditingController controller,
+      required String label,
+      required String hint,
+      required IconData icon,
+      TextInputType keyboardType = TextInputType.text,
+      VoidCallback? onTap,
+    }) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 2, bottom: 6),
+            child: Text(label,
+                style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: kInkMid,
+                    letterSpacing: 1.0)),
+          ),
+          TextFormField(
+            controller: controller,
+            keyboardType: keyboardType,
+            readOnly: onTap != null,
+            onTap: onTap,
+            style: const TextStyle(
+                fontSize: 14, fontWeight: FontWeight.w600, color: kInk),
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w400,
+                  color: kInkMid.withOpacity(0.55)),
+              prefixIcon: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+                child: Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: kOrange.withOpacity(0.10),
+                    borderRadius: BorderRadius.circular(8),
                   ),
+                  child: Icon(icon, size: 15, color: kOrange),
                 ),
+              ),
+              prefixIconConstraints:
+                  const BoxConstraints(minWidth: 0, minHeight: 0),
+              filled: true,
+              fillColor: kSurfaceDim,
+              contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14, vertical: 14),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(kRInner),
+                borderSide: const BorderSide(color: kBorder, width: 1),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(kRInner),
+                borderSide: const BorderSide(color: kBorder, width: 1),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(kRInner),
+                borderSide:
+                    const BorderSide(color: kOrange, width: 2),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
 
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            return Container(
+              padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(ctx).viewInsets.bottom),
+              decoration: BoxDecoration(
+                color: kSurface,
+                borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(kRCard)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.07),
+                    blurRadius: 20,
+                    offset: const Offset(0, -6),
+                  ),
+                ],
+              ),
+              clipBehavior: Clip.hardEdge,
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-
-                      // ── Drag handle ────────────────────────────────────
-                      Center(
-                        child: Container(
-                          width: 36,
-                          height: 4,
-                          margin: const EdgeInsets.only(bottom: 20),
-                          decoration: BoxDecoration(
-                            color: kBorder,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                      ),
-
-                      // ── Header row ─────────────────────────────────────
                       Row(
                         children: [
                           Container(
@@ -1496,219 +1142,39 @@ void _showAddAssessmentSheet() {
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: const Icon(
-                              Icons.add_chart_outlined,
-                              color: kOrange,
-                              size: 20,
-                            ),
+                                Icons.medication_liquid_rounded,
+                                color: kOrange,
+                                size: 22),
                           ),
                           const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'New Assessment',
-                                  style: TextStyle(
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.w700,
-                                    color: kInk,
-                                    letterSpacing: -0.3,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  '${widget.patient.firstName} ${widget.patient.lastName}',
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    color: kInkMid,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          // SHARED badge — matches _sharedBadge() style
-                          if (widget.isSharedPatient)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                    colors: [kOrangeLight, kOrange]),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: const Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.people_rounded,
-                                      size: 12, color: Colors.white),
-                                  SizedBox(width: 4),
-                                  Text(
-                                    'Shared',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
+                          const Text('Edit Deworming Status',
+                              style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                  color: kInk,
+                                  letterSpacing: -0.3)),
                         ],
                       ),
-
-                      // ── Divider ────────────────────────────────────────
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                        child: Divider(height: 1, color: kBorder),
+                      const SizedBox(height: 20),
+                      CheckboxListTile(
+                        value: isNA,
+                        onChanged: (v) =>
+                            setSheetState(() => isNA = v ?? false),
+                        title: const Text('Not applicable',
+                            style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: kInk)),
+                        activeColor: kOrange,
+                        contentPadding: EdgeInsets.zero,
+                        controlAffinity:
+                            ListTileControlAffinity.leading,
                       ),
-
-                      // ── Error banner ───────────────────────────────────
-                      if (errorMessage != null) ...[
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 11),
-                          decoration: BoxDecoration(
-                            color: kAmberBg,
-                            borderRadius: BorderRadius.circular(kRInner),
-                            border: Border.all(
-                              color: kOrange.withOpacity(0.40),
-                              width: 1.5,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.warning_amber_rounded,
-                                  color: kOrange, size: 17),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  errorMessage!,
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: kOrange,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                      ],
-
-                      // ── ADDED: Visit Date & Time ───────────────────────
-                      const Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'VISIT DATE & TIME',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: kInkMid,
-                            letterSpacing: 1.2,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Row(children: [
-                        Expanded(
-                          child: buildField(
-                            ctx: ctx,
-                            controller: visitDateCtrl,
-                            label: 'DATE OF VISIT',
-                            hint: 'MM / DD / YYYY',
-                            icon: Icons.calendar_today_outlined,
-                            onTap: () async {
-                              final picked = await showDatePicker(
-                                context: ctx,
-                                initialDate: DateTime.now(),
-                                firstDate: DateTime(2020),
-                                lastDate: DateTime.now()
-                                    .add(const Duration(days: 1)),
-                                builder: (c, child) => Theme(
-                                  data: Theme.of(c).copyWith(
-                                    colorScheme: const ColorScheme.light(
-                                        primary: kOrange,
-                                        onPrimary: Colors.white,
-                                        surface: Colors.white),
-                                  ),
-                                  child: child!,
-                                ),
-                              );
-                              if (picked != null) {
-                                setSheetState(() {
-                                  visitDateCtrl.text =
-                                      '${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}-${picked.year}';
-                                });
-                              }
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: buildField(
-                            ctx: ctx,
-                            controller: visitTimeCtrl,
-                            label: 'TIME OF VISIT',
-                            hint: 'e.g. 10:30 AM',
-                            icon: Icons.schedule_outlined,
-                            onTap: () async {
-                              final picked = await showTimePicker(
-                                context: ctx,
-                                initialTime: TimeOfDay.now(),
-                                builder: (c, child) => Theme(
-                                  data: Theme.of(c).copyWith(
-                                    colorScheme: const ColorScheme.light(
-                                        primary: kOrange,
-                                        onPrimary: Colors.white,
-                                        surface: Colors.white),
-                                  ),
-                                  child: child!,
-                                ),
-                              );
-                              if (picked != null) {
-                                final hour = picked.hourOfPeriod == 0
-                                    ? 12
-                                    : picked.hourOfPeriod;
-                                final minute = picked.minute
-                                    .toString()
-                                    .padLeft(2, '0');
-                                final period =
-                                    picked.period == DayPeriod.am
-                                        ? 'AM'
-                                        : 'PM';
-                                setSheetState(() {
-                                  visitTimeCtrl.text =
-                                      '$hour:$minute $period';
-                                });
-                              }
-                            },
-                          ),
-                        ),
-                      ]),
-                      const SizedBox(height: 16),
-
-                      // ── Section label ──────────────────────────────────
-                      const Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'MEASUREMENT DETAILS',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: kInkMid,
-                            letterSpacing: 1.2,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-
-                      // ── Date field ─────────────────────────────────────
+                      const SizedBox(height: 12),
                       buildField(
                         ctx: ctx,
-                        controller: dateCtrl,
-                        label: 'DATE OF MEASUREMENT',
+                        controller: dateLastCtrl,
+                        label: 'DATE OF LAST DEWORMING',
                         hint: 'MM / DD / YYYY',
                         icon: Icons.calendar_today_outlined,
                         onTap: () async {
@@ -1729,97 +1195,303 @@ void _showAddAssessmentSheet() {
                             ),
                           );
                           if (picked != null) {
-                            dateCtrl.text =
+                            dateLastCtrl.text =
                                 '${picked.month.toString().padLeft(2, '0')}/${picked.day.toString().padLeft(2, '0')}/${picked.year}';
-                            if (errorMessage != null) {
-                              setSheetState(() => errorMessage = null);
-                            }
+                            setSheetState(() {});
                           }
                         },
                       ),
                       const SizedBox(height: 10),
-
-                      // ── Weight + Height side by side ───────────────────
-                      Row(
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: buildField(
-                              ctx: ctx,
-                              controller: weightCtrl,
-                              label: 'WEIGHT (kg)',
-                              hint: 'e.g. 9.5',
-                              icon: Icons.monitor_weight_outlined,
-                              keyboardType:
-                                  const TextInputType.numberWithOptions(
-                                      decimal: true),
-                            ),
+                          Padding(
+                            padding:
+                                const EdgeInsets.only(left: 2, bottom: 6),
+                            child: const Text('MEDICATION GIVEN',
+                                style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: kInkMid,
+                                    letterSpacing: 1.0)),
                           ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: buildField(
-                              ctx: ctx,
-                              controller: heightCtrl,
-                              label: 'HEIGHT (cm)',
-                              hint: 'e.g. 80',
-                              icon: Icons.height,
-                              keyboardType:
-                                  const TextInputType.numberWithOptions(
-                                      decimal: true),
+                          DropdownButtonFormField<String?>(
+                            value: selectedDrug,
+                            decoration: InputDecoration(
+                              prefixIcon: Padding(
+                                padding:
+                                    const EdgeInsets.fromLTRB(12, 8, 8, 8),
+                                child: Container(
+                                  padding: const EdgeInsets.all(7),
+                                  decoration: BoxDecoration(
+                                    color: kOrange.withOpacity(0.10),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Icon(Icons.vaccines_rounded,
+                                      size: 15, color: kOrange),
+                                ),
+                              ),
+                              prefixIconConstraints:
+                                  const BoxConstraints(minWidth: 0, minHeight: 0),
+                              filled: true,
+                              fillColor: kSurfaceDim,
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 14),
+                              border: OutlineInputBorder(
+                                borderRadius:
+                                    BorderRadius.circular(kRInner),
+                                borderSide: const BorderSide(
+                                    color: kBorder, width: 1),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius:
+                                    BorderRadius.circular(kRInner),
+                                borderSide: const BorderSide(
+                                    color: kBorder, width: 1),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius:
+                                    BorderRadius.circular(kRInner),
+                                borderSide: const BorderSide(
+                                    color: kOrange, width: 2),
+                              ),
                             ),
+                            hint: const Text('Select medication',
+                                style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    color: kInkMid)),
+                            items: dewormingDrugs
+                                .map((String drug) =>
+                                    DropdownMenuItem<String?>(
+                                      value: drug,
+                                      child: Text(drug,
+                                          style: const TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                              color: kInk)),
+                                    ))
+                                .toList(),
+                            onChanged: (String? value) => setSheetState(
+                                () => selectedDrug = value),
                           ),
                         ],
                       ),
                       const SizedBox(height: 10),
-
-                      // ── MUAC ───────────────────────────────────────────
                       buildField(
                         ctx: ctx,
-                        controller: muacCtrl,
-                        label: 'MUAC (cm)',
-                        hint: 'e.g. 16.0',
-                        icon: Icons.straighten,
-                        keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
+                        controller: adverseCtrl,
+                        label: 'ADVERSE REACTIONS (if any)',
+                        hint: 'Leave blank if none',
+                        icon: Icons.warning_amber_rounded,
                       ),
-
-                      const SizedBox(height: 22),
-
-                      // ── Save button — matches VaccinationStatusSection ─
+                      const SizedBox(height: 10),
+                      buildField(
+                        ctx: ctx,
+                        controller: nextDateCtrl,
+                        label: 'NEXT DEWORMING DATE',
+                        hint: 'MM / DD / YYYY',
+                        icon: Icons.event_rounded,
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: ctx,
+                            initialDate: DateTime.now(),
+                            firstDate: DateTime.now(),
+                            lastDate: DateTime.now()
+                                .add(const Duration(days: 365 * 2)),
+                            builder: (c, child) => Theme(
+                              data: Theme.of(c).copyWith(
+                                colorScheme: const ColorScheme.light(
+                                  primary: kOrange,
+                                  onPrimary: Colors.white,
+                                  surface: Colors.white,
+                                ),
+                              ),
+                              child: child!,
+                            ),
+                          );
+                          if (picked != null) {
+                            nextDateCtrl.text =
+                                '${picked.month.toString().padLeft(2, '0')}/${picked.day.toString().padLeft(2, '0')}/${picked.year}';
+                            setSheetState(() {});
+                          }
+                        },
+                      ),
+                      if (errorMessage != null) ...[
+                        const SizedBox(height: 12),
+                        Text(errorMessage!,
+                            style: const TextStyle(
+                                fontSize: 13,
+                                color: Colors.red,
+                                fontWeight: FontWeight.w500)),
+                      ],
+                      const SizedBox(height: 24),
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
                           onPressed: saving
                               ? null
                               : () async {
-                                  setSheetState(() {
-                                    errorMessage = null;
-                                    saving = true;
-                                  });
-                                  if (dateCtrl.text.trim().isEmpty ||
-                                      weightCtrl.text.trim().isEmpty ||
-                                      heightCtrl.text.trim().isEmpty) {
+                                  setSheetState(
+                                      () => errorMessage = null);
+                                  final deworming = {
+                                    'dateOfLastDeworming':
+                                        dateLastCtrl.text.trim(),
+                                    'isNA': isNA,
+                                    'drugGiven': selectedDrug ?? '',
+                                    'adverseReactions':
+                                        adverseCtrl.text.trim(),
+                                    'nextDewormingDate':
+                                        nextDateCtrl.text.trim(),
+                                  };
+                                  setSheetState(() => saving = true);
+                                  try {
+                                    final patient = widget.patient;
+                                    final firestore = FirestoreService();
+
+                                    Map<String, dynamic>
+                                        buildDewormingPayload(
+                                            Map<String, dynamic>
+                                                dewormingData) {
+                                      final now = DateTime.now();
+                                      final dateStr =
+                                          '${now.month.toString().padLeft(2, '0')}/${now.day.toString().padLeft(2, '0')}/${now.year}';
+                                      return {
+                                        'demographic': {
+                                          'firstName': patient.firstName,
+                                          'lastName': patient.lastName,
+                                          'age': patient.age.toString(),
+                                          'sex': patient.sex,
+                                          'address': patient.address,
+                                          'dateOfBirth':
+                                              patient.dateOfBirth,
+                                          'mother': patient.motherName,
+                                          'motherContact':
+                                              patient.motherContact,
+                                          'father': patient.fatherName,
+                                          'fatherContact':
+                                              patient.fatherContact,
+                                        },
+                                        'anthropometric': {
+                                          'dateOfMeasurement': dateStr,
+                                          'weight': '',
+                                          'height': '',
+                                          'muac': '',
+                                          'weightForAge': '',
+                                          'weightForHeight': '',
+                                          'heightForAge': '',
+                                          'bmi': '',
+                                        },
+                                        'healthStatus': {
+                                          'diarrhea': false,
+                                          'fever': false,
+                                          'cough': false,
+                                          'other': false,
+                                          'medications': false,
+                                        },
+                                        'dietary': {
+                                          'purelyBreastfed': null,
+                                          'cfAge': '',
+                                          'cfFrequency': '',
+                                          'cfFoods': '',
+                                          'mealFrequency': '',
+                                        },
+                                        'deworming': dewormingData,
+                                        'oral': {'overallRisk': null},
+                                        'dewormingOnly': true,
+                                        'isDeleted': false,
+                                      };
+                                    }
+
+                                    String? assessmentId;
+                                    try {
+                                      final freshAssessments =
+                                          await firestore
+                                              .getAssessmentsForBarangayPatient(
+                                                  patient.docId);
+                                      if (freshAssessments.isNotEmpty) {
+                                        assessmentId =
+                                            freshAssessments.last['id']
+                                                as String?;
+                                      }
+                                    } catch (e) {
+                                      debugPrint(
+                                          '[Deworming] Could not fetch fresh assessments: $e');
+                                    }
+
+                                    final canUpdate =
+                                        assessmentId != null &&
+                                            assessmentId.isNotEmpty;
+                                    bool saved = false;
+
+                                    if (canUpdate) {
+                                      try {
+                                        await firestore
+                                            .updateAssessmentInBarangayPatient(
+                                          patientId: patient.docId,
+                                          assessmentId: assessmentId!,
+                                          updatedData: {
+                                            'deworming': deworming
+                                          },
+                                        );
+                                        saved = true;
+                                      } catch (e) {
+                                        debugPrint(
+                                            '[Deworming] Update failed ($e)');
+                                        if (!e
+                                            .toString()
+                                            .contains('not-found') &&
+                                            !e
+                                                .toString()
+                                                .contains('NOT_FOUND')) {
+                                          rethrow;
+                                        }
+                                      }
+                                    }
+
+                                    if (!saved) {
+                                      await firestore
+                                          .saveAssessmentToBarangayPatient(
+                                        patientId: patient.docId,
+                                        assessmentData:
+                                            buildDewormingPayload(
+                                                deworming),
+                                      );
+                                    }
+
+                                    if (mounted) {
+                                      setState(() => _loading = true);
+                                      await _fetchAssessments();
+                                    }
+                                    if (ctx.mounted) Navigator.pop(ctx);
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                              'Deworming status updated.'),
+                                          backgroundColor:
+                                              Color(0xFF2E8B7B),
+                                        ),
+                                      );
+                                    }
+                                  } catch (e) {
+                                    debugPrint(
+                                        'Error saving deworming: $e');
                                     setSheetState(() {
-                                      errorMessage =
-                                          'Date, weight, and height are required.';
                                       saving = false;
+                                      errorMessage =
+                                          'Failed to save. Try again.';
                                     });
-                                    return;
                                   }
-                                  await _saveNewAssessment(
-                                    date:      dateCtrl.text.trim(),
-                                    weight:    weightCtrl.text.trim(),
-                                    height:    heightCtrl.text.trim(),
-                                    muac:      muacCtrl.text.trim(),
-                                    visitDate: visitDateCtrl.text.trim(), // ← ADDED
-                                    visitTime: visitTimeCtrl.text.trim(), // ← ADDED
-                                  );
-                                  if (ctx.mounted) Navigator.pop(ctx);
                                 },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor:
-                                saving ? kOrange.withOpacity(0.6) : kOrange,
+                            backgroundColor: saving
+                                ? kOrange.withOpacity(0.6)
+                                : kOrange,
                             foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 16),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(30),
                             ),
@@ -1830,243 +1502,663 @@ void _showAddAssessmentSheet() {
                                   width: 22,
                                   height: 22,
                                   child: CircularProgressIndicator(
-                                    strokeWidth: 2.5,
-                                    color: Colors.white,
-                                  ),
+                                      strokeWidth: 2.5,
+                                      color: Colors.white),
                                 )
-                              : const Text(
-                                  'Save Assessment',
+                              : const Text('Save',
                                   style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.5)),
                         ),
                       ),
-
-                      // ── Cancel link ────────────────────────────────────
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 8),
                       TextButton(
                         onPressed: () => Navigator.pop(ctx),
-                        style: TextButton.styleFrom(foregroundColor: kInkMid),
-                        child: const Text(
-                          'Cancel',
-                          style: TextStyle(
-                              fontSize: 13, fontWeight: FontWeight.w500),
-                        ),
+                        style: TextButton.styleFrom(
+                            foregroundColor: kInkMid),
+                        child: const Text('Cancel',
+                            style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500)),
                       ),
                     ],
                   ),
                 ),
-              ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // ── Add Assessment Sheet ───────────────────────────────────────────────────
+  void _showAddAssessmentSheet() {
+    final visitDateCtrl = TextEditingController();
+    final visitTimeCtrl = TextEditingController();
+    final dateCtrl = TextEditingController();
+    final weightCtrl = TextEditingController();
+    final heightCtrl = TextEditingController();
+    final muacCtrl = TextEditingController();
+
+    bool saving = false;
+    String? errorMessage;
+
+    const kOrange = Color(0xFFF08030);
+    const kOrangeLight = Color(0xFFF5A962);
+    const kAmberBg = Color(0xFFFFF6EE);
+    const kSurface = Color(0xFFFFFFFF);
+    const kSurfaceDim = Color(0xFFFAFAFA);
+    const kBorder = Color(0xFFE8E8ED);
+    const kInk = Color(0xFF1C1C1E);
+    const kInkMid = Color(0xFF6C6C70);
+    const kRCard = 18.0;
+    const kRInner = 12.0;
+
+    Widget buildField({
+      required BuildContext ctx,
+      required TextEditingController controller,
+      required String label,
+      required String hint,
+      required IconData icon,
+      TextInputType keyboardType = TextInputType.text,
+      VoidCallback? onTap,
+    }) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 2, bottom: 6),
+            child: Text(label,
+                style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: kInkMid,
+                    letterSpacing: 1.0)),
+          ),
+          TextFormField(
+            controller: controller,
+            keyboardType: keyboardType,
+            readOnly: onTap != null,
+            onTap: onTap,
+            style: const TextStyle(
+                fontSize: 14, fontWeight: FontWeight.w600, color: kInk),
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w400,
+                  color: kInkMid.withOpacity(0.55)),
+              prefixIcon: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+                child: Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: kOrange.withOpacity(0.10),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(icon, size: 15, color: kOrange),
+                ),
+              ),
+              prefixIconConstraints:
+                  const BoxConstraints(minWidth: 0, minHeight: 0),
+              filled: true,
+              fillColor: kSurfaceDim,
+              contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14, vertical: 14),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(kRInner),
+                borderSide: const BorderSide(color: kBorder, width: 1),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(kRInner),
+                borderSide: const BorderSide(color: kBorder, width: 1),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(kRInner),
+                borderSide: const BorderSide(color: kOrange, width: 2),
+              ),
             ),
-          );
-        },
-      );
-    },
-  );
-}
-
-
-  Widget _buildSheetField({
-    required BuildContext ctx,
-    required TextEditingController controller,
-    required String label,
-    required String hint,
-    required IconData icon,
-    TextInputType? keyboardType,
-    VoidCallback? onTap,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.18),
-        borderRadius: BorderRadius.circular(12),
-        border:
-            Border.all(color: Colors.white.withOpacity(0.28), width: 1),
-      ),
-      child: TextField(
-        controller: controller,
-        keyboardType: keyboardType,
-        readOnly: onTap != null,
-        onTap: onTap,
-        style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Colors.white),
-        decoration: InputDecoration(
-          labelText: label,
-          labelStyle: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: Colors.white.withOpacity(0.75)),
-          hintText: hint,
-          hintStyle: TextStyle(
-              fontSize: 13, color: Colors.white.withOpacity(0.4)),
-          prefixIcon:
-              Icon(icon, color: Colors.white.withOpacity(0.7), size: 20),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16, vertical: 14),
-        ),
-      ),
-    );
-  }
-
-  // (removed duplicate older implementation)
-
-// ============================================================================
-// SIMPLE FIX: Update _saveNewAssessment to save ALL data
-// Replace your existing _saveNewAssessment method with this
-// ============================================================================
-
-Future<void> _saveNewAssessment({
-  required String date,
-  required String weight,
-  required String height,
-  required String muac,
-  // ── ADDED: visit date & time ──────────────────────────────────────────────
-  String? visitDate,
-  String? visitTime,
-  // Add optional parameters for complete data
-  bool? diarrhea,
-  bool? fever,
-  bool? cough,
-  bool? other,
-  bool? medications,
-  bool? purelyBreastfed,
-  String? cfAge,
-  String? cfFreq,
-  String? cfFood,
-  String? mealFreq,
-  String? dewormDate,
-  bool? dewormNA,
-  String? drugGiven,
-  String? adverseReactions,
-  String? nextDewormDate,
-  String? overallRisk,
-}) async {
-  final patient = widget.patient;
-
-  // Calculate anthropometric classifications. Use empty ageStr when DOB + measurement date exist
-  // so the calculator uses exact age in months from dates (avoids age-in-years vs months confusion).
-  final result = AnthropometricCalculator.calculate(
-    weightStr: weight,
-    heightStr: height,
-    ageStr: patient.dateOfBirth.trim().isNotEmpty && date.trim().isNotEmpty
-        ? ''
-        : patient.age.toString(),
-    sexStr: patient.sex,
-    dobStr: patient.dateOfBirth,
-    measurementDateStr: date,
-  );
-
-  // Track whether Weight for Length/Height (Lt/Ht) was saved and why not if missing
-  final bool wflSaved = result != null &&
-      result.weightForHeight != null &&
-      result.weightForHeight!.trim().isNotEmpty;
-  if (!wflSaved) {
-    debugPrint(
-      '[Lumasdang] Assessment save: Weight for Length/Height (Lt/Ht) will NOT be saved. '
-      'weight=$weight, height=$height, DOB=${patient.dateOfBirth}, date=$date, sex=${patient.sex}. '
-      'Reason: ${result == null ? "calculator returned null (see AnthropometricCalculator log above)" : "calculator did not return weightForHeight (often age/height outside WHO range)"}',
-    );
-  }
-
-  // ✅ NOW INCLUDES ALL DATA - just like home page
-  final data = {
-    // ── ADDED: visit date & time ──────────────────────────────────────────
-    'visitDate': visitDate ?? '',
-    'visitTime': visitTime ?? '',
-    'demographic': {
-      'firstName': patient.firstName,
-      'lastName': patient.lastName,
-      'age': patient.age.toString(),
-      'sex': patient.sex,
-      'address': patient.address,
-      'dateOfBirth': patient.dateOfBirth,
-      'mother': patient.motherName,
-      'motherContact': patient.motherContact,
-      'father': patient.fatherName,
-      'fatherContact': patient.fatherContact,
-    },
-    'anthropometric': {
-      'dateOfMeasurement': date,
-      'weight': weight,
-      'height': height,
-      'muac': muac,
-      'weightForAge': result?.weightForAge ?? '',
-      'weightForHeight': result?.weightForHeight ?? '',
-      'heightForAge': result?.heightForAge ?? '',
-      'bmi': result?.bmi ?? '',
-    },
-    // ✅ ADD HEALTH STATUS
-    'healthStatus': {
-      'diarrhea': diarrhea ?? false,
-      'fever': fever ?? false,
-      'cough': cough ?? false,
-      'other': other ?? false,
-      'medications': medications ?? false,
-    },
-    // ✅ ADD DIETARY
-    'dietary': {
-      'purelyBreastfed': purelyBreastfed,
-      'cfAge': cfAge ?? '',
-      'cfFrequency': cfFreq ?? '',
-      'cfFoods': cfFood ?? '',
-      'mealFrequency': mealFreq ?? '',
-    },
-    // ✅ ADD DEWORMING
-    'deworming': {
-      'dateOfLastDeworming': dewormDate ?? '',
-      'isNA': dewormNA ?? false,
-      'drugGiven': drugGiven,
-      'adverseReactions': adverseReactions ?? '',
-      'nextDewormingDate': nextDewormDate ?? '',
-    },
-    // ✅ ADD ORAL ASSESSMENT
-    'oral': {
-      'overallRisk': overallRisk,
-    },
-  };
-
-  final firestore = FirestoreService();
-  
-  try {
-    // ✅ ALWAYS save to barangay shared storage
-    await firestore.saveAssessmentToBarangayPatient(
-      patientId: patient.docId,  // Use patient.docId directly
-      assessmentData: data,
-    );
-    
-    // Also save locally
-    await LocalDbService.instance
-        .saveLocalRecord(data, synced: true, firestoreId: patient.docId);
-    
-    if (mounted) {
-      setState(() => _loading = true);
-      await _fetchAssessments();
-      final String saveMessage = wflSaved
-          ? '✅ Complete assessment saved to shared patient record!'
-          : '✅ Assessment saved. Weight for Length/Height was not calculated (age/height may be outside WHO range: 0–2y length 45–110 cm, 2–5y height 65–120 cm). See console for details.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(saveMessage),
-          backgroundColor: const Color(0xFF2E8B7B),
-          duration: wflSaved ? const Duration(seconds: 2) : const Duration(seconds: 5),
-        ),
+          ),
+        ],
       );
     }
-  } catch (e) {
-    debugPrint('Error saving assessment: $e');
-    
-    // Fallback to local storage
-    await LocalDbService.instance.saveLocalRecord(data, synced: false);
-    
-    if (mounted) {
-      setState(() => _loading = true);
-      await _fetchAssessments();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            return Container(
+              padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(ctx).viewInsets.bottom),
+              decoration: BoxDecoration(
+                color: kSurface,
+                borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(kRCard)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.07),
+                    blurRadius: 20,
+                    offset: const Offset(0, -6),
+                  ),
+                ],
+              ),
+              clipBehavior: Clip.hardEdge,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    height: 5,
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                          colors: [kOrangeLight, kOrange]),
+                    ),
+                  ),
+                  Padding(
+                    padding:
+                        const EdgeInsets.fromLTRB(20, 16, 20, 28),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 36,
+                            height: 4,
+                            margin:
+                                const EdgeInsets.only(bottom: 20),
+                            decoration: BoxDecoration(
+                              color: kBorder,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: kOrange.withOpacity(0.10),
+                                borderRadius:
+                                    BorderRadius.circular(10),
+                              ),
+                              child: const Icon(
+                                  Icons.add_chart_outlined,
+                                  color: kOrange,
+                                  size: 20),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                children: [
+                                  const Text('New Assessment',
+                                      style: TextStyle(
+                                          fontSize: 17,
+                                          fontWeight: FontWeight.w700,
+                                          color: kInk,
+                                          letterSpacing: -0.3)),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${widget.patient.firstName} ${widget.patient.lastName}',
+                                    style: const TextStyle(
+                                        fontSize: 13, color: kInkMid),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (widget.isSharedPatient)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                      colors: [kOrangeLight, kOrange]),
+                                  borderRadius:
+                                      BorderRadius.circular(20),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.people_rounded,
+                                        size: 12, color: Colors.white),
+                                    SizedBox(width: 4),
+                                    Text('Shared',
+                                        style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white)),
+                                  ],
+                                ),
+                              ),
+                          ],
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          child: Divider(height: 1, color: kBorder),
+                        ),
+                        if (errorMessage != null) ...[
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 11),
+                            decoration: BoxDecoration(
+                              color: kAmberBg,
+                              borderRadius:
+                                  BorderRadius.circular(kRInner),
+                              border: Border.all(
+                                  color: kOrange.withOpacity(0.40),
+                                  width: 1.5),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                    Icons.warning_amber_rounded,
+                                    color: kOrange,
+                                    size: 17),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(errorMessage!,
+                                      style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          color: kOrange)),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                        ],
+                        const Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text('VISIT DATE & TIME',
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: kInkMid,
+                                  letterSpacing: 1.2)),
+                        ),
+                        const SizedBox(height: 10),
+                        Row(children: [
+                          Expanded(
+                            child: buildField(
+                              ctx: ctx,
+                              controller: visitDateCtrl,
+                              label: 'DATE OF VISIT',
+                              hint: 'MM / DD / YYYY',
+                              icon: Icons.calendar_today_outlined,
+                              onTap: () async {
+                                final picked = await showDatePicker(
+                                  context: ctx,
+                                  initialDate: DateTime.now(),
+                                  firstDate: DateTime(2020),
+                                  lastDate: DateTime.now()
+                                      .add(const Duration(days: 1)),
+                                  builder: (c, child) => Theme(
+                                    data: Theme.of(c).copyWith(
+                                      colorScheme:
+                                          const ColorScheme.light(
+                                              primary: kOrange,
+                                              onPrimary: Colors.white,
+                                              surface: Colors.white),
+                                    ),
+                                    child: child!,
+                                  ),
+                                );
+                                if (picked != null) {
+                                  setSheetState(() {
+                                    visitDateCtrl.text =
+                                        '${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}-${picked.year}';
+                                  });
+                                }
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: buildField(
+                              ctx: ctx,
+                              controller: visitTimeCtrl,
+                              label: 'TIME OF VISIT',
+                              hint: 'e.g. 10:30 AM',
+                              icon: Icons.schedule_outlined,
+                              onTap: () async {
+                                final picked = await showTimePicker(
+                                  context: ctx,
+                                  initialTime: TimeOfDay.now(),
+                                  builder: (c, child) => Theme(
+                                    data: Theme.of(c).copyWith(
+                                      colorScheme:
+                                          const ColorScheme.light(
+                                              primary: kOrange,
+                                              onPrimary: Colors.white,
+                                              surface: Colors.white),
+                                    ),
+                                    child: child!,
+                                  ),
+                                );
+                                if (picked != null) {
+                                  final hour =
+                                      picked.hourOfPeriod == 0
+                                          ? 12
+                                          : picked.hourOfPeriod;
+                                  final minute = picked.minute
+                                      .toString()
+                                      .padLeft(2, '0');
+                                  final period =
+                                      picked.period == DayPeriod.am
+                                          ? 'AM'
+                                          : 'PM';
+                                  setSheetState(() {
+                                    visitTimeCtrl.text =
+                                        '$hour:$minute $period';
+                                  });
+                                }
+                              },
+                            ),
+                          ),
+                        ]),
+                        const SizedBox(height: 16),
+                        const Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text('MEASUREMENT DETAILS',
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: kInkMid,
+                                  letterSpacing: 1.2)),
+                        ),
+                        const SizedBox(height: 10),
+                        buildField(
+                          ctx: ctx,
+                          controller: dateCtrl,
+                          label: 'DATE OF MEASUREMENT',
+                          hint: 'MM / DD / YYYY',
+                          icon: Icons.calendar_today_outlined,
+                          onTap: () async {
+                            final picked = await showDatePicker(
+                              context: ctx,
+                              initialDate: DateTime.now(),
+                              firstDate: DateTime(2020),
+                              lastDate: DateTime.now(),
+                              builder: (c, child) => Theme(
+                                data: Theme.of(c).copyWith(
+                                  colorScheme: const ColorScheme.light(
+                                    primary: kOrange,
+                                    onPrimary: Colors.white,
+                                    surface: Colors.white,
+                                  ),
+                                ),
+                                child: child!,
+                              ),
+                            );
+                            if (picked != null) {
+                              dateCtrl.text =
+                                  '${picked.month.toString().padLeft(2, '0')}/${picked.day.toString().padLeft(2, '0')}/${picked.year}';
+                              if (errorMessage != null) {
+                                setSheetState(() => errorMessage = null);
+                              }
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: buildField(
+                                ctx: ctx,
+                                controller: weightCtrl,
+                                label: 'WEIGHT (kg)',
+                                hint: 'e.g. 9.5',
+                                icon: Icons.monitor_weight_outlined,
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                        decimal: true),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: buildField(
+                                ctx: ctx,
+                                controller: heightCtrl,
+                                label: 'HEIGHT (cm)',
+                                hint: 'e.g. 80',
+                                icon: Icons.height,
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                        decimal: true),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        buildField(
+                          ctx: ctx,
+                          controller: muacCtrl,
+                          label: 'MUAC (cm)',
+                          hint: 'e.g. 16.0',
+                          icon: Icons.straighten,
+                          keyboardType:
+                              const TextInputType.numberWithOptions(
+                                  decimal: true),
+                        ),
+                        const SizedBox(height: 22),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: saving
+                                ? null
+                                : () async {
+                                    setSheetState(() {
+                                      errorMessage = null;
+                                      saving = true;
+                                    });
+                                    if (dateCtrl.text.trim().isEmpty ||
+                                        weightCtrl.text.trim().isEmpty ||
+                                        heightCtrl.text.trim().isEmpty) {
+                                      setSheetState(() {
+                                        errorMessage =
+                                            'Date, weight, and height are required.';
+                                        saving = false;
+                                      });
+                                      return;
+                                    }
+                                    await _saveNewAssessment(
+                                      date: dateCtrl.text.trim(),
+                                      weight: weightCtrl.text.trim(),
+                                      height: heightCtrl.text.trim(),
+                                      muac: muacCtrl.text.trim(),
+                                      visitDate:
+                                          visitDateCtrl.text.trim(),
+                                      visitTime:
+                                          visitTimeCtrl.text.trim(),
+                                    );
+                                    if (ctx.mounted) Navigator.pop(ctx);
+                                  },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: saving
+                                  ? kOrange.withOpacity(0.6)
+                                  : kOrange,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: saving
+                                ? const SizedBox(
+                                    width: 22,
+                                    height: 22,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2.5,
+                                        color: Colors.white),
+                                  )
+                                : const Text('Save Assessment',
+                                    style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 0.5)),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          style: TextButton.styleFrom(
+                              foregroundColor: kInkMid),
+                          child: const Text('Cancel',
+                              style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // ── Save New Assessment ────────────────────────────────────────────────────
+  Future<void> _saveNewAssessment({
+    required String date,
+    required String weight,
+    required String height,
+    required String muac,
+    String? visitDate,
+    String? visitTime,
+    bool? diarrhea,
+    bool? fever,
+    bool? cough,
+    bool? other,
+    bool? medications,
+    bool? purelyBreastfed,
+    String? cfAge,
+    String? cfFreq,
+    String? cfFood,
+    String? mealFreq,
+    String? dewormDate,
+    bool? dewormNA,
+    String? drugGiven,
+    String? adverseReactions,
+    String? nextDewormDate,
+    String? overallRisk,
+  }) async {
+    final patient = widget.patient;
+
+    final result = AnthropometricCalculator.calculate(
+      weightStr: weight,
+      heightStr: height,
+      ageStr: patient.dateOfBirth.trim().isNotEmpty &&
+              date.trim().isNotEmpty
+          ? ''
+          : patient.age.toString(),
+      sexStr: patient.sex,
+      dobStr: patient.dateOfBirth,
+      measurementDateStr: date,
+    );
+
+    final bool wflSaved = result != null &&
+        result.weightForHeight != null &&
+        result.weightForHeight!.trim().isNotEmpty;
+
+    final data = {
+      'visitDate': visitDate ?? '',
+      'visitTime': visitTime ?? '',
+      'demographic': {
+        'firstName': patient.firstName,
+        'lastName': patient.lastName,
+        'age': patient.age.toString(),
+        'sex': patient.sex,
+        'address': patient.address,
+        'dateOfBirth': patient.dateOfBirth,
+        'mother': patient.motherName,
+        'motherContact': patient.motherContact,
+        'father': patient.fatherName,
+        'fatherContact': patient.fatherContact,
+      },
+      'anthropometric': {
+        'dateOfMeasurement': date,
+        'weight': weight,
+        'height': height,
+        'muac': muac,
+        'weightForAge': result?.weightForAge ?? '',
+        'weightForHeight': result?.weightForHeight ?? '',
+        'heightForAge': result?.heightForAge ?? '',
+        'bmi': result?.bmi ?? '',
+      },
+      'healthStatus': {
+        'diarrhea': diarrhea ?? false,
+        'fever': fever ?? false,
+        'cough': cough ?? false,
+        'other': other ?? false,
+        'medications': medications ?? false,
+      },
+      'dietary': {
+        'purelyBreastfed': purelyBreastfed,
+        'cfAge': cfAge ?? '',
+        'cfFrequency': cfFreq ?? '',
+        'cfFoods': cfFood ?? '',
+        'mealFrequency': mealFreq ?? '',
+      },
+      'deworming': {
+        'dateOfLastDeworming': dewormDate ?? '',
+        'isNA': dewormNA ?? false,
+        'drugGiven': drugGiven,
+        'adverseReactions': adverseReactions ?? '',
+        'nextDewormingDate': nextDewormDate ?? '',
+      },
+      'oral': {
+        'overallRisk': overallRisk,
+      },
+    };
+
+    final firestore = FirestoreService();
+
+    try {
+      await firestore.saveAssessmentToBarangayPatient(
+        patientId: patient.docId,
+        assessmentData: data,
+      );
+
+      await LocalDbService.instance
+          .saveLocalRecord(data, synced: true, firestoreId: patient.docId);
+
+      if (mounted) {
+        setState(() => _loading = true);
+        await _fetchAssessments();
+        final String saveMessage = wflSaved
+            ? 'Assessment saved!'
+            : 'Assessment saved. Weight for Length/Height was not calculated '
+                '(age/height may be outside WHO range).';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(saveMessage),
+            backgroundColor: const Color(0xFF2E8B7B),
+            duration: wflSaved
+                ? const Duration(seconds: 2)
+                : const Duration(seconds: 5),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error saving assessment: $e');
+
+      await LocalDbService.instance.saveLocalRecord(data, synced: false);
+
+      if (mounted) {
+        setState(() => _loading = true);
+        await _fetchAssessments();
+      }
     }
   }
 }
-    }
