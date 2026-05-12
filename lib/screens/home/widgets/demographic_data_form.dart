@@ -120,12 +120,31 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
   String? _residenceStatus;
   String? _selectedSex;
   String? _selectedBloodType;
+  String? _selectedBirthWeight;
+  String? _selectedBirthOrder;
   String? _motherPhilHealthMemberType;
   String? _fatherPhilHealthMemberType;
   String? _selectedExtension;
   String? _selectedMotherStatus = 'Present';
   String? _selectedFatherStatus = 'Present';
   String? _selectedCaregiverPresence = 'No';
+
+  static const _birthWeightOptions = [
+    '1.0', '1.1', '1.2', '1.3', '1.4', '1.5', '1.6', '1.7', '1.8', '1.9',
+    '2.0', '2.1', '2.2', '2.3', '2.4', '2.5', '2.6', '2.7', '2.8', '2.9',
+    '3.0', '3.1', '3.2', '3.3', '3.4', '3.5', '3.6', '3.7', '3.8', '3.9',
+    '4.0', '4.1', '4.2', '4.3', '4.4', '4.5', '4.6', '4.7', '4.8', '4.9',
+    '5.0',
+  ];
+
+  static const _birthOrderOptions = [
+    '1st',
+    '2nd',
+    '3rd',
+    '4th',
+    '5th',
+    '6th or later',
+  ];
 
   static const _philHealthMemberTypes = [
     'Member',
@@ -179,6 +198,33 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
     final btText = widget.bloodTypeController.text.trim();
     if (_bloodTypes.contains(btText)) {
       _selectedBloodType = btText;
+    }
+
+    // Seed extension name from controller if already set
+    final extText = widget.extensionNameController.text.trim();
+    if (['Jr.', 'Sr.', 'II', 'III', 'IV'].contains(extText)) {
+      _selectedExtension = extText;
+    }
+
+    // Seed birth weight selection if already set
+    final birthWeightText = widget.birthWeightController.text.trim();
+    if (birthWeightText.isNotEmpty && _birthWeightOptions.contains(birthWeightText)) {
+      _selectedBirthWeight = birthWeightText;
+    }
+
+    // Seed birth order selection if already set
+    final birthOrderValue = widget.birthOrderController.text.trim();
+    if (birthOrderValue.isNotEmpty) {
+      final order = int.tryParse(birthOrderValue);
+      if (order != null && order >= 1 && order <= 5) {
+        _selectedBirthOrder = '${order}st';
+        if (order == 2) _selectedBirthOrder = '2nd';
+        if (order == 3) _selectedBirthOrder = '3rd';
+        if (order == 4) _selectedBirthOrder = '4th';
+        if (order == 5) _selectedBirthOrder = '5th';
+      } else if (order != null && order > 5) {
+        _selectedBirthOrder = '6th or later';
+      }
     }
 
     // Seed PhilHealth member type dropdowns
@@ -304,7 +350,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
         ),
         const SizedBox(height: 5),
         DropdownButtonFormField<String>(
-          value: value,
+          initialValue: value,
           validator: validator,
           onChanged: onChanged,
           dropdownColor: Colors.white,
@@ -682,17 +728,44 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
               ),
               const SizedBox(height: 12),
 
-              _buildField(
-                label: 'MIDDLE NAME',
-                controller: widget.middleNameController,
-                icon: Icons.badge_outlined,
-                enabled: !_middleNameNA,
-                validator: (v) {
-                  if (widget.isDraft || _middleNameNA) return null;
-                  if (v == null || v.trim().isEmpty) return 'Required';
-                  if (v.trim().length < 2) return 'Min. 2 chars';
-                  return null;
-                },
+              Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: _buildField(
+                      label: 'MIDDLE NAME',
+                      controller: widget.middleNameController,
+                      icon: Icons.badge_outlined,
+                      enabled: !_middleNameNA,
+                      validator: (v) {
+                        if (widget.isDraft || _middleNameNA) return null;
+                        if (v == null || v.trim().isEmpty) return 'Required';
+                        if (v.trim().length < 2) return 'Min. 2 chars';
+                        return null;
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _buildDropdown(
+                      label: 'EXTENSION NAME',
+                      value: _selectedExtension,
+                      items: const ['None', 'Jr.', 'Sr.', 'II', 'III', 'IV'],
+                      icon: Icons.badge_outlined,
+                      onChanged: (v) {
+                        setState(() {
+                          _selectedExtension = v;
+                          if (v == 'None' || v == null) {
+                            widget.extensionNameController.clear();
+                            _selectedExtension = null;
+                          } else {
+                            widget.extensionNameController.text = v;
+                          }
+                        });
+                      },
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 12),
 
@@ -721,21 +794,6 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                     style: TextStyle(fontSize: 12, color: Color(0xFF888888)),
                   ),
                 ],
-              ),
-              const SizedBox(height: 12),
-
-              // ── EXTENSION NAME DROPDOWN ─────────────────────────────
-              _buildDropdown(
-                label: 'EXTENSION NAME',
-                value: _selectedExtension,
-                items: const ['Jr.', 'Sr.', 'II', 'III', 'IV'],
-                icon: Icons.badge_outlined,
-                onChanged: (v) {
-                  setState(() {
-                    _selectedExtension = v;
-                    widget.extensionNameController.text = v ?? '';
-                  });
-                },
               ),
               const SizedBox(height: 12),
 
@@ -833,36 +891,74 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
               Row(
                 children: [
                   Expanded(
-                    child: _buildField(
+                    child: _buildDropdown(
                       label: 'BIRTH WEIGHT (kg)',
-                      controller: widget.birthWeightController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
+                      value: _selectedBirthWeight,
+                      items: _birthWeightOptions,
                       icon: Icons.monitor_weight_outlined,
-                      hint: 'e.g. 3.2',
-                      validator: (v) {
-                        if (widget.isDraft || (v == null || v.trim().isEmpty))
-                          return null;
-                        final w = double.tryParse(v.trim());
-                        if (w == null || w <= 0) return 'Invalid weight';
-                        return null;
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedBirthWeight = value;
+                          if (value == null) {
+                            widget.birthWeightController.clear();
+                          } else {
+                            widget.birthWeightController.text = value;
+                          }
+                        });
                       },
                     ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: _buildField(
+                    child: _buildDropdown(
                       label: 'BIRTH ORDER',
-                      controller: widget.birthOrderController,
-                      keyboardType: TextInputType.number,
+                      value: _selectedBirthOrder,
+                      items: _birthOrderOptions,
                       icon: Icons.sort_outlined,
-                      hint: 'e.g. 1, 2, 3…',
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedBirthOrder = value;
+                          if (value == null) {
+                            widget.birthOrderController.clear();
+                          } else if (value == '6th or later') {
+                            if (int.tryParse(widget.birthOrderController.text.trim()) == null ||
+                                int.tryParse(widget.birthOrderController.text.trim())! <= 5) {
+                              widget.birthOrderController.clear();
+                            }
+                          } else {
+                            final numeric = value.replaceAll(RegExp(r'[^0-9]'), '');
+                            widget.birthOrderController.text = numeric;
+                          }
+                        });
+                      },
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              if (_selectedBirthOrder == '6th or later') ...[
+                const SizedBox(height: 12),
+                _buildField(
+                  label: 'BIRTH ORDER (exact)',
+                  controller: widget.birthOrderController,
+                  keyboardType: TextInputType.number,
+                  icon: Icons.sort_outlined,
+                  hint: 'Enter 6 or higher',
+                  validator: (v) {
+                    if (widget.isDraft || _selectedBirthOrder != '6th or later') {
+                      return null;
+                    }
+                    if (v == null || v.trim().isEmpty) {
+                      return 'Required for 6th or later';
+                    }
+                    final order = int.tryParse(v.trim());
+                    if (order == null || order <= 5) {
+                      return 'Enter 6 or greater';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+              ],
 
               _buildField(
                 label: 'RELIGION',
@@ -1054,7 +1150,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
               _buildLabelRow("MOTHER'S STATUS", isRequired: true),
               const SizedBox(height: 5),
               DropdownButtonFormField<String>(
-                value: _selectedMotherStatus,
+                initialValue: _selectedMotherStatus,
                 onChanged: (v) {
                   setState(() {
                     _selectedMotherStatus = v;
@@ -1209,7 +1305,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
               _buildLabelRow("FATHER'S STATUS", isRequired: true),
               const SizedBox(height: 5),
               DropdownButtonFormField<String>(
-                value: _selectedFatherStatus,
+                initialValue: _selectedFatherStatus,
                 onChanged: (v) {
                   setState(() {
                     _selectedFatherStatus = v;
@@ -1372,7 +1468,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
               _buildLabelRow("IS CAREGIVER DIFFERENT FROM PARENTS?", isOptional: true),
               const SizedBox(height: 5),
               DropdownButtonFormField<String>(
-                value: _selectedCaregiverPresence,
+                initialValue: _selectedCaregiverPresence,
                 onChanged: (v) {
                   setState(() {
                     _selectedCaregiverPresence = v;
@@ -1410,52 +1506,51 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                   hint: 'Enter caregiver name',
                 ),
                 const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildField(
+                        label: 'CAREGIVER AGE',
+                        controller: widget.caregiverAgeController,
+                        keyboardType: TextInputType.number,
+                        icon: Icons.cake_outlined,
+                        hint: 'Years',
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _buildField(
+                        label: 'RELATIONSHIP TO CHILD',
+                        controller: widget.caregiverRelationshipController,
+                        icon: Icons.family_restroom_outlined,
+                        hint: 'e.g. Lolo, Tita…',
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildField(
+                        label: 'ETHNICITY',
+                        controller: widget.caregiverEthnicityController,
+                        icon: Icons.groups_outlined,
+                        hint: 'e.g. Ibaloi…',
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _buildField(
+                        label: 'RELIGION',
+                        controller: widget.caregiverReligionController,
+                        icon: Icons.church_outlined,
+                        hint: 'e.g. Catholic…',
+                      ),
+                    ),
+                  ],
+                ),
               ],
-              if (_selectedCaregiverPresence == 'Yes')
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildField(
-                      label: 'CAREGIVER AGE',
-                      controller: widget.caregiverAgeController,
-                      keyboardType: TextInputType.number,
-                      icon: Icons.cake_outlined,
-                      hint: 'Years',
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _buildField(
-                      label: 'RELATIONSHIP TO CHILD',
-                      controller: widget.caregiverRelationshipController,
-                      icon: Icons.family_restroom_outlined,
-                      hint: 'e.g. Lolo, Tita…',
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildField(
-                      label: 'ETHNICITY',
-                      controller: widget.caregiverEthnicityController,
-                      icon: Icons.groups_outlined,
-                      hint: 'e.g. Ibaloi…',
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _buildField(
-                      label: 'RELIGION',
-                      controller: widget.caregiverReligionController,
-                      icon: Icons.church_outlined,
-                      hint: 'e.g. Catholic…',
-                    ),
-                  ),
-                ],
-              ),
               const SizedBox(height: 16),
 
               _buildYesNoRow(

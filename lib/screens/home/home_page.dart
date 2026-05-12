@@ -38,6 +38,7 @@ class _HomePageState extends State<HomePage>
   final TextEditingController firstNameController = TextEditingController();
   final TextEditingController middleNameController = TextEditingController();
   final TextEditingController lastNameController = TextEditingController();
+  final TextEditingController extensionNameController = TextEditingController();
   final TextEditingController ageController = TextEditingController();
   final TextEditingController ageDaysController = TextEditingController();
   final TextEditingController ageYearsController = TextEditingController();
@@ -115,6 +116,12 @@ class _HomePageState extends State<HomePage>
   String? _ipEthnicity;
   bool? _isFourPsMember;
   bool? _hasDisability;
+  String? _selectedSex;
+  String? _selectedBloodType;
+  String? _residenceStatus;
+  String? _selectedMotherStatus;
+  String? _selectedFatherStatus;
+  String? _selectedCaregiverPresence;
 
   bool _diarrhea = false;
   bool _fever = false;
@@ -231,6 +238,7 @@ class _HomePageState extends State<HomePage>
     birthOrderController.dispose();
     residenceStatusController.dispose();
     lengthOfStayController.dispose();
+    extensionNameController.dispose();
 
     // Parents
     motherController.dispose();
@@ -284,6 +292,120 @@ class _HomePageState extends State<HomePage>
   Future<void> _saveDraft() async {
     setState(() => _isDraft = true);
     await _saveAllData();
+  }
+
+  Future<void> _onSaveAssessmentTapped() async {
+    final isFormValid = _formKey.currentState?.validate() ?? false;
+    if (!isFormValid) return;
+
+    final confirmed = await _showAssessmentPreview();
+    if (confirmed == true) {
+      await _saveAllData();
+    }
+  }
+
+  Future<bool?> _showAssessmentPreview() {
+    final summaryItems = _buildAssessmentSummary();
+    return showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Review Assessment'),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: summaryItems
+                  .map((item) => _buildSummaryRow(item['label']!, item['value']!))
+                  .toList(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Confirm & Save'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  List<Map<String, String>> _buildAssessmentSummary() {
+    final nameParts = <String>[];
+    if (firstNameController.text.trim().isNotEmpty) {
+      nameParts.add(firstNameController.text.trim());
+    }
+    if (middleNameController.text.trim().isNotEmpty) {
+      nameParts.add(middleNameController.text.trim());
+    }
+    if (lastNameController.text.trim().isNotEmpty) {
+      nameParts.add(lastNameController.text.trim());
+    }
+    var patientName = nameParts.join(' ');
+    final extensionText = extensionNameController.text.trim();
+    if (extensionText.isNotEmpty) {
+      patientName = '$patientName $extensionText';
+    }
+
+    final motherStatus = _selectedMotherStatus ?? 'Present';
+    final fatherStatus = _selectedFatherStatus ?? 'Present';
+    final caregiverStatus = _selectedCaregiverPresence ?? 'No';
+
+    return [
+      {'label': 'Patient Name', 'value': patientName.isEmpty ? 'N/A' : patientName},
+      {'label': 'Sex', 'value': _selectedSex ?? 'N/A'},
+      {'label': 'Date of Birth', 'value': dobController.text.trim().isEmpty ? 'N/A' : dobController.text.trim()},
+      {'label': 'Blood Type', 'value': _selectedBloodType ?? 'N/A'},
+      {'label': 'Birth Weight', 'value': birthWeightController.text.trim().isEmpty ? 'N/A' : '${birthWeightController.text.trim()} kg'},
+      {'label': 'Birth Order', 'value': birthOrderController.text.trim().isEmpty ? 'N/A' : birthOrderController.text.trim()},
+      {'label': 'Address', 'value': addressController.text.trim().isEmpty ? 'N/A' : addressController.text.trim()},
+      {'label': 'Place of Birth', 'value': placeOfBirthController.text.trim().isEmpty ? 'N/A' : placeOfBirthController.text.trim()},
+      {'label': 'Mother Status', 'value': motherStatus},
+      {'label': 'Mother Name', 'value': motherController.text.trim().isEmpty ? 'N/A' : motherController.text.trim()},
+      {'label': 'Mother Contact', 'value': motherContactController.text.trim().isEmpty ? 'N/A' : motherContactController.text.trim()},
+      {'label': 'Father Status', 'value': fatherStatus},
+      {'label': 'Father Name', 'value': fatherController.text.trim().isEmpty ? 'N/A' : fatherController.text.trim()},
+      {'label': 'Father Contact', 'value': fatherContactController.text.trim().isEmpty ? 'N/A' : fatherContactController.text.trim()},
+      {'label': 'Caregiver Present', 'value': caregiverStatus},
+      {'label': '4Ps Member', 'value': _isFourPsMember == true ? 'Yes' : 'No'},
+      {'label': 'Has Disability', 'value': _hasDisability == true ? 'Yes' : 'No'},
+      {'label': 'Residence Status', 'value': _residenceStatus ?? 'N/A'},
+    ];
+  }
+
+  Widget _buildSummaryRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 4,
+            child: Text(
+              '$label:',
+              style: const TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 6,
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFF444444),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   // ── Save All Data ──────────────────────────────────────────────────────────
@@ -572,59 +694,6 @@ class _HomePageState extends State<HomePage>
       }
     }
 
-    // ── Update vaccination status from form changes (real-time) ──────────────────────────────────────────
-    Future<void> _updateVaccinationStatusFromForm(Map<String, dynamic> vaccinationData) async {
-      // Only update if we have patient information and vaccination data
-      if (firstNameController.text.trim().isEmpty || 
-          lastNameController.text.trim().isEmpty || 
-          vaccinationData.isEmpty) {
-        return;
-      }
-
-      try {
-        // Count columns recorded as true, ignoring _date and nextDoseDate keys.
-        int doseCount(String vaccine) {
-          final doses = vaccinationData[vaccine] as Map<String, dynamic>?;
-          if (doses == null) return 0;
-          return doses.entries
-              .where((e) =>
-                  !e.key.endsWith('_date') &&
-                  e.key != 'nextDoseDate' &&
-                  e.value == true)
-              .length;
-        }
-
-        String doseLabelForCount(String vaccineName, int count) {
-          final labels = kVaccineDoseLabels[vaccineName] ?? const <String>[];
-          if (count <= 0 || labels.isEmpty) return 'Pending';
-          final idx = (count - 1).clamp(0, labels.length - 1);
-          return labels[idx];
-        }
-
-        final statuses = <String, String>{};
-        for (final entry in kVaccineNameToKey.entries) {
-          final vaccineName = entry.key;
-          final firestoreKey = entry.value;
-          final count = doseCount(vaccineName);
-          if (count <= 0) continue;
-          statuses[firestoreKey] = doseLabelForCount(vaccineName, count);
-        }
-
-        // Save to local vaccination status for immediate update
-        final fs = FirestoreService();
-        await fs.saveVaccinationStatus(
-          firstName: firstNameController.text.trim(),
-          middleName: middleNameController.text.trim(),
-          lastName: lastNameController.text.trim(),
-          statuses: statuses,
-        );
-
-        debugPrint('Vaccination status updated from form changes');
-      } catch (e) {
-        debugPrint('Error updating vaccination status from form: $e');
-      }
-    }
-
     if (mounted) {
       // Clear all controllers
       for (final c in [
@@ -703,6 +772,9 @@ class _HomePageState extends State<HomePage>
         _ipEthnicity = null;
         _isFourPsMember = null;
         _hasDisability = null;
+        _selectedMotherStatus = null;
+        _selectedFatherStatus = null;
+        _selectedCaregiverPresence = null;
         _oralData = null;
         _oralRiskError = null;
         _vaccinationData = null;
@@ -925,6 +997,7 @@ class _HomePageState extends State<HomePage>
               firstNameController: firstNameController,
               middleNameController: middleNameController,
               lastNameController: lastNameController,
+              extensionNameController: extensionNameController,
               ageController: ageController,
               ageDaysController: ageDaysController,
               ageYearsController: ageYearsController,
@@ -1120,7 +1193,7 @@ class _HomePageState extends State<HomePage>
                 Expanded(
                   flex: 2,
                   child: GestureDetector(
-                    onTap: _saveAllData,
+                    onTap: _onSaveAssessmentTapped,
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 15),
                       decoration: BoxDecoration(
