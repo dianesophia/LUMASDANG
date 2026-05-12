@@ -43,6 +43,7 @@ class DemographicDataForm extends StatefulWidget {
   // PhilHealth — Father
   final TextEditingController fatherPhilHealthNumberController;
   final TextEditingController fatherPhilHealthMemberTypeController;
+  final TextEditingController extensionNameController;
 
   final bool? belongsToIpGroup;
   final String? ipEthnicity;
@@ -92,6 +93,7 @@ class DemographicDataForm extends StatefulWidget {
     required this.motherPhilHealthMemberTypeController,
     required this.fatherPhilHealthNumberController,
     required this.fatherPhilHealthMemberTypeController,
+    required this.extensionNameController,
     this.belongsToIpGroup,
     this.ipEthnicity,
     this.isFourPsMember,
@@ -120,13 +122,42 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
   String? _selectedBloodType;
   String? _motherPhilHealthMemberType;
   String? _fatherPhilHealthMemberType;
+  String? _selectedExtension;
+  String? _selectedMotherStatus = 'Present';
+  String? _selectedFatherStatus = 'Present';
+  String? _selectedCaregiverPresence = 'No';
 
   static const _philHealthMemberTypes = [
-    'Member', 'Dependent', 'Indigent', 'Senior Citizen', 'PWD', 'Other',
+    'Member',
+    'Dependent',
+    'Indigent',
+    'Senior Citizen',
+    'PWD',
+    'Other',
   ];
 
   static const _bloodTypes = [
-    'A+', 'A−', 'B+', 'B−', 'AB+', 'AB−', 'O+', 'O−', 'Unknown',
+    'A+',
+    'A−',
+    'B+',
+    'B−',
+    'AB+',
+    'AB−',
+    'O+',
+    'O−',
+    'Unknown',
+  ];
+
+  static const _parentStatuses = [
+    'Present',
+    'N/A (Deceased)',
+    'N/A (Unknown)',
+    'N/A (Absent)',
+  ];
+
+  static const _caregiverOptions = [
+    'Yes',
+    'No',
   ];
 
   @override
@@ -223,7 +254,8 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
           ),
           textButtonTheme: TextButtonThemeData(
             style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFFF5A962)),
+              foregroundColor: const Color(0xFFF5A962),
+            ),
           ),
         ),
         child: child!,
@@ -235,10 +267,10 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
       final now = DateTime.now();
       final days = now.difference(picked).inDays;
       widget.ageDaysController.text = days.clamp(0, 99999).toString();
-      final months =
-          (now.year - picked.year) * 12 + (now.month - picked.month);
+      final months = (now.year - picked.year) * 12 + (now.month - picked.month);
       widget.ageController.text = months.clamp(0, 60).toString();
-      final years = now.year -
+      final years =
+          now.year -
           picked.year -
           (now.month < picked.month ||
                   (now.month == picked.month && now.day < picked.day)
@@ -276,8 +308,11 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
           validator: validator,
           onChanged: onChanged,
           dropdownColor: Colors.white,
-          icon: const Icon(Icons.keyboard_arrow_down_rounded,
-              color: Color(0xFFF5A962), size: 20),
+          icon: const Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: Color(0xFFF5A962),
+            size: 20,
+          ),
           style: const TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w500,
@@ -291,40 +326,48 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                 : null,
             filled: true,
             fillColor: const Color(0xFFFAFAFA),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 11,
+            ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide:
-                  const BorderSide(color: Color(0xFFEEEEEE), width: 1.5),
+              borderSide: const BorderSide(
+                color: Color(0xFFEEEEEE),
+                width: 1.5,
+              ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide:
-                  const BorderSide(color: Color(0xFFF5A962), width: 2),
+              borderSide: const BorderSide(color: Color(0xFFF5A962), width: 2),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide:
-                  const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+              borderSide: const BorderSide(
+                color: Color(0xFFEF4444),
+                width: 1.5,
+              ),
             ),
             focusedErrorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide:
-                  const BorderSide(color: Color(0xFFEF4444), width: 2),
+              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 2),
             ),
             errorStyle: const TextStyle(fontSize: 10),
           ),
           items: items
-              .map((item) => DropdownMenuItem(
-                    value: item,
-                    child: Text(item,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: Color(0xFF1A1A1A),
-                        )),
-                  ))
+              .map(
+                (item) => DropdownMenuItem(
+                  value: item,
+                  child: Text(
+                    item,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF1A1A1A),
+                    ),
+                  ),
+                ),
+              )
               .toList(),
         ),
       ],
@@ -338,13 +381,10 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
         decoration: BoxDecoration(
-          color:
-              selected ? const Color(0xFFF5A962) : const Color(0xFFFAFAFA),
+          color: selected ? const Color(0xFFF5A962) : const Color(0xFFFAFAFA),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: selected
-                ? const Color(0xFFF5A962)
-                : const Color(0xFFEEEEEE),
+            color: selected ? const Color(0xFFF5A962) : const Color(0xFFEEEEEE),
             width: 1.5,
           ),
         ),
@@ -386,13 +426,15 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFFF5A962),
-              letterSpacing: 0.5,
-            )),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFFF5A962),
+            letterSpacing: 0.5,
+          ),
+        ),
         const SizedBox(height: 5),
         TextFormField(
           controller: controller,
@@ -403,50 +445,59 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
           onTap: onTap,
           maxLines: maxLines,
           style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF1A1A1A)),
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF1A1A1A),
+          ),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle:
-                const TextStyle(fontSize: 12, color: Colors.black26),
+            hintStyle: const TextStyle(fontSize: 12, color: Colors.black26),
             prefixIcon: icon != null
                 ? Icon(icon, size: 16, color: Colors.black38)
                 : null,
             suffixIcon: onTap != null
-                ? const Icon(Icons.calendar_month_outlined,
-                    size: 18, color: Color(0xFFF5A962))
+                ? const Icon(
+                    Icons.calendar_month_outlined,
+                    size: 18,
+                    color: Color(0xFFF5A962),
+                  )
                 : null,
             filled: true,
             fillColor: (!enabled || readOnly)
                 ? const Color(0xFFF0F0F0)
                 : const Color(0xFFFAFAFA),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 11,
+            ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide:
-                  const BorderSide(color: Color(0xFFEEEEEE), width: 1.5),
+              borderSide: const BorderSide(
+                color: Color(0xFFEEEEEE),
+                width: 1.5,
+              ),
             ),
             disabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide:
-                  const BorderSide(color: Color(0xFFE0E0E0), width: 1.5),
+              borderSide: const BorderSide(
+                color: Color(0xFFE0E0E0),
+                width: 1.5,
+              ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide:
-                  const BorderSide(color: Color(0xFFF5A962), width: 2),
+              borderSide: const BorderSide(color: Color(0xFFF5A962), width: 2),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide:
-                  const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+              borderSide: const BorderSide(
+                color: Color(0xFFEF4444),
+                width: 1.5,
+              ),
             ),
             focusedErrorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide:
-                  const BorderSide(color: Color(0xFFEF4444), width: 2),
+              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 2),
             ),
             errorStyle: const TextStyle(fontSize: 10),
           ),
@@ -455,10 +506,11 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
     );
   }
 
-  Widget _buildCard(
-      {required String? headerTitle,
-      IconData? headerIcon,
-      required Widget child}) {
+  Widget _buildCard({
+    required String? headerTitle,
+    IconData? headerIcon,
+    required Widget child,
+  }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       decoration: BoxDecoration(
@@ -538,17 +590,37 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
     );
   }
 
-  Widget _buildLabelRow(String label) {
+  Widget _buildLabelRow(String label, {bool isRequired = false, bool isOptional = false}) {
+    String displayLabel = label;
+    if (isRequired) {
+      displayLabel = '$label *';
+    }
+    
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
-      child: Text(
-        label,
-        style: const TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          color: Color(0xFFF5A962),
-          letterSpacing: 0.5,
-        ),
+      child: Row(
+        children: [
+          Text(
+            displayLabel,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFFF5A962),
+              letterSpacing: 0.5,
+            ),
+          ),
+          if (isOptional) ...[const SizedBox(width: 6),
+            Text(
+              '(Optional)',
+              style: const TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFFAAAAAA),
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -622,7 +694,8 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                   return null;
                 },
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 12),
+
               Row(
                 children: [
                   SizedBox(
@@ -643,10 +716,26 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                     ),
                   ),
                   const SizedBox(width: 6),
-                  const Text('N/A (no middle name)',
-                      style:
-                          TextStyle(fontSize: 12, color: Color(0xFF888888))),
+                  const Text(
+                    'N/A (no middle name)',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF888888)),
+                  ),
                 ],
+              ),
+              const SizedBox(height: 12),
+
+              // ── EXTENSION NAME DROPDOWN ─────────────────────────────
+              _buildDropdown(
+                label: 'EXTENSION NAME',
+                value: _selectedExtension,
+                items: const ['Jr.', 'Sr.', 'II', 'III', 'IV'],
+                icon: Icons.badge_outlined,
+                onChanged: (v) {
+                  setState(() {
+                    _selectedExtension = v;
+                    widget.extensionNameController.text = v ?? '';
+                  });
+                },
               ),
               const SizedBox(height: 12),
 
@@ -740,6 +829,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
               ),
               const SizedBox(height: 12),
 
+              _buildSubHeader('BIRTH INFORMATION'),
               Row(
                 children: [
                   Expanded(
@@ -747,12 +837,13 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                       label: 'BIRTH WEIGHT (kg)',
                       controller: widget.birthWeightController,
                       keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true),
+                        decimal: true,
+                      ),
                       icon: Icons.monitor_weight_outlined,
                       hint: 'e.g. 3.2',
                       validator: (v) {
-                        if (widget.isDraft ||
-                            (v == null || v.trim().isEmpty)) return null;
+                        if (widget.isDraft || (v == null || v.trim().isEmpty))
+                          return null;
                         final w = double.tryParse(v.trim());
                         if (w == null || w <= 0) return 'Invalid weight';
                         return null;
@@ -766,7 +857,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                       controller: widget.birthOrderController,
                       keyboardType: TextInputType.number,
                       icon: Icons.sort_outlined,
-                      hint: 'e.g. 1st, 2nd…',
+                      hint: 'e.g. 1, 2, 3…',
                     ),
                   ),
                 ],
@@ -812,7 +903,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                       'Kankanaey',
                       'Kalanguya',
                       'Applai',
-                      'Other'
+                      'Other',
                     ])
                       _buildTogglePill(eth, _ipEthnicity == eth, () {
                         setState(() => _ipEthnicity = eth);
@@ -904,8 +995,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                 label: 'ADDRESS',
                 controller: widget.addressController,
                 icon: Icons.home_outlined,
-                validator: (v) =>
-                    _requiredOnSubmit(v, 'Address is required'),
+                validator: (v) => _requiredOnSubmit(v, 'Address is required'),
               ),
               const SizedBox(height: 12),
               _buildField(
@@ -928,12 +1018,15 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                   }),
                   const SizedBox(width: 8),
                   _buildTogglePill(
-                      'Permanent', _residenceStatus == 'Permanent', () {
-                    setState(() {
-                      _residenceStatus = 'Permanent';
-                      widget.residenceStatusController.text = 'Permanent';
-                    });
-                  }),
+                    'Permanent',
+                    _residenceStatus == 'Permanent',
+                    () {
+                      setState(() {
+                        _residenceStatus = 'Permanent';
+                        widget.residenceStatusController.text = 'Permanent';
+                      });
+                    },
+                  ),
                 ],
               ),
               const SizedBox(height: 12),
@@ -958,14 +1051,49 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildField(
-                label: "MOTHER'S FULL NAME *",
-                controller: widget.motherController,
-                icon: Icons.person_outline,
-                validator: (v) =>
-                    _alwaysRequired(v, "Mother's name is required"),
+              _buildLabelRow("MOTHER'S STATUS", isRequired: true),
+              const SizedBox(height: 5),
+              DropdownButtonFormField<String>(
+                value: _selectedMotherStatus,
+                onChanged: (v) {
+                  setState(() {
+                    _selectedMotherStatus = v;
+                    if (v == 'Present') {
+                      widget.motherController.clear();
+                    } else {
+                      widget.motherController.text = v ?? '';
+                    }
+                  });
+                },
+                items: _parentStatuses
+                    .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                    .toList(),
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.person_outline, size: 16),
+                  filled: true,
+                  fillColor: const Color(0xFFFAFAFA),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: Color(0xFFEEEEEE), width: 1.5),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: Color(0xFFF5A962), width: 2),
+                  ),
+                ),
               ),
               const SizedBox(height: 12),
+              if (_selectedMotherStatus == 'Present') ...[    
+                _buildField(
+                  label: "MOTHER'S FULL NAME *",
+                  controller: widget.motherController,
+                  icon: Icons.person_outline,
+                  validator: (v) =>
+                      _alwaysRequired(v, "Mother's name is required"),
+                ),
+                const SizedBox(height: 12),
+              ],
               Row(
                 children: [
                   Expanded(
@@ -1026,8 +1154,10 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                             onChanged: (v) {
                               setState(() {
                                 _motherPhilHealthMemberType = v;
-                                widget.motherPhilHealthMemberTypeController
-                                    .text = v ?? '';
+                                widget
+                                        .motherPhilHealthMemberTypeController
+                                        .text =
+                                    v ?? '';
                               });
                             },
                           ),
@@ -1076,14 +1206,49 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildField(
-                label: "FATHER'S FULL NAME *",
-                controller: widget.fatherController,
-                icon: Icons.person_outline,
-                validator: (v) =>
-                    _alwaysRequired(v, "Father's name is required"),
+              _buildLabelRow("FATHER'S STATUS", isRequired: true),
+              const SizedBox(height: 5),
+              DropdownButtonFormField<String>(
+                value: _selectedFatherStatus,
+                onChanged: (v) {
+                  setState(() {
+                    _selectedFatherStatus = v;
+                    if (v == 'Present') {
+                      widget.fatherController.clear();
+                    } else {
+                      widget.fatherController.text = v ?? '';
+                    }
+                  });
+                },
+                items: _parentStatuses
+                    .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                    .toList(),
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.person_outline, size: 16),
+                  filled: true,
+                  fillColor: const Color(0xFFFAFAFA),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: Color(0xFFEEEEEE), width: 1.5),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: Color(0xFFF5A962), width: 2),
+                  ),
+                ),
               ),
               const SizedBox(height: 12),
+              if (_selectedFatherStatus == 'Present') ...[         
+                _buildField(
+                  label: "FATHER'S FULL NAME *",
+                  controller: widget.fatherController,
+                  icon: Icons.person_outline,
+                  validator: (v) =>
+                      _alwaysRequired(v, "Father's name is required"),
+                ),
+                const SizedBox(height: 12),
+              ],
               Row(
                 children: [
                   Expanded(
@@ -1152,8 +1317,10 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                             onChanged: (v) {
                               setState(() {
                                 _fatherPhilHealthMemberType = v;
-                                widget.fatherPhilHealthMemberTypeController
-                                    .text = v ?? '';
+                                widget
+                                        .fatherPhilHealthMemberTypeController
+                                        .text =
+                                    v ?? '';
                               });
                             },
                           ),
@@ -1202,13 +1369,49 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildField(
-                label: "CAREGIVER'S FULL NAME",
-                controller: widget.caregiverNameController,
-                icon: Icons.person_outline,
-                hint: 'If different from parents',
+              _buildLabelRow("IS CAREGIVER DIFFERENT FROM PARENTS?", isOptional: true),
+              const SizedBox(height: 5),
+              DropdownButtonFormField<String>(
+                value: _selectedCaregiverPresence,
+                onChanged: (v) {
+                  setState(() {
+                    _selectedCaregiverPresence = v;
+                    if (v == 'No') {
+                      widget.caregiverNameController.clear();
+                      widget.caregiverAgeController.clear();
+                      widget.caregiverRelationshipController.clear();
+                    }
+                  });
+                },
+                items: _caregiverOptions
+                    .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                    .toList(),
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.supervisor_account_outlined, size: 16),
+                  filled: true,
+                  fillColor: const Color(0xFFFAFAFA),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: Color(0xFFEEEEEE), width: 1.5),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: Color(0xFFF5A962), width: 2),
+                  ),
+                ),
               ),
               const SizedBox(height: 12),
+              if (_selectedCaregiverPresence == 'Yes') ...[              
+                _buildField(
+                  label: "CAREGIVER'S FULL NAME",
+                  controller: widget.caregiverNameController,
+                  icon: Icons.person_outline,
+                  hint: 'Enter caregiver name',
+                ),
+                const SizedBox(height: 12),
+              ],
+              if (_selectedCaregiverPresence == 'Yes')
               Row(
                 children: [
                   Expanded(
