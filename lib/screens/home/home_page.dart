@@ -122,6 +122,7 @@ class _HomePageState extends State<HomePage>
   String? _selectedMotherStatus;
   String? _selectedFatherStatus;
   String? _selectedCaregiverPresence;
+  bool _isSyncing = false;
 
   bool _diarrhea = false;
   bool _fever = false;
@@ -209,6 +210,35 @@ class _HomePageState extends State<HomePage>
         }
       }
     });
+  }
+
+  Future<void> _syncPendingAssessments() async {
+    if (_isSyncing) return;
+    setState(() => _isSyncing = true);
+
+    try {
+      final online = kIsWeb ? true : await ConnectivityService.instance.checkOnline();
+      if (!online) {
+        _showSnackBar(
+          'Offline: sync will run when online.',
+          color: const Color(0xFFF08030),
+        );
+        return;
+      }
+
+      final synced = await LocalDbService.instance.syncPending(FirestoreService());
+      if (synced > 0) {
+        _showSnackBar('$synced pending assessment(s) synced.');
+      } else {
+        _showSnackBar('No pending assessments to sync.');
+      }
+    } catch (e) {
+      _showSnackBar('Sync failed: ${e.toString()}', color: const Color(0xFFEF4444));
+    } finally {
+      if (mounted) {
+        setState(() => _isSyncing = false);
+      }
+    }
   }
 
   @override
@@ -863,6 +893,36 @@ class _HomePageState extends State<HomePage>
                 ),
               ),
               const Spacer(),
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _syncPendingAssessments,
+                  borderRadius: BorderRadius.circular(50),
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.35),
+                        width: 1.2,
+                      ),
+                    ),
+                    child: _isSyncing
+                        ? const SizedBox(
+                            height: 18,
+                            width: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.sync_outlined,
+                            color: Colors.white, size: 18),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
               Material(
                 color: Colors.transparent,
                 child: InkWell(

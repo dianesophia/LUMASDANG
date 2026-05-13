@@ -125,9 +125,20 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
   String? _motherPhilHealthMemberType;
   String? _fatherPhilHealthMemberType;
   String? _selectedExtension;
+  bool _extensionOptional = false;
   String? _selectedMotherStatus = 'Present';
   String? _selectedFatherStatus = 'Present';
   String? _selectedCaregiverPresence = 'No';
+
+  bool sameAsAddress = false;
+
+  String? selectedProvince;
+  String? selectedMunicipality;
+  String? selectedBarangay;
+
+  String? birthProvince;
+  String? birthMunicipality;
+  String? birthBarangay;
 
   static const _birthWeightOptions = [
     '1.0', '1.1', '1.2', '1.3', '1.4', '1.5', '1.6', '1.7', '1.8', '1.9',
@@ -178,6 +189,133 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
     'Yes',
     'No',
   ];
+
+   final Map<String, List<String>> carLocations = {
+    "Abra": [
+      "Bangued",
+      "Boliney",
+      "Bucay",
+      "Bucloc",
+      "Daguioman",
+      "Danglas",
+      "Dolores",
+      "La Paz",
+      "Lacub",
+      "Lagangilang",
+      "Lagayan",
+      "Langiden",
+      "Licuan-Baay",
+      "Luba",
+      "Malibcong",
+      "Manabo",
+      "Peñarrubia",
+      "Pidigan",
+      "Pilar",
+      "Sallapadan",
+      "San Isidro",
+      "San Juan",
+      "San Quintin",
+      "Tayum",
+      "Tineg",
+      "Tubo",
+      "Villaviciosa",
+    ],
+    "Apayao": [
+      "Calanasan",
+      "Conner",
+      "Flora",
+      "Kabugao",
+      "Luna",
+      "Pudtol",
+      "Santa Marcela",
+    ],
+    "Benguet": [
+      "Atok",
+      "Bakun",
+      "Bokod",
+      "Buguias",
+      "Itogon",
+      "Kabayan",
+      "Kapangan",
+      "Kibungan",
+      "La Trinidad",
+      "Mankayan",
+      "Sablan",
+      "Tuba",
+      "Tublay",
+    ],
+    "Ifugao": [
+      "Aguinaldo",
+      "Alfonso Lista",
+      "Asipulo",
+      "Banaue",
+      "Hingyon",
+      "Hungduan",
+      "Kiangan",
+      "Lagawe",
+      "Lamut",
+      "Mayoyao",
+      "Tinoc",
+    ],
+    "Kalinga": [
+      "Balbalan",
+      "Lubuagan",
+      "Pasil",
+      "Pinukpuk",
+      "Rizal",
+      "Tanudan",
+      "Tinglayan",
+      "Tabuk City",
+    ],
+    "Mountain Province": [
+      "Barlig",
+      "Bauko",
+      "Besao",
+      "Bontoc",
+      "Natonin",
+      "Paracelis",
+      "Sabangan",
+      "Sadanga",
+      "Sagada",
+      "Tadian",
+    ],
+  };
+
+  /// Sample barangays
+  final List<String> barangays = [
+    "Barangay 1",
+    "Barangay 2",
+    "Barangay 3",
+    "Poblacion",
+    "San Jose",
+  ];
+
+  final Map<String, List<String>> barangayData = {
+  "La Trinidad": [
+    "Alapang",
+    "Alno",
+    "Ambiong",
+    "Bahong",
+    "Balili",
+    "Beckel",
+    "Betag",
+    "Bineng",
+    "Cruz",
+    "Lubas",
+    "Pico",
+    "Poblacion",
+    "Puguis",
+    "Shilan",
+    "Tawang",
+    "Wangal",
+  ],
+
+  "Baguio": [
+    "Session Road",
+    "Irisan",
+    "Burnham",
+  ],
+};
 
   @override
   void initState() {
@@ -275,6 +413,30 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
     return null;
   }
 
+  String _formatAddress(String? province, String? municipality, String? barangay) {
+    final parts = <String>[];
+    if (barangay != null && barangay.isNotEmpty) parts.add(barangay);
+    if (municipality != null && municipality.isNotEmpty) parts.add(municipality);
+    if (province != null && province.isNotEmpty) parts.add(province);
+    return parts.join(', ');
+  }
+
+  void _updateAddressController() {
+    widget.addressController.text = _formatAddress(
+      selectedProvince,
+      selectedMunicipality,
+      selectedBarangay,
+    );
+  }
+
+  void _updatePlaceOfBirthController() {
+    widget.placeOfBirthController.text = _formatAddress(
+      birthProvince,
+      birthMunicipality,
+      birthBarangay,
+    );
+  }
+
   // ── Date picker ────────────────────────────────────────────────────────────
   Future<void> _pickDate(BuildContext context) async {
     DateTime initialDate = DateTime.now();
@@ -332,9 +494,10 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
     required String label,
     required String? value,
     required List<String> items,
-    required ValueChanged<String?> onChanged,
+    ValueChanged<String?>? onChanged,
     IconData? icon,
     String? Function(String?)? validator,
+    bool enabled = true,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -352,7 +515,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
         DropdownButtonFormField<String>(
           initialValue: value,
           validator: validator,
-          onChanged: onChanged,
+          onChanged: enabled ? onChanged : null,
           dropdownColor: Colors.white,
           icon: const Icon(
             Icons.keyboard_arrow_down_rounded,
@@ -366,6 +529,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
           ),
           decoration: InputDecoration(
             hintText: 'Select…',
+            enabled: enabled,
             hintStyle: const TextStyle(fontSize: 12, color: Colors.black26),
             prefixIcon: icon != null
                 ? Icon(icon, size: 16, color: Colors.black38)
@@ -752,6 +916,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                       value: _selectedExtension,
                       items: const ['None', 'Jr.', 'Sr.', 'II', 'III', 'IV'],
                       icon: Icons.badge_outlined,
+                      enabled: !_extensionOptional,
                       onChanged: (v) {
                         setState(() {
                           _selectedExtension = v;
@@ -767,31 +932,70 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-
+              const SizedBox(height: 10),
               Row(
                 children: [
-                  SizedBox(
-                    height: 24,
-                    width: 24,
-                    child: Checkbox(
-                      value: _middleNameNA,
-                      activeColor: const Color(0xFFF5A962),
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      onChanged: (val) {
-                        setState(() {
-                          _middleNameNA = val ?? false;
-                          if (_middleNameNA) {
-                            widget.middleNameController.clear();
-                          }
-                        });
-                      },
+                  Expanded(
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          height: 24,
+                          width: 24,
+                          child: Checkbox(
+                            value: _middleNameNA,
+                            activeColor: const Color(0xFFF5A962),
+                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            onChanged: (val) {
+                              setState(() {
+                                _middleNameNA = val ?? false;
+                                if (_middleNameNA) {
+                                  widget.middleNameController.clear();
+                                }
+                              });
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        const Flexible(
+                          child: Text(
+                            'N/A (no middle name)',
+                            style: TextStyle(fontSize: 12, color: Color(0xFF888888)),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 6),
-                  const Text(
-                    'N/A (no middle name)',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF888888)),
+                  const SizedBox(width: 20),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          height: 24,
+                          width: 24,
+                          child: Checkbox(
+                            value: _extensionOptional,
+                            activeColor: const Color(0xFFF5A962),
+                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            onChanged: (val) {
+                              setState(() {
+                                _extensionOptional = val ?? false;
+                                if (_extensionOptional) {
+                                  _selectedExtension = null;
+                                  widget.extensionNameController.clear();
+                                }
+                              });
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        const Flexible(
+                          child: Text(
+                            'Extension optional',
+                            style: TextStyle(fontSize: 12, color: Color(0xFF888888)),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -1087,21 +1291,164 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildField(
-                label: 'ADDRESS',
-                controller: widget.addressController,
-                icon: Icons.home_outlined,
-                validator: (v) => _requiredOnSubmit(v, 'Address is required'),
-              ),
-              const SizedBox(height: 12),
-              _buildField(
-                label: 'PLACE OF BIRTH',
-                controller: widget.placeOfBirthController,
-                icon: Icons.location_on_outlined,
-                validator: (v) =>
-                    _requiredOnSubmit(v, 'Place of birth is required'),
-              ),
-              const SizedBox(height: 12),
+              /// ADDRESS
+        const Text(
+          "ADDRESS",
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+
+        const SizedBox(height: 12),
+
+        _buildDropdown(
+          label: "Province",
+          value: selectedProvince,
+          items: carLocations.keys.toList(),
+          onChanged: (value) {
+            setState(() {
+              selectedProvince = value;
+              selectedMunicipality = null;
+              selectedBarangay = null;
+              _updateAddressController();
+              if (sameAsAddress) {
+                birthProvince = selectedProvince;
+                birthMunicipality = selectedMunicipality;
+                birthBarangay = selectedBarangay;
+                _updatePlaceOfBirthController();
+              }
+            });
+          },
+        ),
+
+        const SizedBox(height: 12),
+
+        _buildDropdown(
+          label: "Municipality / City",
+          value: selectedMunicipality,
+          items: selectedProvince == null
+              ? []
+              : carLocations[selectedProvince]!,
+          onChanged: (value) {
+            setState(() {
+              selectedMunicipality = value;
+              selectedBarangay = null;
+              _updateAddressController();
+              if (sameAsAddress) {
+                birthProvince = selectedProvince;
+                birthMunicipality = selectedMunicipality;
+                birthBarangay = selectedBarangay;
+                _updatePlaceOfBirthController();
+              }
+            });
+          },
+        ),
+
+        const SizedBox(height: 12),
+
+        _buildDropdown(
+          label: "Barangay",
+          value: selectedBarangay,
+          items: barangays,
+          onChanged: (value) {
+            setState(() {
+              selectedBarangay = value;
+              _updateAddressController();
+              if (sameAsAddress) {
+                birthProvince = selectedProvince;
+                birthMunicipality = selectedMunicipality;
+                birthBarangay = selectedBarangay;
+                _updatePlaceOfBirthController();
+              }
+            });
+          },
+        ),
+
+        const SizedBox(height: 20),
+
+        /// CHECKBOX
+        CheckboxListTile(
+          value: sameAsAddress,
+          title: const Text("Place of Birth is same as Address"),
+          contentPadding: EdgeInsets.zero,
+          onChanged: (value) {
+            setState(() {
+              sameAsAddress = value!;
+
+              if (sameAsAddress) {
+                birthProvince = selectedProvince;
+                birthMunicipality = selectedMunicipality;
+                birthBarangay = selectedBarangay;
+                _updatePlaceOfBirthController();
+              }
+            });
+          },
+        ),
+
+        const SizedBox(height: 20),
+
+        /// PLACE OF BIRTH
+        const Text(
+          "PLACE OF BIRTH",
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+
+        const SizedBox(height: 12),
+
+        _buildDropdown(
+          label: "Province",
+          value: birthProvince,
+          items: carLocations.keys.toList(),
+          onChanged: sameAsAddress
+              ? null
+              : (value) {
+                  setState(() {
+                    birthProvince = value;
+                    birthMunicipality = null;
+                    birthBarangay = null;
+                    _updatePlaceOfBirthController();
+                  });
+                },
+        ),
+
+        const SizedBox(height: 12),
+
+        _buildDropdown(
+          label: "Municipality / City",
+          value: birthMunicipality,
+          items: birthProvince == null
+              ? []
+              : carLocations[birthProvince]!,
+          onChanged: sameAsAddress
+              ? null
+              : (value) {
+                  setState(() {
+                    birthMunicipality = value;
+                    birthBarangay = null;
+                    _updatePlaceOfBirthController();
+                  });
+                },
+        ),
+
+        const SizedBox(height: 12),
+
+        _buildDropdown(
+          label: "Barangay",
+          value: birthBarangay,
+          items: barangays,
+          onChanged: sameAsAddress
+              ? null
+              : (value) {
+                  setState(() {
+                    birthBarangay = value;
+                    _updatePlaceOfBirthController();
+                  });
+                },
+        ),
+   
+  
 
               _buildLabelRow('STATUS OF RESIDENCE'),
               Row(
