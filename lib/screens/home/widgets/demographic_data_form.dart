@@ -128,6 +128,8 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
   bool _extensionOptional = false;
   String? _selectedMotherStatus = 'Present';
   String? _selectedFatherStatus = 'Present';
+  bool _isMotherAvailable = true;
+  bool _isFatherAvailable = true;
   String? _selectedCaregiverPresence = 'No';
 
   bool sameAsAddress = false;
@@ -374,6 +376,9 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
     if (_philHealthMemberTypes.contains(fPhType)) {
       _fatherPhilHealthMemberType = fPhType;
     }
+
+    _isMotherAvailable = _selectedMotherStatus == 'Present';
+    _isFatherAvailable = _selectedFatherStatus == 'Present';
   }
 
   @override
@@ -1494,6 +1499,45 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Row(
+                children: [
+                  SizedBox(
+                    height: 24,
+                    width: 24,
+                    child: Checkbox(
+                      value: _isMotherAvailable,
+                      activeColor: const Color(0xFFF5A962),
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      onChanged: (val) {
+                        setState(() {
+                          _isMotherAvailable = val ?? false;
+                          if (!_isMotherAvailable) {
+                            _selectedMotherStatus = 'N/A (Absent)';
+                            widget.motherController.text = _selectedMotherStatus!;
+                            widget.motherContactController.clear();
+                            widget.motherAgeController.clear();
+                            widget.motherOccupationController.clear();
+                            widget.motherPhilHealthNumberController.clear();
+                            widget.motherPhilHealthMemberTypeController.clear();
+                            _motherPhilHealthMemberType = null;
+                          } else {
+                            _selectedMotherStatus = 'Present';
+                            widget.motherController.clear();
+                          }
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Mother available',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF1A1A1A)),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
               _buildLabelRow("MOTHER'S STATUS", isRequired: true),
               const SizedBox(height: 5),
               DropdownButtonFormField<String>(
@@ -1501,6 +1545,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                 onChanged: (v) {
                   setState(() {
                     _selectedMotherStatus = v;
+                    _isMotherAvailable = v == 'Present';
                     if (v == 'Present') {
                       widget.motherController.clear();
                     } else {
@@ -1546,6 +1591,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                       keyboardType: TextInputType.number,
                       icon: Icons.cake_outlined,
                       hint: 'Years',
+                      enabled: _isMotherAvailable,
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -1556,7 +1602,8 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                       keyboardType: TextInputType.phone,
                       hint: '09XXXXXXXXX',
                       icon: Icons.phone_outlined,
-                      validator: _validateMotherPhone,
+                      enabled: _isMotherAvailable,
+                      validator: _isMotherAvailable ? _validateMotherPhone : null,
                     ),
                   ),
                 ],
@@ -1567,6 +1614,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                 controller: widget.motherOccupationController,
                 icon: Icons.work_outline,
                 hint: 'e.g. Farmer, Teacher…',
+                enabled: _isMotherAvailable,
               ),
               const SizedBox(height: 12),
               // PhilHealth
@@ -1585,6 +1633,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                             keyboardType: TextInputType.number,
                             icon: Icons.credit_card_outlined,
                             hint: '12-digit number',
+                            enabled: _isMotherAvailable,
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -1594,6 +1643,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                             value: _motherPhilHealthMemberType,
                             items: _philHealthMemberTypes,
                             icon: Icons.badge_outlined,
+                            enabled: _isMotherAvailable,
                             onChanged: (v) {
                               setState(() {
                                 _motherPhilHealthMemberType = v;
@@ -1617,6 +1667,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                         keyboardType: TextInputType.number,
                         icon: Icons.credit_card_outlined,
                         hint: '12-digit number',
+                        enabled: _isMotherAvailable,
                       ),
                       const SizedBox(height: 10),
                       _buildDropdown(
@@ -1624,6 +1675,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                         value: _motherPhilHealthMemberType,
                         items: _philHealthMemberTypes,
                         icon: Icons.badge_outlined,
+                        enabled: _isMotherAvailable,
                         onChanged: (v) {
                           setState(() {
                             _motherPhilHealthMemberType = v;
@@ -1649,6 +1701,45 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Row(
+                children: [
+                  SizedBox(
+                    height: 24,
+                    width: 24,
+                    child: Checkbox(
+                      value: _isFatherAvailable,
+                      activeColor: const Color(0xFFF5A962),
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      onChanged: (val) {
+                        setState(() {
+                          _isFatherAvailable = val ?? false;
+                          if (!_isFatherAvailable) {
+                            _selectedFatherStatus = 'N/A (Absent)';
+                            widget.fatherController.text = _selectedFatherStatus!;
+                            widget.fatherContactController.clear();
+                            widget.fatherAgeController.clear();
+                            widget.fatherOccupationController.clear();
+                            widget.fatherPhilHealthNumberController.clear();
+                            widget.fatherPhilHealthMemberTypeController.clear();
+                            _fatherPhilHealthMemberType = null;
+                          } else {
+                            _selectedFatherStatus = 'Present';
+                            widget.fatherController.clear();
+                          }
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Father available',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF1A1A1A)),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
               _buildLabelRow("FATHER'S STATUS", isRequired: true),
               const SizedBox(height: 5),
               DropdownButtonFormField<String>(
@@ -1656,6 +1747,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                 onChanged: (v) {
                   setState(() {
                     _selectedFatherStatus = v;
+                    _isFatherAvailable = v == 'Present';
                     if (v == 'Present') {
                       widget.fatherController.clear();
                     } else {
@@ -1701,6 +1793,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                       keyboardType: TextInputType.number,
                       icon: Icons.cake_outlined,
                       hint: 'Years',
+                      enabled: _isFatherAvailable,
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -1711,15 +1804,18 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                       keyboardType: TextInputType.phone,
                       hint: '09XXXXXXXXX',
                       icon: Icons.phone_outlined,
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) {
-                          return 'Contact number is required';
-                        }
-                        if (!_phoneRegex.hasMatch(v.trim())) {
-                          return 'Invalid PH number';
-                        }
-                        return null;
-                      },
+                      enabled: _isFatherAvailable,
+                      validator: _isFatherAvailable
+                          ? (v) {
+                              if (v == null || v.trim().isEmpty) {
+                                return 'Contact number is required';
+                              }
+                              if (!_phoneRegex.hasMatch(v.trim())) {
+                                return 'Invalid PH number';
+                              }
+                              return null;
+                            }
+                          : null,
                     ),
                   ),
                 ],
@@ -1730,6 +1826,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                 controller: widget.fatherOccupationController,
                 icon: Icons.work_outline,
                 hint: 'e.g. Farmer, Driver…',
+                enabled: _isFatherAvailable,
               ),
               const SizedBox(height: 12),
               // PhilHealth
@@ -1748,6 +1845,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                             keyboardType: TextInputType.number,
                             icon: Icons.credit_card_outlined,
                             hint: '12-digit number',
+                            enabled: _isFatherAvailable,
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -1757,6 +1855,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                             value: _fatherPhilHealthMemberType,
                             items: _philHealthMemberTypes,
                             icon: Icons.badge_outlined,
+                            enabled: _isFatherAvailable,
                             onChanged: (v) {
                               setState(() {
                                 _fatherPhilHealthMemberType = v;
@@ -1780,6 +1879,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                         keyboardType: TextInputType.number,
                         icon: Icons.credit_card_outlined,
                         hint: '12-digit number',
+                        enabled: _isFatherAvailable,
                       ),
                       const SizedBox(height: 10),
                       _buildDropdown(
@@ -1787,6 +1887,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                         value: _fatherPhilHealthMemberType,
                         items: _philHealthMemberTypes,
                         icon: Icons.badge_outlined,
+                        enabled: _isFatherAvailable,
                         onChanged: (v) {
                           setState(() {
                             _fatherPhilHealthMemberType = v;

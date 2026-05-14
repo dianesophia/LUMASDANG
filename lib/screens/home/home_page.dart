@@ -30,8 +30,9 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin, AutomaticKeepAliveClientMixin {
   late TabController _tabController;
+  late TabController _sectionTabController;
   final ScrollController _homeScrollController = ScrollController();
 
   // ── Form controllers ───────────────────────────────────────────────────────
@@ -180,6 +181,7 @@ class _HomePageState extends State<HomePage>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _sectionTabController = TabController(length: 4, vsync: this);
 
     LocalDbService.instance.init().then((_) async {
       final online =
@@ -246,6 +248,7 @@ class _HomePageState extends State<HomePage>
     _homeScrollController.dispose();
     _patientListRefreshTrigger.dispose();
     _tabController.dispose();
+    _sectionTabController.dispose();
 
     // Patient
     firstNameController.dispose();
@@ -313,6 +316,9 @@ class _HomePageState extends State<HomePage>
 
     super.dispose();
   }
+
+  @override
+  bool get wantKeepAlive => true;
 
   // ── Save Draft ─────────────────────────────────────────────────────────────
   /// Sets draft mode then runs _saveAllData. In draft mode only the basic
@@ -827,6 +833,7 @@ class _HomePageState extends State<HomePage>
   // ── Build ──────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return Scaffold(
       bottomNavigationBar: _buildBottomTabBar(),
       body: Container(
@@ -1015,293 +1022,356 @@ class _HomePageState extends State<HomePage>
   }
 
   Widget _buildHomeTab() {
-    return SingleChildScrollView(
-      key: const PageStorageKey<String>('home_scroll'),
-      controller: _homeScrollController,
-      padding: const EdgeInsets.all(16),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            StatsRow(
-              key: ValueKey(_statsRefreshKey),
-              onTap: () => _tabController.animateTo(1),
-            ),
-            const SizedBox(height: 16),
-            const UpcomingEvents(),
-            const SizedBox(height: 20),
-
-            // ── Visit Date & Time ──────────────────────────────────
-            _buildVisitCard(),
-            const SizedBox(height: 16),
-
-            // Section label
-            Padding(
-              padding: const EdgeInsets.only(left: 4),
-              child: Text(
-                'NEW ASSESSMENT',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white.withOpacity(0.65),
-                  letterSpacing: 1.4,
+    return Column(
+      children: [
+        Expanded(
+          child: NestedScrollView(
+            controller: _homeScrollController,
+            headerSliverBuilder: (context, innerBoxIsScrolled) {
+              return [
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        StatsRow(
+                          key: ValueKey(_statsRefreshKey),
+                          onTap: () => _tabController.animateTo(1),
+                        ),
+                        const SizedBox(height: 16),
+                        const UpcomingEvents(),
+                        const SizedBox(height: 20),
+                        _buildVisitCard(),
+                      ],
+                    ),
+                  ),
                 ),
+                SliverPersistentHeader(
+                  pinned: true,
+                  delegate: _HomeSectionTabBarDelegate(
+                    TabBar(
+                      controller: _sectionTabController,
+                      isScrollable: true,
+                      labelColor: Colors.white,
+                      unselectedLabelColor: Colors.white70,
+                      labelStyle: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                      indicator: BoxDecoration(
+                        color: const Color(0xFFF5A962),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      tabs: const [
+                        Tab(text: 'Basic Info'),
+                        Tab(text: 'Physical'),
+                        Tab(text: 'Nutrition'),
+                        Tab(text: 'Medical'),
+                      ],
+                    ),
+                  ),
+                ),
+              ];
+            },
+            body: Form(
+              key: _formKey,
+              child: TabBarView(
+                controller: _sectionTabController,
+                children: [
+                  _buildBasicInfoSection(),
+                  _buildPhysicalAssessmentSection(),
+                  _buildNutritionSection(),
+                  _buildMedicalSection(),
+                ],
               ),
             ),
-            const SizedBox(height: 12),
-
-            // ── 1. Demographic ─────────────────────────────────────────
-            DemographicDataForm(
-              key: ValueKey('demographic_form_$_demographicFormKey'),
-              firstNameController: firstNameController,
-              middleNameController: middleNameController,
-              lastNameController: lastNameController,
-              extensionNameController: extensionNameController,
-              ageController: ageController,
-              ageDaysController: ageDaysController,
-              ageYearsController: ageYearsController,
-              sexController: sexController,
-              bloodTypeController: bloodTypeController,
-              motherPhilHealthNumberController: motherPhilHealthNumberController,
-              motherPhilHealthMemberTypeController: motherPhilHealthMemberTypeController,
-              fatherPhilHealthNumberController: fatherPhilHealthNumberController,
-              fatherPhilHealthMemberTypeController: fatherPhilHealthMemberTypeController,
-              addressController: addressController,
-              placeOfBirthController: placeOfBirthController,
-              dobController: dobController,
-              motherController: motherController,
-              motherContactController: motherContactController,
-              motherAgeController: motherAgeController,
-              motherOccupationController: motherOccupationController,
-              fatherController: fatherController,
-              fatherContactController: fatherContactController,
-              fatherAgeController: fatherAgeController,
-              fatherOccupationController: fatherOccupationController,
-              religionController: religionController,
-              residenceStatusController: residenceStatusController,
-              lengthOfStayController: lengthOfStayController,
-              birthWeightController: birthWeightController,
-              birthOrderController: birthOrderController,
-              caregiverNameController: caregiverNameController,
-              caregiverAgeController: caregiverAgeController,
-              caregiverEthnicityController: caregiverEthnicityController,
-              caregiverRelationshipController: caregiverRelationshipController,
-              caregiverReligionController: caregiverReligionController,
-              fourPsHouseholdIdController: fourPsHouseholdIdController,
-              disabilityController: disabilityController,
-              belongsToIpGroup: _belongsToIpGroup,
-              ipEthnicity: _ipEthnicity,
-              isFourPsMember: _isFourPsMember,
-              hasDisability: _hasDisability,
-              onBelongsToIpGroupChanged: (v) =>
-                  setState(() => _belongsToIpGroup = v),
-              onIpEthnicityChanged: (v) => setState(() => _ipEthnicity = v),
-              onIsFourPsMemberChanged: (v) =>
-                  setState(() => _isFourPsMember = v),
-              onHasDisabilityChanged: (v) =>
-                  setState(() => _hasDisability = v),
-              isDraft: _isDraft,
-            ),
-            const SizedBox(height: 16),
-
-            // ── 2. Anthropometric ──────────────────────────────────────
-            AnthropometricDataForm(
-              key: ValueKey('anthropometric_form_$_anthropometricFormKey'),
-              dateController: measurementDateController,
-              weightController: weightController,
-              heightController: heightController,
-              muacController: muacController,
-              weightForAgeController: weightForAgeController,
-              weightForHeightController: weightForHeightController,
-              heightForAgeController: heightForAgeController,
-              bmiController: bmiController,
-              ageController: ageController,
-              sexController: sexController,
-              dobController: dobController,
-            ),
-            const SizedBox(height: 16),
-
-            // ── 3. Health Status ───────────────────────────────────────
-            HealthStatusForm(
-              diarrhea: _diarrhea,
-              onDiarrheaChanged: (v) => setState(() => _diarrhea = v),
-              fever: _fever,
-              onFeverChanged: (v) => setState(() => _fever = v),
-              cough: _cough,
-              onCoughChanged: (v) => setState(() => _cough = v),
-              other: _other,
-              onOtherChanged: (v) => setState(() => _other = v),
-              medications: _medications,
-              onMedicationsChanged: (v) => setState(() => _medications = v),
-            ),
-            const SizedBox(height: 16),
-
-            // ── 4. Allergies ───────────────────────────────────────────
-            AllergiesForm(
-              key: ValueKey('allergies_form_$_allergiesFormKey'),
-              onDataChanged: (data) =>
-                  setState(() => _allergiesData = data),
-            ),
-            const SizedBox(height: 16),
-
-            // ── 5. Family Planning ─────────────────────────────────────
-            FamilyPlanningForm(
-              key: ValueKey('fp_form_$_familyPlanningFormKey'),
-              onDataChanged: (data) =>
-                  setState(() => _familyPlanningData = data),
-            ),
-            const SizedBox(height: 16),
-
-            // ── 6. Dietary Assessment ──────────────────────────────────
-            DietaryAssessmentForm(
-              key: ValueKey('dietary_form_$_dietaryFormKey'),
-              purelyBreastfed: _purelyBreastfed,
-              onPurelyBreastfedChanged: (v) {
-                setState(() {
-                  _purelyBreastfed = v;
-                  _purelyBreastfedError = null;
-                });
-              },
-              ageWhenCfController: cfAgeController,
-              freqCfController: cfFreqController,
-              foodCfController: cfFoodController,
-              mealFrequencyController: mealFreqController,
-              purelyBreastfedError: _purelyBreastfedError,
-            ),
-            const SizedBox(height: 16),
-
-            // ── 7. Nutrition Environment ───────────────────────────────
-            NutritionEnvironmentForm(
-              key: ValueKey('nutrition_env_form_$_nutritionEnvFormKey'),
-              onDataChanged: (data) =>
-                  setState(() => _nutritionEnvData = data),
-            ),
-            const SizedBox(height: 16),
-
-            // ── 8. Oral Assessment ─────────────────────────────────────
-            OralAssessmentForm(
-              key: ValueKey('oral_form_$_oralFormKey'),
-              onDataChanged: (data) {
-                _oralData = data;
-                setState(() => _oralRiskError = null);
-              },
-              overallRiskError: _oralRiskError,
-            ),
-            const SizedBox(height: 16),
-
-            // ── 9. Vaccination ─────────────────────────────────────────
-            VaccinationForm(
-              key: ValueKey('vaccination_form_$_vaccinationFormKey'),
-              onDataChanged: (data) => _vaccinationData = data,
-            ),
-            const SizedBox(height: 16),
-
-            // ── 10. Deworming ──────────────────────────────────────────
-            DewormingForm(
-              key: ValueKey('deworming_form_$_dewormingFormKey'),
-              onSave: (map) {
-                setState(() {
-                  _dewormingData = map;
-                  _dewormingError = null;
-                });
-              },
-              errorText: _dewormingError,
-            ),
-
-            const SizedBox(height: 24),
-
-            // ── Save Draft + Save Assessment ───────────────────────────
-            Row(
-              children: [
-                // Save Draft — ghost/outline style
-                Expanded(
-                  child: GestureDetector(
-                    onTap: _saveDraft,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.7),
-                          width: 1.5,
-                        ),
-                      ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.save_outlined,
-                              color: Colors.white, size: 18),
-                          SizedBox(width: 6),
-                          Text(
-                            'Save Draft',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
-                              letterSpacing: 0.3,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                // Save Assessment — orange gradient
-                Expanded(
-                  flex: 2,
-                  child: GestureDetector(
-                    onTap: _onSaveAssessmentTapped,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFFF5A962), Color(0xFFF08030)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFFF5A962)
-                                .withValues(alpha: 0.35),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.check_circle_outline,
-                              color: Colors.white, size: 18),
-                          SizedBox(width: 8),
-                          Text(
-                            'Save Assessment',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
-                              letterSpacing: 0.3,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 30),
-          ],
+          ),
         ),
+        const SizedBox(height: 16),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: _buildSaveActionRow(),
+        ),
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+
+  Widget _buildBasicInfoSection() {
+    return SingleChildScrollView(
+      key: const PageStorageKey('basic_info_tab'),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'NEW ASSESSMENT',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: Colors.white70,
+              letterSpacing: 1.4,
+            ),
+          ),
+          const SizedBox(height: 12),
+          DemographicDataForm(
+            key: ValueKey('demographic_form_$_demographicFormKey'),
+            firstNameController: firstNameController,
+            middleNameController: middleNameController,
+            lastNameController: lastNameController,
+            extensionNameController: extensionNameController,
+            ageController: ageController,
+            ageDaysController: ageDaysController,
+            ageYearsController: ageYearsController,
+            sexController: sexController,
+            bloodTypeController: bloodTypeController,
+            motherPhilHealthNumberController: motherPhilHealthNumberController,
+            motherPhilHealthMemberTypeController: motherPhilHealthMemberTypeController,
+            fatherPhilHealthNumberController: fatherPhilHealthNumberController,
+            fatherPhilHealthMemberTypeController: fatherPhilHealthMemberTypeController,
+            addressController: addressController,
+            placeOfBirthController: placeOfBirthController,
+            dobController: dobController,
+            motherController: motherController,
+            motherContactController: motherContactController,
+            motherAgeController: motherAgeController,
+            motherOccupationController: motherOccupationController,
+            fatherController: fatherController,
+            fatherContactController: fatherContactController,
+            fatherAgeController: fatherAgeController,
+            fatherOccupationController: fatherOccupationController,
+            religionController: religionController,
+            residenceStatusController: residenceStatusController,
+            lengthOfStayController: lengthOfStayController,
+            birthWeightController: birthWeightController,
+            birthOrderController: birthOrderController,
+            caregiverNameController: caregiverNameController,
+            caregiverAgeController: caregiverAgeController,
+            caregiverEthnicityController: caregiverEthnicityController,
+            caregiverRelationshipController: caregiverRelationshipController,
+            caregiverReligionController: caregiverReligionController,
+            fourPsHouseholdIdController: fourPsHouseholdIdController,
+            disabilityController: disabilityController,
+            belongsToIpGroup: _belongsToIpGroup,
+            ipEthnicity: _ipEthnicity,
+            isFourPsMember: _isFourPsMember,
+            hasDisability: _hasDisability,
+            onBelongsToIpGroupChanged: (v) =>
+                setState(() => _belongsToIpGroup = v),
+            onIpEthnicityChanged: (v) => setState(() => _ipEthnicity = v),
+            onIsFourPsMemberChanged: (v) =>
+                setState(() => _isFourPsMember = v),
+            onHasDisabilityChanged: (v) =>
+                setState(() => _hasDisability = v),
+            isDraft: _isDraft,
+          ),
+          const SizedBox(height: 16),
+        ],
       ),
     );
   }
 
-  // ── Visit Date & Time card ─────────────────────────────────────────────────
+  Widget _buildPhysicalAssessmentSection() {
+    return SingleChildScrollView(
+      key: const PageStorageKey('physical_assessment_tab'),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AnthropometricDataForm(
+            key: ValueKey('anthropometric_form_$_anthropometricFormKey'),
+            dateController: measurementDateController,
+            weightController: weightController,
+            heightController: heightController,
+            muacController: muacController,
+            weightForAgeController: weightForAgeController,
+            weightForHeightController: weightForHeightController,
+            heightForAgeController: heightForAgeController,
+            bmiController: bmiController,
+            ageController: ageController,
+            sexController: sexController,
+            dobController: dobController,
+          ),
+          const SizedBox(height: 16),
+          HealthStatusForm(
+            diarrhea: _diarrhea,
+            onDiarrheaChanged: (v) => setState(() => _diarrhea = v),
+            fever: _fever,
+            onFeverChanged: (v) => setState(() => _fever = v),
+            cough: _cough,
+            onCoughChanged: (v) => setState(() => _cough = v),
+            other: _other,
+            onOtherChanged: (v) => setState(() => _other = v),
+            medications: _medications,
+            onMedicationsChanged: (v) => setState(() => _medications = v),
+          ),
+          const SizedBox(height: 16),
+          AllergiesForm(
+            key: ValueKey('allergies_form_$_allergiesFormKey'),
+            onDataChanged: (data) => setState(() => _allergiesData = data),
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNutritionSection() {
+    return SingleChildScrollView(
+      key: const PageStorageKey('nutrition_tab'),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          DietaryAssessmentForm(
+            key: ValueKey('dietary_form_$_dietaryFormKey'),
+            purelyBreastfed: _purelyBreastfed,
+            onPurelyBreastfedChanged: (v) {
+              setState(() {
+                _purelyBreastfed = v;
+                _purelyBreastfedError = null;
+              });
+            },
+            ageWhenCfController: cfAgeController,
+            freqCfController: cfFreqController,
+            foodCfController: cfFoodController,
+            mealFrequencyController: mealFreqController,
+            purelyBreastfedError: _purelyBreastfedError,
+          ),
+          const SizedBox(height: 16),
+          NutritionEnvironmentForm(
+            key: ValueKey('nutrition_env_form_$_nutritionEnvFormKey'),
+            onDataChanged: (data) => setState(() => _nutritionEnvData = data),
+          ),
+          const SizedBox(height: 16),
+          FamilyPlanningForm(
+            key: ValueKey('fp_form_$_familyPlanningFormKey'),
+            onDataChanged: (data) => setState(() => _familyPlanningData = data),
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMedicalSection() {
+    return SingleChildScrollView(
+      key: const PageStorageKey('medical_tab'),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          OralAssessmentForm(
+            key: ValueKey('oral_form_$_oralFormKey'),
+            onDataChanged: (data) {
+              _oralData = data;
+              setState(() => _oralRiskError = null);
+            },
+            overallRiskError: _oralRiskError,
+          ),
+          const SizedBox(height: 16),
+          VaccinationForm(
+            key: ValueKey('vaccination_form_$_vaccinationFormKey'),
+            onDataChanged: (data) => _vaccinationData = data,
+          ),
+          const SizedBox(height: 16),
+          DewormingForm(
+            key: ValueKey('deworming_form_$_dewormingFormKey'),
+            onSave: (map) {
+              setState(() {
+                _dewormingData = map;
+                _dewormingError = null;
+              });
+            },
+            errorText: _dewormingError,
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSaveActionRow() {
+    return Row(
+      children: [
+        Expanded(
+          child: GestureDetector(
+            onTap: _saveDraft,
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 15),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.7),
+                  width: 1.5,
+                ),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.save_outlined, color: Colors.white, size: 18),
+                  SizedBox(width: 6),
+                  Text(
+                    'Save Draft',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          flex: 2,
+          child: GestureDetector(
+            onTap: _onSaveAssessmentTapped,
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 15),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFF5A962), Color(0xFFF08030)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFF5A962).withValues(alpha: 0.35),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.check_circle_outline, color: Colors.white, size: 18),
+                  SizedBox(width: 8),
+                  Text(
+                    'Save Assessment',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildVisitCard() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
@@ -1583,4 +1653,29 @@ class _HomePageState extends State<HomePage>
       onNavigateToPatients: () => _tabController.animateTo(1),
     );
   }
+}
+
+class _HomeSectionTabBarDelegate extends SliverPersistentHeaderDelegate {
+  final TabBar tabBar;
+
+  _HomeSectionTabBarDelegate(this.tabBar);
+
+  @override
+  double get minExtent => tabBar.preferredSize.height;
+
+  @override
+  double get maxExtent => tabBar.preferredSize.height;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Container(
+      color: const Color(0xFF2E8B7B),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      alignment: Alignment.centerLeft,
+      child: tabBar,
+    );
+  }
+
+  @override
+  bool shouldRebuild(covariant SliverPersistentHeaderDelegate oldDelegate) => false;
 }
