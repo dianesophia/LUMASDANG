@@ -46,11 +46,15 @@ class _HomePageState extends State<HomePage>
   final TextEditingController sexController = TextEditingController();
   final TextEditingController bloodTypeController = TextEditingController();
   // PhilHealth — Mother
-  final TextEditingController motherPhilHealthNumberController = TextEditingController();
-  final TextEditingController motherPhilHealthMemberTypeController = TextEditingController();
+  final TextEditingController motherPhilHealthNumberController =
+      TextEditingController();
+  final TextEditingController motherPhilHealthMemberTypeController =
+      TextEditingController();
   // PhilHealth — Father
-  final TextEditingController fatherPhilHealthNumberController = TextEditingController();
-  final TextEditingController fatherPhilHealthMemberTypeController = TextEditingController();
+  final TextEditingController fatherPhilHealthNumberController =
+      TextEditingController();
+  final TextEditingController fatherPhilHealthMemberTypeController =
+      TextEditingController();
   final TextEditingController addressController = TextEditingController();
   final TextEditingController placeOfBirthController = TextEditingController();
   final TextEditingController dobController = TextEditingController();
@@ -91,8 +95,8 @@ class _HomePageState extends State<HomePage>
   final TextEditingController disabilityController = TextEditingController();
 
   // Visit
-  final TextEditingController visitDateController   = TextEditingController();
-  final TextEditingController visitTimeController   = TextEditingController();
+  final TextEditingController visitDateController = TextEditingController();
+  final TextEditingController visitTimeController = TextEditingController();
 
   // Anthropometric
   final TextEditingController measurementDateController =
@@ -170,8 +174,7 @@ class _HomePageState extends State<HomePage>
         content: Text(message, style: const TextStyle(fontSize: 13)),
         backgroundColor: color ?? const Color(0xFF2E8B7B),
         behavior: SnackBarBehavior.floating,
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         margin: const EdgeInsets.all(16),
       ),
     );
@@ -184,11 +187,13 @@ class _HomePageState extends State<HomePage>
     _sectionTabController = TabController(length: 4, vsync: this);
 
     LocalDbService.instance.init().then((_) async {
-      final online =
-          kIsWeb ? true : await ConnectivityService.instance.checkOnline();
+      final online = kIsWeb
+          ? true
+          : await ConnectivityService.instance.checkOnline();
       if (online) {
-        final synced =
-            await LocalDbService.instance.syncPending(FirestoreService());
+        final synced = await LocalDbService.instance.syncPending(
+          FirestoreService(),
+        );
         if (synced > 0 && mounted) {
           _showSnackBar('$synced pending assessment(s) synced.');
         }
@@ -205,8 +210,9 @@ class _HomePageState extends State<HomePage>
 
     ConnectivityService.instance.startMonitoring((online) async {
       if (online) {
-        final synced =
-            await LocalDbService.instance.syncPending(FirestoreService());
+        final synced = await LocalDbService.instance.syncPending(
+          FirestoreService(),
+        );
         if (synced > 0 && mounted) {
           _showSnackBar('$synced pending assessment(s) synced.');
         }
@@ -219,7 +225,9 @@ class _HomePageState extends State<HomePage>
     setState(() => _isSyncing = true);
 
     try {
-      final online = kIsWeb ? true : await ConnectivityService.instance.checkOnline();
+      final online = kIsWeb
+          ? true
+          : await ConnectivityService.instance.checkOnline();
       if (!online) {
         _showSnackBar(
           'Offline: sync will run when online.',
@@ -228,14 +236,19 @@ class _HomePageState extends State<HomePage>
         return;
       }
 
-      final synced = await LocalDbService.instance.syncPending(FirestoreService());
+      final synced = await LocalDbService.instance.syncPending(
+        FirestoreService(),
+      );
       if (synced > 0) {
         _showSnackBar('$synced pending assessment(s) synced.');
       } else {
         _showSnackBar('No pending assessments to sync.');
       }
     } catch (e) {
-      _showSnackBar('Sync failed: ${e.toString()}', color: const Color(0xFFEF4444));
+      _showSnackBar(
+        'Sync failed: ${e.toString()}',
+        color: const Color(0xFFEF4444),
+      );
     } finally {
       if (mounted) {
         setState(() => _isSyncing = false);
@@ -351,7 +364,9 @@ class _HomePageState extends State<HomePage>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: summaryItems
-                  .map((item) => _buildSummaryRow(item['label']!, item['value']!))
+                  .map(
+                    (item) => _buildSummaryRow(item['label']!, item['value']!),
+                  )
                   .toList(),
             ),
           ),
@@ -392,23 +407,74 @@ class _HomePageState extends State<HomePage>
     final caregiverStatus = _selectedCaregiverPresence ?? 'No';
 
     return [
-      {'label': 'Patient Name', 'value': patientName.isEmpty ? 'N/A' : patientName},
+      {
+        'label': 'Patient Name',
+        'value': patientName.isEmpty ? 'N/A' : patientName,
+      },
       {'label': 'Sex', 'value': _selectedSex ?? 'N/A'},
-      {'label': 'Date of Birth', 'value': dobController.text.trim().isEmpty ? 'N/A' : dobController.text.trim()},
+      {
+        'label': 'Date of Birth',
+        'value': dobController.text.trim().isEmpty
+            ? 'N/A'
+            : dobController.text.trim(),
+      },
       {'label': 'Blood Type', 'value': _selectedBloodType ?? 'N/A'},
-      {'label': 'Birth Weight', 'value': birthWeightController.text.trim().isEmpty ? 'N/A' : '${birthWeightController.text.trim()} kg'},
-      {'label': 'Birth Order', 'value': birthOrderController.text.trim().isEmpty ? 'N/A' : birthOrderController.text.trim()},
-      {'label': 'Address', 'value': addressController.text.trim().isEmpty ? 'N/A' : addressController.text.trim()},
-      {'label': 'Place of Birth', 'value': placeOfBirthController.text.trim().isEmpty ? 'N/A' : placeOfBirthController.text.trim()},
+      {
+        'label': 'Birth Weight',
+        'value': birthWeightController.text.trim().isEmpty
+            ? 'N/A'
+            : '${birthWeightController.text.trim()} kg',
+      },
+      {
+        'label': 'Birth Order',
+        'value': birthOrderController.text.trim().isEmpty
+            ? 'N/A'
+            : birthOrderController.text.trim(),
+      },
+      {
+        'label': 'Address',
+        'value': addressController.text.trim().isEmpty
+            ? 'N/A'
+            : addressController.text.trim(),
+      },
+      {
+        'label': 'Place of Birth',
+        'value': placeOfBirthController.text.trim().isEmpty
+            ? 'N/A'
+            : placeOfBirthController.text.trim(),
+      },
       {'label': 'Mother Status', 'value': motherStatus},
-      {'label': 'Mother Name', 'value': motherController.text.trim().isEmpty ? 'N/A' : motherController.text.trim()},
-      {'label': 'Mother Contact', 'value': motherContactController.text.trim().isEmpty ? 'N/A' : motherContactController.text.trim()},
+      {
+        'label': 'Mother Name',
+        'value': motherController.text.trim().isEmpty
+            ? 'N/A'
+            : motherController.text.trim(),
+      },
+      {
+        'label': 'Mother Contact',
+        'value': motherContactController.text.trim().isEmpty
+            ? 'N/A'
+            : motherContactController.text.trim(),
+      },
       {'label': 'Father Status', 'value': fatherStatus},
-      {'label': 'Father Name', 'value': fatherController.text.trim().isEmpty ? 'N/A' : fatherController.text.trim()},
-      {'label': 'Father Contact', 'value': fatherContactController.text.trim().isEmpty ? 'N/A' : fatherContactController.text.trim()},
+      {
+        'label': 'Father Name',
+        'value': fatherController.text.trim().isEmpty
+            ? 'N/A'
+            : fatherController.text.trim(),
+      },
+      {
+        'label': 'Father Contact',
+        'value': fatherContactController.text.trim().isEmpty
+            ? 'N/A'
+            : fatherContactController.text.trim(),
+      },
       {'label': 'Caregiver Present', 'value': caregiverStatus},
       {'label': '4Ps Member', 'value': _isFourPsMember == true ? 'Yes' : 'No'},
-      {'label': 'Has Disability', 'value': _hasDisability == true ? 'Yes' : 'No'},
+      {
+        'label': 'Has Disability',
+        'value': _hasDisability == true ? 'Yes' : 'No',
+      },
       {'label': 'Residence Status', 'value': _residenceStatus ?? 'N/A'},
     ];
   }
@@ -423,20 +489,14 @@ class _HomePageState extends State<HomePage>
             flex: 4,
             child: Text(
               '$label:',
-              style: const TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-              ),
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
             ),
           ),
           Expanded(
             flex: 6,
             child: Text(
               value,
-              style: const TextStyle(
-                fontSize: 13,
-                color: Color(0xFF444444),
-              ),
+              style: const TextStyle(fontSize: 13, color: Color(0xFF444444)),
             ),
           ),
         ],
@@ -468,27 +528,25 @@ class _HomePageState extends State<HomePage>
       }
 
       if (_oralData == null || _oralData!['overallRisk'] == null) {
-        setState(
-            () => _oralRiskError = 'Please select an overall risk level');
+        setState(() => _oralRiskError = 'Please select an overall risk level');
         hasNonTextErrors = true;
       } else {
         setState(() => _oralRiskError = null);
       }
 
       if (_dewormingData == null) {
-        setState(() =>
-            _dewormingError = 'Please fill in deworming information');
+        setState(
+          () => _dewormingError = 'Please fill in deworming information',
+        );
         hasNonTextErrors = true;
       } else {
         final dw = _dewormingData!['deworming'] as Map<String, dynamic>?;
         final isNA = dw?['isNA'] == true;
         if (!isNA) {
-          if ((dw?['dateOfLastDeworming'] ?? '')
-              .toString()
-              .trim()
-              .isEmpty) {
+          if ((dw?['dateOfLastDeworming'] ?? '').toString().trim().isEmpty) {
             setState(
-                () => _dewormingError = 'Please enter a date or select N/A');
+              () => _dewormingError = 'Please enter a date or select N/A',
+            );
             hasNonTextErrors = true;
           } else if (dw?['drugGiven'] == null) {
             setState(() => _dewormingError = 'Please select a drug given');
@@ -543,13 +601,15 @@ class _HomePageState extends State<HomePage>
         'motherAge': motherAgeController.text.trim(),
         'motherOccupation': motherOccupationController.text.trim(),
         'motherPhilHealthNumber': motherPhilHealthNumberController.text.trim(),
-        'motherPhilHealthMemberType': motherPhilHealthMemberTypeController.text.trim(),
+        'motherPhilHealthMemberType': motherPhilHealthMemberTypeController.text
+            .trim(),
         'father': fatherController.text.trim(),
         'fatherContact': fatherContactController.text.trim(),
         'fatherAge': fatherAgeController.text.trim(),
         'fatherOccupation': fatherOccupationController.text.trim(),
         'fatherPhilHealthNumber': fatherPhilHealthNumberController.text.trim(),
-        'fatherPhilHealthMemberType': fatherPhilHealthMemberTypeController.text.trim(),
+        'fatherPhilHealthMemberType': fatherPhilHealthMemberTypeController.text
+            .trim(),
         'caregiverName': caregiverNameController.text.trim(),
         'caregiverAge': caregiverAgeController.text.trim(),
         'caregiverEthnicity': caregiverEthnicityController.text.trim(),
@@ -592,8 +652,9 @@ class _HomePageState extends State<HomePage>
     };
 
     final firestore = FirestoreService();
-    final online =
-        kIsWeb ? true : await ConnectivityService.instance.checkOnline();
+    final online = kIsWeb
+        ? true
+        : await ConnectivityService.instance.checkOnline();
     String? barangayPatientId;
 
     if (online) {
@@ -608,8 +669,8 @@ class _HomePageState extends State<HomePage>
                 patientId: barangayPatientId!,
                 vaccinationData: _vaccinationData!,
                 patientInfo: {
-                  'firstName':     firstNameController.text.trim(),
-                  'lastName':      lastNameController.text.trim(),
+                  'firstName': firstNameController.text.trim(),
+                  'lastName': lastNameController.text.trim(),
                   'motherContact': motherContactController.text.trim(),
                   'fatherContact': fatherContactController.text.trim(),
                 },
@@ -627,8 +688,11 @@ class _HomePageState extends State<HomePage>
             );
           }
         }
-        await LocalDbService.instance
-            .saveLocalRecord(data, synced: true, firestoreId: docId);
+        await LocalDbService.instance.saveLocalRecord(
+          data,
+          synced: true,
+          firestoreId: docId,
+        );
         if (!mounted) return;
         _patientListRefreshTrigger.value++;
         _showSnackBar(
@@ -639,8 +703,9 @@ class _HomePageState extends State<HomePage>
         await LocalDbService.instance.saveLocalRecord(data, synced: false);
         if (!mounted) return;
         _showSnackBar(
-            'Saved locally (will sync later). Error: ${e.toString()}',
-            color: Colors.orange);
+          'Saved locally (will sync later). Error: ${e.toString()}',
+          color: Colors.orange,
+        );
       }
     } else {
       await LocalDbService.instance.saveLocalRecord(data, synced: false);
@@ -662,10 +727,12 @@ class _HomePageState extends State<HomePage>
           final doses = _vaccinationData![vaccine] as Map<String, dynamic>?;
           if (doses == null) return 0;
           return doses.entries
-              .where((e) =>
-                  !e.key.endsWith('_date') &&
-                  e.key != 'nextDoseDate' &&
-                  e.value == true)
+              .where(
+                (e) =>
+                    !e.key.endsWith('_date') &&
+                    e.key != 'nextDoseDate' &&
+                    e.value == true,
+              )
               .length;
         }
 
@@ -841,11 +908,7 @@ class _HomePageState extends State<HomePage>
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF2E8B7B),
-              Color(0xFF5CAA7F),
-              Color(0xFF8BC88A),
-            ],
+            colors: [Color(0xFF2E8B7B), Color(0xFF5CAA7F), Color(0xFF8BC88A)],
           ),
         ),
         child: SafeArea(
@@ -886,8 +949,11 @@ class _HomePageState extends State<HomePage>
                     width: 1.2,
                   ),
                 ),
-                child: const Icon(Icons.eco_rounded,
-                    color: Colors.white, size: 18),
+                child: const Icon(
+                  Icons.eco_rounded,
+                  color: Colors.white,
+                  size: 18,
+                ),
               ),
               const SizedBox(width: 12),
               const Text(
@@ -924,8 +990,11 @@ class _HomePageState extends State<HomePage>
                               color: Colors.white,
                             ),
                           )
-                        : const Icon(Icons.sync_outlined,
-                            color: Colors.white, size: 18),
+                        : const Icon(
+                            Icons.sync_outlined,
+                            color: Colors.white,
+                            size: 18,
+                          ),
                   ),
                 ),
               ),
@@ -948,8 +1017,11 @@ class _HomePageState extends State<HomePage>
                         width: 1.2,
                       ),
                     ),
-                    child: const Icon(Icons.settings_outlined,
-                        color: Colors.white, size: 18),
+                    child: const Icon(
+                      Icons.settings_outlined,
+                      color: Colors.white,
+                      size: 18,
+                    ),
                   ),
                 ),
               ),
@@ -974,19 +1046,66 @@ class _HomePageState extends State<HomePage>
     );
   }
 
+  // Widget _buildBottomTabBar() {
+  //   return Container(
+  //     decoration: BoxDecoration(
+  //       gradient: const LinearGradient(
+  //         begin: Alignment.topLeft,
+  //         end: Alignment.bottomRight,
+  //         colors: [Color(0xFF2E8B7B), Color(0xFF5CAA7F)],
+  //       ),
+  //       boxShadow: [
+  //         BoxShadow(
+  //           color: Colors.black.withOpacity(0.15),
+  //           blurRadius: 12,
+  //           offset: const Offset(0, -3),
+  //         ),
+  //       ],
+  //     ),
+  //     child: SafeArea(
+  //       top: false,
+  //       child: TabBar(
+  //         controller: _tabController,
+  //         indicator: BoxDecoration(
+  //           color: Colors.white.withOpacity(0.2),
+  //           borderRadius: BorderRadius.circular(12),
+  //         ),
+  //         indicatorSize: TabBarIndicatorSize.tab,
+  //         indicatorPadding:
+  //             const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+  //         dividerColor: Colors.transparent,
+  //         labelColor: Colors.white,
+  //         unselectedLabelColor: Colors.white.withOpacity(0.55),
+  //         labelStyle:
+  //             const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+  //         unselectedLabelStyle: const TextStyle(fontSize: 12),
+  //         tabs: const [
+  //           Tab(icon: Icon(Icons.home_outlined, size: 22), text: 'Home'),
+  //           Tab(
+  //               icon: Icon(Icons.people_outline, size: 22),
+  //               text: 'Patients'),
+  //           Tab(
+  //               icon: Icon(Icons.notifications_outlined, size: 22),
+  //               text: 'Alerts'),
+  //         ],
+  //       ),
+  //     ),
+  //   );
+  // }
+
   Widget _buildBottomTabBar() {
     return Container(
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF2E8B7B), Color(0xFF5CAA7F)],
+          colors: [Color(0xFF1F6B5F), Color(0xFF2E8B7B)],
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.15),
-            blurRadius: 12,
-            offset: const Offset(0, -3),
+            color: Colors.black.withOpacity(0.18),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
           ),
         ],
       ),
@@ -995,26 +1114,28 @@ class _HomePageState extends State<HomePage>
         child: TabBar(
           controller: _tabController,
           indicator: BoxDecoration(
-            color: Colors.white.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(12),
+            color: Colors.white.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(14),
           ),
           indicatorSize: TabBarIndicatorSize.tab,
-          indicatorPadding:
-              const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          indicatorPadding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
           dividerColor: Colors.transparent,
           labelColor: Colors.white,
-          unselectedLabelColor: Colors.white.withOpacity(0.55),
-          labelStyle:
-              const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
-          unselectedLabelStyle: const TextStyle(fontSize: 12),
+          unselectedLabelColor: Colors.white.withOpacity(0.45),
+          labelStyle: const TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 11,
+            letterSpacing: 0.2,
+          ),
+          unselectedLabelStyle: const TextStyle(fontSize: 11),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           tabs: const [
-            Tab(icon: Icon(Icons.home_outlined, size: 22), text: 'Home'),
+            Tab(icon: Icon(Icons.home_rounded, size: 22), text: 'Home'),
+            Tab(icon: Icon(Icons.people_rounded, size: 22), text: 'Patients'),
             Tab(
-                icon: Icon(Icons.people_outline, size: 22),
-                text: 'Patients'),
-            Tab(
-                icon: Icon(Icons.notifications_outlined, size: 22),
-                text: 'Alerts'),
+              icon: Icon(Icons.notifications_rounded, size: 22),
+              text: 'Alerts',
+            ),
           ],
         ),
       ),
@@ -1047,21 +1168,61 @@ class _HomePageState extends State<HomePage>
                     ),
                   ),
                 ),
+                // SliverPersistentHeader(
+                //   pinned: true,
+                //   delegate: _HomeSectionTabBarDelegate(
+                //     TabBar(
+                //       controller: _sectionTabController,
+                //       isScrollable: true,
+                //       labelColor: Colors.white,
+                //       unselectedLabelColor: Colors.white70,
+                //       labelStyle: const TextStyle(
+                //         fontWeight: FontWeight.w700,
+                //         fontSize: 13,
+                //       ),
+                //       indicator: BoxDecoration(
+                //         color: const Color(0xFFF5A962),
+                //         borderRadius: BorderRadius.circular(12),
+                //       ),
+                //       tabs: const [
+                //         Tab(text: 'Basic Info'),
+                //         Tab(text: 'Physical'),
+                //         Tab(text: 'Nutrition'),
+                //         Tab(text: 'Medical'),
+                //       ],
+                //     ),
+                //   ),
+                // ),
                 SliverPersistentHeader(
                   pinned: true,
                   delegate: _HomeSectionTabBarDelegate(
                     TabBar(
                       controller: _sectionTabController,
                       isScrollable: true,
+                      tabAlignment: TabAlignment.start,
                       labelColor: Colors.white,
-                      unselectedLabelColor: Colors.white70,
+                      unselectedLabelColor: Colors.white.withOpacity(0.55),
                       labelStyle: const TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 13,
                       ),
                       indicator: BoxDecoration(
                         color: const Color(0xFFF5A962),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFF5A962).withOpacity(0.4),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      indicatorSize: TabBarIndicatorSize.tab,
+                      indicatorPadding: EdgeInsets.zero,
+                      dividerColor: Colors.transparent,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
                       ),
                       tabs: const [
                         Tab(text: 'Basic Info'),
@@ -1127,9 +1288,11 @@ class _HomePageState extends State<HomePage>
             sexController: sexController,
             bloodTypeController: bloodTypeController,
             motherPhilHealthNumberController: motherPhilHealthNumberController,
-            motherPhilHealthMemberTypeController: motherPhilHealthMemberTypeController,
+            motherPhilHealthMemberTypeController:
+                motherPhilHealthMemberTypeController,
             fatherPhilHealthNumberController: fatherPhilHealthNumberController,
-            fatherPhilHealthMemberTypeController: fatherPhilHealthMemberTypeController,
+            fatherPhilHealthMemberTypeController:
+                fatherPhilHealthMemberTypeController,
             addressController: addressController,
             placeOfBirthController: placeOfBirthController,
             dobController: dobController,
@@ -1160,10 +1323,8 @@ class _HomePageState extends State<HomePage>
             onBelongsToIpGroupChanged: (v) =>
                 setState(() => _belongsToIpGroup = v),
             onIpEthnicityChanged: (v) => setState(() => _ipEthnicity = v),
-            onIsFourPsMemberChanged: (v) =>
-                setState(() => _isFourPsMember = v),
-            onHasDisabilityChanged: (v) =>
-                setState(() => _hasDisability = v),
+            onIsFourPsMemberChanged: (v) => setState(() => _isFourPsMember = v),
+            onHasDisabilityChanged: (v) => setState(() => _hasDisability = v),
             isDraft: _isDraft,
           ),
           const SizedBox(height: 16),
@@ -1352,7 +1513,11 @@ class _HomePageState extends State<HomePage>
               child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.check_circle_outline, color: Colors.white, size: 18),
+                  Icon(
+                    Icons.check_circle_outline,
+                    color: Colors.white,
+                    size: 18,
+                  ),
                   SizedBox(width: 8),
                   Text(
                     'Save Assessment',
@@ -1409,8 +1574,11 @@ class _HomePageState extends State<HomePage>
                     ),
                   ],
                 ),
-                child: const Icon(Icons.access_time_rounded,
-                    color: Colors.white, size: 18),
+                child: const Icon(
+                  Icons.access_time_rounded,
+                  color: Colors.white,
+                  size: 18,
+                ),
               ),
               const SizedBox(width: 12),
               const Text(
@@ -1433,13 +1601,15 @@ class _HomePageState extends State<HomePage>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('DATE OF VISIT',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFFF5A962),
-                          letterSpacing: 0.5,
-                        )),
+                    const Text(
+                      'DATE OF VISIT',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFFF5A962),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
                     const SizedBox(height: 5),
                     GestureDetector(
                       onTap: () async {
@@ -1447,8 +1617,7 @@ class _HomePageState extends State<HomePage>
                           context: context,
                           initialDate: DateTime.now(),
                           firstDate: DateTime(2020),
-                          lastDate: DateTime.now()
-                              .add(const Duration(days: 1)),
+                          lastDate: DateTime.now().add(const Duration(days: 1)),
                           builder: (ctx, child) => Theme(
                             data: Theme.of(ctx).copyWith(
                               colorScheme: const ColorScheme.light(
@@ -1459,8 +1628,8 @@ class _HomePageState extends State<HomePage>
                               ),
                               textButtonTheme: TextButtonThemeData(
                                 style: TextButton.styleFrom(
-                                    foregroundColor:
-                                        const Color(0xFFF5A962)),
+                                  foregroundColor: const Color(0xFFF5A962),
+                                ),
                               ),
                             ),
                             child: child!,
@@ -1478,47 +1647,52 @@ class _HomePageState extends State<HomePage>
                           controller: visitDateController,
                           readOnly: true,
                           style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                              color: Color(0xFF1A1A1A)),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF1A1A1A),
+                          ),
                           decoration: InputDecoration(
                             hintText: 'Tap to select',
                             hintStyle: const TextStyle(
-                                fontSize: 12,
-                                color: Colors.black26),
+                              fontSize: 12,
+                              color: Colors.black26,
+                            ),
                             prefixIcon: const Icon(
-                                Icons.calendar_month_outlined,
-                                size: 16,
-                                color: Color(0xFFF5A962)),
-                            suffixIcon: visitDateController
-                                    .text.isNotEmpty
+                              Icons.calendar_month_outlined,
+                              size: 16,
+                              color: Color(0xFFF5A962),
+                            ),
+                            suffixIcon: visitDateController.text.isNotEmpty
                                 ? GestureDetector(
                                     onTap: () => setState(
-                                        () => visitDateController
-                                            .clear()),
-                                    child: const Icon(Icons.clear,
-                                        size: 14,
-                                        color: Colors.black38),
+                                      () => visitDateController.clear(),
+                                    ),
+                                    child: const Icon(
+                                      Icons.clear,
+                                      size: 14,
+                                      color: Colors.black38,
+                                    ),
                                   )
                                 : null,
                             filled: true,
                             fillColor: const Color(0xFFFAFAFA),
-                            contentPadding:
-                                const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 11),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 11,
+                            ),
                             enabledBorder: OutlineInputBorder(
-                              borderRadius:
-                                  BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(10),
                               borderSide: const BorderSide(
-                                  color: Color(0xFFEEEEEE),
-                                  width: 1.5),
+                                color: Color(0xFFEEEEEE),
+                                width: 1.5,
+                              ),
                             ),
                             focusedBorder: OutlineInputBorder(
-                              borderRadius:
-                                  BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(10),
                               borderSide: const BorderSide(
-                                  color: Color(0xFFF5A962),
-                                  width: 2),
+                                color: Color(0xFFF5A962),
+                                width: 2,
+                              ),
                             ),
                           ),
                         ),
@@ -1535,13 +1709,15 @@ class _HomePageState extends State<HomePage>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('TIME OF VISIT',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFFF5A962),
-                          letterSpacing: 0.5,
-                        )),
+                    const Text(
+                      'TIME OF VISIT',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFFF5A962),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
                     const SizedBox(height: 5),
                     GestureDetector(
                       onTap: () async {
@@ -1559,8 +1735,8 @@ class _HomePageState extends State<HomePage>
                               ),
                               textButtonTheme: TextButtonThemeData(
                                 style: TextButton.styleFrom(
-                                    foregroundColor:
-                                        const Color(0xFFF5A962)),
+                                  foregroundColor: const Color(0xFFF5A962),
+                                ),
                               ),
                             ),
                             child: child!,
@@ -1570,16 +1746,15 @@ class _HomePageState extends State<HomePage>
                           final hour = picked.hourOfPeriod == 0
                               ? 12
                               : picked.hourOfPeriod;
-                          final minute = picked.minute
-                              .toString()
-                              .padLeft(2, '0');
-                          final period =
-                              picked.period == DayPeriod.am
-                                  ? 'AM'
-                                  : 'PM';
+                          final minute = picked.minute.toString().padLeft(
+                            2,
+                            '0',
+                          );
+                          final period = picked.period == DayPeriod.am
+                              ? 'AM'
+                              : 'PM';
                           setState(() {
-                            visitTimeController.text =
-                                '$hour:$minute $period';
+                            visitTimeController.text = '$hour:$minute $period';
                           });
                         }
                       },
@@ -1588,47 +1763,52 @@ class _HomePageState extends State<HomePage>
                           controller: visitTimeController,
                           readOnly: true,
                           style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                              color: Color(0xFF1A1A1A)),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF1A1A1A),
+                          ),
                           decoration: InputDecoration(
                             hintText: 'Tap to select',
                             hintStyle: const TextStyle(
-                                fontSize: 12,
-                                color: Colors.black26),
+                              fontSize: 12,
+                              color: Colors.black26,
+                            ),
                             prefixIcon: const Icon(
-                                Icons.schedule_outlined,
-                                size: 16,
-                                color: Color(0xFFF5A962)),
-                            suffixIcon: visitTimeController
-                                    .text.isNotEmpty
+                              Icons.schedule_outlined,
+                              size: 16,
+                              color: Color(0xFFF5A962),
+                            ),
+                            suffixIcon: visitTimeController.text.isNotEmpty
                                 ? GestureDetector(
                                     onTap: () => setState(
-                                        () => visitTimeController
-                                            .clear()),
-                                    child: const Icon(Icons.clear,
-                                        size: 14,
-                                        color: Colors.black38),
+                                      () => visitTimeController.clear(),
+                                    ),
+                                    child: const Icon(
+                                      Icons.clear,
+                                      size: 14,
+                                      color: Colors.black38,
+                                    ),
                                   )
                                 : null,
                             filled: true,
                             fillColor: const Color(0xFFFAFAFA),
-                            contentPadding:
-                                const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 11),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 11,
+                            ),
                             enabledBorder: OutlineInputBorder(
-                              borderRadius:
-                                  BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(10),
                               borderSide: const BorderSide(
-                                  color: Color(0xFFEEEEEE),
-                                  width: 1.5),
+                                color: Color(0xFFEEEEEE),
+                                width: 1.5,
+                              ),
                             ),
                             focusedBorder: OutlineInputBorder(
-                              borderRadius:
-                                  BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(10),
                               borderSide: const BorderSide(
-                                  color: Color(0xFFF5A962),
-                                  width: 2),
+                                color: Color(0xFFF5A962),
+                                width: 2,
+                              ),
                             ),
                           ),
                         ),
@@ -1667,7 +1847,11 @@ class _HomeSectionTabBarDelegate extends SliverPersistentHeaderDelegate {
   double get maxExtent => tabBar.preferredSize.height;
 
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
     return Container(
       color: const Color(0xFF2E8B7B),
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1677,5 +1861,6 @@ class _HomeSectionTabBarDelegate extends SliverPersistentHeaderDelegate {
   }
 
   @override
-  bool shouldRebuild(covariant SliverPersistentHeaderDelegate oldDelegate) => false;
+  bool shouldRebuild(covariant SliverPersistentHeaderDelegate oldDelegate) =>
+      false;
 }
