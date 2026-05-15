@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lumasdang/screens/dashboard/dashboard_screen.dart';
 import 'package:lumasdang/screens/patient_list.dart';
 import 'package:lumasdang/screens/settingsPages/main_Settings.dart';
 import 'package:lumasdang/screens/notifications_tab.dart';
@@ -8,7 +9,6 @@ import '../../services/local_db_service.dart';
 import '../../services/connectivity_service.dart';
 import '../../services/vaccine_reminder_service.dart';
 
-import 'widgets/stats_row.dart';
 import 'widgets/upcoming_events.dart';
 import 'widgets/demographic_data_form.dart';
 import 'widgets/anthropometric_data_form.dart';
@@ -149,7 +149,7 @@ class _HomePageState extends State<HomePage>
   bool _isDraft = false;
 
   // ── Refresh / reset keys ───────────────────────────────────────────────────
-  int _statsRefreshKey = 0;
+  int _dashboardRefreshKey = 0;
   final ValueNotifier<int> _patientListRefreshTrigger = ValueNotifier<int>(0);
   int _demographicFormKey = 0;
   int _anthropometricFormKey = 0;
@@ -183,7 +183,7 @@ class _HomePageState extends State<HomePage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _sectionTabController = TabController(length: 4, vsync: this);
 
     LocalDbService.instance.init().then((_) async {
@@ -663,10 +663,10 @@ class _HomePageState extends State<HomePage>
         try {
           barangayPatientId = await firestore.savePatientToBarangay(data);
           // Save next-dose reminders if vaccination data present
-          if (_vaccinationData != null && barangayPatientId != null) {
+          if (_vaccinationData != null) {
             try {
               await VaccineReminderService().saveReminders(
-                patientId: barangayPatientId!,
+                patientId: barangayPatientId,
                 vaccinationData: _vaccinationData!,
                 patientInfo: {
                   'firstName': firstNameController.text.trim(),
@@ -695,6 +695,7 @@ class _HomePageState extends State<HomePage>
         );
         if (!mounted) return;
         _patientListRefreshTrigger.value++;
+        setState(() => _dashboardRefreshKey++);
         _showSnackBar(
           _isDraft ? 'Draft saved.' : 'Assessment saved to server and locally.',
           color: _isDraft ? const Color(0xFFF5A962) : const Color(0xFF2E8B7B),
@@ -854,7 +855,7 @@ class _HomePageState extends State<HomePage>
       }
 
       setState(() {
-        _statsRefreshKey++;
+        _dashboardRefreshKey++;
         _demographicFormKey++;
         _anthropometricFormKey++;
         _dietaryFormKey++;
@@ -892,8 +893,6 @@ class _HomePageState extends State<HomePage>
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _formKey.currentState?.reset();
       });
-
-      setState(() => _statsRefreshKey++);
     }
   }
 
@@ -919,7 +918,8 @@ class _HomePageState extends State<HomePage>
                 child: TabBarView(
                   controller: _tabController,
                   children: [
-                    _buildHomeTab(),
+                    DashboardScreen(refreshKey: _dashboardRefreshKey),
+                    _buildAssessmentTab(),
                     _buildPatientListTab(),
                     _buildNotificationsTab(),
                   ],
@@ -942,10 +942,10 @@ class _HomePageState extends State<HomePage>
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withValues(alpha: 0.2),
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: Colors.white.withOpacity(0.35),
+                    color: Colors.white.withValues(alpha: 0.35),
                     width: 1.2,
                   ),
                 ),
@@ -974,10 +974,10 @@ class _HomePageState extends State<HomePage>
                   child: Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.35),
+                        color: Colors.white.withValues(alpha: 0.35),
                         width: 1.2,
                       ),
                     ),
@@ -1010,10 +1010,10 @@ class _HomePageState extends State<HomePage>
                   child: Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.35),
+                        color: Colors.white.withValues(alpha: 0.35),
                         width: 1.2,
                       ),
                     ),
@@ -1035,7 +1035,7 @@ class _HomePageState extends State<HomePage>
               gradient: LinearGradient(
                 colors: [
                   Colors.transparent,
-                  Colors.white.withOpacity(0.35),
+                  Colors.white.withValues(alpha: 0.35),
                   Colors.transparent,
                 ],
               ),
@@ -1067,7 +1067,7 @@ class _HomePageState extends State<HomePage>
   //       child: TabBar(
   //         controller: _tabController,
   //         indicator: BoxDecoration(
-  //           color: Colors.white.withOpacity(0.2),
+  //           color: Colors.white.withValues(alpha: 0.2),
   //           borderRadius: BorderRadius.circular(12),
   //         ),
   //         indicatorSize: TabBarIndicatorSize.tab,
@@ -1075,7 +1075,7 @@ class _HomePageState extends State<HomePage>
   //             const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
   //         dividerColor: Colors.transparent,
   //         labelColor: Colors.white,
-  //         unselectedLabelColor: Colors.white.withOpacity(0.55),
+  //         unselectedLabelColor: Colors.white.withValues(alpha: 0.55),
   //         labelStyle:
   //             const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
   //         unselectedLabelStyle: const TextStyle(fontSize: 12),
@@ -1103,7 +1103,7 @@ class _HomePageState extends State<HomePage>
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.18),
+            color: Colors.black.withValues(alpha: 0.18),
             blurRadius: 16,
             offset: const Offset(0, -4),
           ),
@@ -1114,14 +1114,14 @@ class _HomePageState extends State<HomePage>
         child: TabBar(
           controller: _tabController,
           indicator: BoxDecoration(
-            color: Colors.white.withOpacity(0.15),
+            color: Colors.white.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(14),
           ),
           indicatorSize: TabBarIndicatorSize.tab,
           indicatorPadding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
           dividerColor: Colors.transparent,
           labelColor: Colors.white,
-          unselectedLabelColor: Colors.white.withOpacity(0.45),
+          unselectedLabelColor: Colors.white.withValues(alpha: 0.45),
           labelStyle: const TextStyle(
             fontWeight: FontWeight.w700,
             fontSize: 11,
@@ -1130,7 +1130,14 @@ class _HomePageState extends State<HomePage>
           unselectedLabelStyle: const TextStyle(fontSize: 11),
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           tabs: const [
-            Tab(icon: Icon(Icons.home_rounded, size: 22), text: 'Home'),
+            Tab(
+              icon: Icon(Icons.dashboard_rounded, size: 22),
+              text: 'Dashboard',
+            ),
+            Tab(
+              icon: Icon(Icons.assignment_rounded, size: 22),
+              text: 'Assessment',
+            ),
             Tab(icon: Icon(Icons.people_rounded, size: 22), text: 'Patients'),
             Tab(
               icon: Icon(Icons.notifications_rounded, size: 22),
@@ -1142,7 +1149,7 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  Widget _buildHomeTab() {
+  Widget _buildAssessmentTab() {
     return Column(
       children: [
         Expanded(
@@ -1156,11 +1163,6 @@ class _HomePageState extends State<HomePage>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        StatsRow(
-                          key: ValueKey(_statsRefreshKey),
-                          onTap: () => _tabController.animateTo(1),
-                        ),
-                        const SizedBox(height: 16),
                         const UpcomingEvents(),
                         const SizedBox(height: 20),
                         _buildVisitCard(),
@@ -1201,7 +1203,7 @@ class _HomePageState extends State<HomePage>
                       isScrollable: true,
                       tabAlignment: TabAlignment.start,
                       labelColor: Colors.white,
-                      unselectedLabelColor: Colors.white.withOpacity(0.55),
+                      unselectedLabelColor: Colors.white.withValues(alpha: 0.55),
                       labelStyle: const TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 13,
@@ -1211,7 +1213,7 @@ class _HomePageState extends State<HomePage>
                         borderRadius: BorderRadius.circular(10),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFFF5A962).withOpacity(0.4),
+                            color: const Color(0xFFF5A962).withValues(alpha: 0.4),
                             blurRadius: 8,
                             offset: const Offset(0, 3),
                           ),
@@ -1462,10 +1464,10 @@ class _HomePageState extends State<HomePage>
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 15),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.15),
+                color: Colors.white.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: Colors.white.withOpacity(0.7),
+                  color: Colors.white.withValues(alpha: 0.7),
                   width: 1.5,
                 ),
               ),
@@ -1830,7 +1832,7 @@ class _HomePageState extends State<HomePage>
 
   Widget _buildNotificationsTab() {
     return NotificationsTab(
-      onNavigateToPatients: () => _tabController.animateTo(1),
+      onNavigateToPatients: () => _tabController.animateTo(2),
     );
   }
 }

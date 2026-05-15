@@ -1625,4 +1625,72 @@ class FirestoreService {
       return {};
     }
   }
+
+  /// Counts barangay patients created in \[startInclusive, endExclusive).
+  Future<int> getAssessedCountBetween(
+    DateTime startInclusive,
+    DateTime endExclusive,
+  ) async {
+    final user = _auth.currentUser;
+    if (user == null) return 0;
+
+    try {
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+      final barangayId = userDoc.data()?['barangayId'] as String?;
+      if (barangayId == null || barangayId.isEmpty) return 0;
+
+      final snapshot = await _firestore
+          .collection('barangays')
+          .doc(barangayId)
+          .collection('patients')
+          .where('isDeleted', isEqualTo: false)
+          .where(
+            'createdAt',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(startInclusive),
+          )
+          .where('createdAt', isLessThan: Timestamp.fromDate(endExclusive))
+          .get();
+
+      return snapshot.docs.length;
+    } catch (e) {
+      debugPrint('❌ Error getAssessedCountBetween: $e');
+      return 0;
+    }
+  }
+
+  /// Patient documents created in \[startInclusive, endExclusive) for analytics.
+  Future<List<Map<String, dynamic>>> getPatientsCreatedBetween(
+    DateTime startInclusive,
+    DateTime endExclusive,
+  ) async {
+    final user = _auth.currentUser;
+    if (user == null) return [];
+
+    try {
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+      final barangayId = userDoc.data()?['barangayId'] as String?;
+      if (barangayId == null || barangayId.isEmpty) return [];
+
+      final snapshot = await _firestore
+          .collection('barangays')
+          .doc(barangayId)
+          .collection('patients')
+          .where('isDeleted', isEqualTo: false)
+          .where(
+            'createdAt',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(startInclusive),
+          )
+          .where('createdAt', isLessThan: Timestamp.fromDate(endExclusive))
+          .get();
+
+      return snapshot.docs.map((doc) {
+        final m = Map<String, dynamic>.from(doc.data());
+        m['id'] = doc.id;
+        return m;
+      }).toList();
+    } catch (e) {
+      debugPrint('❌ Error getPatientsCreatedBetween: $e');
+      return [];
+    }
+  }
 }
