@@ -354,38 +354,402 @@ class _HomePageState extends State<HomePage>
   }
 
   Future<bool?> _showAssessmentPreview() {
-    final summaryItems = _buildAssessmentSummary();
+    final summarySections = _buildAssessmentSummary();
     return showDialog<bool>(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: const Text('Review Assessment'),
-          content: SingleChildScrollView(
+        return Dialog(
+          backgroundColor: Colors.white,
+          insetPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 860, maxHeight: 760),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: summaryItems
-                  .map(
-                    (item) => _buildSummaryRow(item['label']!, item['value']!),
-                  )
-                  .toList(),
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
+                  child: _buildSummaryHeader(),
+                ),
+                const Divider(height: 1, color: Color(0xFFE8E8ED)),
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final useGrid = constraints.maxWidth >= 700;
+                        if (!useGrid) {
+                          return Column(
+                            children: summarySections
+                                .map(
+                                  (section) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: _buildSummarySectionCard(section),
+                                  ),
+                                )
+                                .toList(),
+                          );
+                        }
+
+                        final itemWidth = (constraints.maxWidth - 12) / 2;
+                        return Wrap(
+                          spacing: 12,
+                          runSpacing: 12,
+                          children: summarySections
+                              .map(
+                                (section) => SizedBox(
+                                  width: itemWidth,
+                                  child: _buildSummarySectionCard(section),
+                                ),
+                              )
+                              .toList(),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                const Divider(height: 1, color: Color(0xFFE8E8ED)),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                  child: Wrap(
+                    alignment: WrapAlignment.end,
+                    spacing: 10,
+                    runSpacing: 8,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(false),
+                        child: const Text('Cancel'),
+                      ),
+                      OutlinedButton(
+                        onPressed: () => Navigator.of(context).pop(false),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFFF08030),
+                          side: const BorderSide(color: Color(0xFFF5A962)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text('Edit'),
+                      ),
+                      ElevatedButton(
+                        onPressed: () => Navigator.of(context).pop(true),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFF08030),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                            vertical: 12,
+                          ),
+                        ),
+                        child: const Text('Confirm & Save'),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Confirm & Save'),
-            ),
-          ],
         );
       },
     );
   }
 
-  List<Map<String, String>> _buildAssessmentSummary() {
+  List<_PatientSummarySection> _buildAssessmentSummary() {
+    final patientName = _buildPatientName();
+    final motherStatus = _statusFromParentValue(motherController);
+    final fatherStatus = _statusFromParentValue(fatherController);
+    final caregiverPresent = _text(caregiverNameController).isEmpty
+        ? (_selectedCaregiverPresence ?? 'No')
+        : 'Yes';
+
+    return [
+      _PatientSummarySection(
+        title: 'Personal Information',
+        icon: Icons.person_outline,
+        rows: [
+          _SummaryRow('Patient Name', patientName, emphasized: true),
+          _SummaryRow('Age', _formatAge(), emphasized: true),
+          _SummaryRow('Sex', _selectedSex ?? _text(sexController)),
+          _SummaryRow('Blood Type', _selectedBloodType ?? _text(bloodTypeController)),
+          _SummaryRow('Religion', _text(religionController)),
+          _SummaryRow('4Ps Member', _formatBool(_isFourPsMember)),
+          _SummaryRow('Has Disability', _formatBool(_hasDisability)),
+          if (_hasDisability == true)
+            _SummaryRow('Disability', _text(disabilityController)),
+        ],
+      ),
+      _PatientSummarySection(
+        title: 'Address & Residence',
+        icon: Icons.home_outlined,
+        rows: [
+          _SummaryRow('Address', _text(addressController)),
+          _SummaryRow(
+            'Residence Status',
+            _residenceStatus ?? _text(residenceStatusController),
+          ),
+          _SummaryRow('Length of Stay', _text(lengthOfStayController)),
+          _SummaryRow('IP Group', _formatBool(_belongsToIpGroup)),
+          if (_belongsToIpGroup == true)
+            _SummaryRow('IP Ethnicity', _ipEthnicity ?? ''),
+        ],
+      ),
+      _PatientSummarySection(
+        title: 'Parent/Guardian Information',
+        icon: Icons.family_restroom_outlined,
+        rows: [
+          _SummaryRow('Mother Status', motherStatus),
+          _SummaryRow('Mother Name', _text(motherController)),
+          _SummaryRow('Mother Contact', _text(motherContactController)),
+          _SummaryRow('Mother Age', _text(motherAgeController)),
+          _SummaryRow('Mother Occupation', _text(motherOccupationController)),
+          _SummaryRow(
+            'Mother PhilHealth',
+            _combineValues([
+              _text(motherPhilHealthNumberController),
+              _text(motherPhilHealthMemberTypeController),
+            ]),
+          ),
+          _SummaryRow('Father Status', fatherStatus),
+          _SummaryRow('Father Name', _text(fatherController)),
+          _SummaryRow('Father Contact', _text(fatherContactController)),
+          _SummaryRow('Father Age', _text(fatherAgeController)),
+          _SummaryRow('Father Occupation', _text(fatherOccupationController)),
+          _SummaryRow(
+            'Father PhilHealth',
+            _combineValues([
+              _text(fatherPhilHealthNumberController),
+              _text(fatherPhilHealthMemberTypeController),
+            ]),
+          ),
+          _SummaryRow('Caregiver Present', caregiverPresent),
+          _SummaryRow('Caregiver Name', _text(caregiverNameController)),
+          _SummaryRow(
+            'Caregiver Relationship',
+            _text(caregiverRelationshipController),
+          ),
+          _SummaryRow('Caregiver Ethnicity', _text(caregiverEthnicityController)),
+        ],
+      ),
+      _PatientSummarySection(
+        title: 'Birth Information',
+        icon: Icons.child_care_outlined,
+        rows: [
+          _SummaryRow('Date of Birth', _text(dobController)),
+          _SummaryRow('Place of Birth', _text(placeOfBirthController)),
+          _SummaryRow('Birth Weight', _appendUnit(_text(birthWeightController), 'kg')),
+          _SummaryRow('Birth Order', _text(birthOrderController)),
+        ],
+      ),
+      _PatientSummarySection(
+        title: 'Nutritional Information',
+        icon: Icons.monitor_weight_outlined,
+        rows: [
+          _SummaryRow('Measurement Date', _text(measurementDateController)),
+          _SummaryRow('Weight', _appendUnit(_text(weightController), 'kg')),
+          _SummaryRow('Height', _appendUnit(_text(heightController), 'cm')),
+          _SummaryRow('MUAC', _appendUnit(_text(muacController), 'cm')),
+          _SummaryRow('BMI', _text(bmiController), emphasized: true),
+          _SummaryRow('Weight-for-Age', _text(weightForAgeController), emphasized: true),
+          _SummaryRow('Weight-for-Height', _text(weightForHeightController), emphasized: true),
+          _SummaryRow('Height-for-Age', _text(heightForAgeController), emphasized: true),
+          _SummaryRow('Purely Breastfed', _formatBool(_purelyBreastfed)),
+          _SummaryRow('CF Age', _text(cfAgeController)),
+          _SummaryRow('CF Frequency', _text(cfFreqController)),
+          _SummaryRow('CF Foods', _text(cfFoodController)),
+          _SummaryRow('Meal Frequency', _text(mealFreqController)),
+        ],
+      ),
+      _PatientSummarySection(
+        title: 'Vaccination Information',
+        icon: Icons.vaccines_outlined,
+        rows: _buildVaccinationRows(),
+      ),
+      _PatientSummarySection(
+        title: 'Medical History',
+        icon: Icons.health_and_safety_outlined,
+        rows: [
+          _SummaryRow('Illnesses / Conditions', _formatMedicalHistory()),
+          _SummaryRow('Medications', _medications ? 'Yes' : ''),
+          _SummaryRow('Deworming', _formatNestedData(_dewormingData?['deworming'])),
+          _SummaryRow('Vitamin A', _formatNestedData(_dewormingData?['vitaminA'])),
+          _SummaryRow('Oral Assessment', _formatNestedData(_oralData)),
+          _SummaryRow('Allergies', _formatNestedData(_allergiesData)),
+        ],
+      ),
+      _PatientSummarySection(
+        title: 'Emergency Contact',
+        icon: Icons.contact_phone_outlined,
+        rows: [
+          _SummaryRow('Primary Contact', _firstProvided([
+            _contactLine('Mother', motherController, motherContactController),
+            _contactLine('Father', fatherController, fatherContactController),
+          ])),
+          _SummaryRow('Caregiver', _combineValues([
+            _text(caregiverNameController),
+            _text(caregiverRelationshipController),
+          ])),
+        ],
+      ),
+      _PatientSummarySection(
+        title: 'Additional Notes',
+        icon: Icons.notes_outlined,
+        rows: [
+          _SummaryRow('Visit Date', _text(visitDateController)),
+          _SummaryRow('Visit Time', _text(visitTimeController)),
+          _SummaryRow('Family Planning', _formatNestedData(_familyPlanningData)),
+          _SummaryRow('Nutrition Environment', _formatNestedData(_nutritionEnvData)),
+        ],
+      ),
+    ];
+  }
+
+  Widget _buildSummaryHeader() {
+    final patientName = _buildPatientName();
+    final initials = patientName
+        .split(' ')
+        .where((part) => part.trim().isNotEmpty)
+        .take(2)
+        .map((part) => part[0].toUpperCase())
+        .join();
+
+    return Row(
+      children: [
+        CircleAvatar(
+          radius: 24,
+          backgroundColor: const Color(0xFFF5A962).withValues(alpha: 0.18),
+          child: Text(
+            initials.isEmpty ? '?' : initials,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFFF08030),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        const Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Review Patient Information',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF1C1C1E),
+                  letterSpacing: -0.3,
+                ),
+              ),
+              SizedBox(height: 3),
+              Text(
+                'Verify all details before saving',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF6C6C70),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSummarySectionCard(_PatientSummarySection section) {
+    final visibleRows = section.rows
+        .where((row) => row.value.trim().isNotEmpty)
+        .toList();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSummarySectionHeader(section.title, section.icon),
+          const SizedBox(height: 12),
+          if (visibleRows.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                'No information entered for this section.',
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.4,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black.withValues(alpha: 0.45),
+                ),
+              ),
+            )
+          else ...visibleRows.map(
+            (row) => _buildSummaryRow(
+              row.label,
+              row.value,
+              emphasized: row.emphasized,
+            ),
+          ).toList(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummarySectionHeader(String title, IconData icon) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFFF5A962), Color(0xFFF08030)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFF5A962).withValues(alpha: 0.35),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Icon(icon, color: Colors.white, size: 18),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            title.toUpperCase(),
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFFF5A962),
+              letterSpacing: 1.1,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _buildPatientName() {
     final nameParts = <String>[];
     if (firstNameController.text.trim().isNotEmpty) {
       nameParts.add(firstNameController.text.trim());
@@ -402,108 +766,170 @@ class _HomePageState extends State<HomePage>
       patientName = '$patientName $extensionText';
     }
 
-    final motherStatus = _selectedMotherStatus ?? 'Present';
-    final fatherStatus = _selectedFatherStatus ?? 'Present';
-    final caregiverStatus = _selectedCaregiverPresence ?? 'No';
-
-    return [
-      {
-        'label': 'Patient Name',
-        'value': patientName.isEmpty ? 'N/A' : patientName,
-      },
-      {'label': 'Sex', 'value': _selectedSex ?? 'N/A'},
-      {
-        'label': 'Date of Birth',
-        'value': dobController.text.trim().isEmpty
-            ? 'N/A'
-            : dobController.text.trim(),
-      },
-      {'label': 'Blood Type', 'value': _selectedBloodType ?? 'N/A'},
-      {
-        'label': 'Birth Weight',
-        'value': birthWeightController.text.trim().isEmpty
-            ? 'N/A'
-            : '${birthWeightController.text.trim()} kg',
-      },
-      {
-        'label': 'Birth Order',
-        'value': birthOrderController.text.trim().isEmpty
-            ? 'N/A'
-            : birthOrderController.text.trim(),
-      },
-      {
-        'label': 'Address',
-        'value': addressController.text.trim().isEmpty
-            ? 'N/A'
-            : addressController.text.trim(),
-      },
-      {
-        'label': 'Place of Birth',
-        'value': placeOfBirthController.text.trim().isEmpty
-            ? 'N/A'
-            : placeOfBirthController.text.trim(),
-      },
-      {'label': 'Mother Status', 'value': motherStatus},
-      {
-        'label': 'Mother Name',
-        'value': motherController.text.trim().isEmpty
-            ? 'N/A'
-            : motherController.text.trim(),
-      },
-      {
-        'label': 'Mother Contact',
-        'value': motherContactController.text.trim().isEmpty
-            ? 'N/A'
-            : motherContactController.text.trim(),
-      },
-      {'label': 'Father Status', 'value': fatherStatus},
-      {
-        'label': 'Father Name',
-        'value': fatherController.text.trim().isEmpty
-            ? 'N/A'
-            : fatherController.text.trim(),
-      },
-      {
-        'label': 'Father Contact',
-        'value': fatherContactController.text.trim().isEmpty
-            ? 'N/A'
-            : fatherContactController.text.trim(),
-      },
-      {'label': 'Caregiver Present', 'value': caregiverStatus},
-      {'label': '4Ps Member', 'value': _isFourPsMember == true ? 'Yes' : 'No'},
-      {
-        'label': 'Has Disability',
-        'value': _hasDisability == true ? 'Yes' : 'No',
-      },
-      {'label': 'Residence Status', 'value': _residenceStatus ?? 'N/A'},
-    ];
+    return patientName;
   }
 
-  Widget _buildSummaryRow(String label, String value) {
+  Widget _buildSummaryRow(
+    String label,
+    String value, {
+    bool emphasized = false,
+  }) {
+    final isEmpty = value.trim().isEmpty;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.only(bottom: 9),
+      child: Column(
         children: [
-          Expanded(
-            flex: 4,
-            child: Text(
-              '$label:',
-              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 4,
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 11,
+                    color: Color(0xFF6C6C70),
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                flex: 6,
+                child: Text(
+                  isEmpty ? 'Not Provided' : value,
+                  textAlign: TextAlign.right,
+                  softWrap: true,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    height: 1.35,
+                    fontWeight: emphasized ? FontWeight.w700 : FontWeight.w500,
+                    color: isEmpty
+                        ? Colors.black26
+                        : emphasized
+                            ? const Color(0xFFF08030)
+                            : const Color(0xFF1A1A1A),
+                  ),
+                ),
+              ),
+            ],
           ),
-          Expanded(
-            flex: 6,
-            child: Text(
-              value,
-              style: const TextStyle(fontSize: 13, color: Color(0xFF444444)),
-            ),
-          ),
+          const SizedBox(height: 9),
+          const Divider(height: 1, color: Color(0xFFE8E8ED)),
         ],
       ),
     );
   }
 
+  List<_SummaryRow> _buildVaccinationRows() {
+    if (_vaccinationData == null || _vaccinationData!.isEmpty) {
+      return const [_SummaryRow('Vaccination Records', '')];
+    }
+
+    final rows = <_SummaryRow>[];
+    _vaccinationData!.forEach((vaccine, value) {
+      if (value is Map) {
+        final selected = value.entries
+            .where((entry) => entry.value != null && entry.value.toString().trim().isNotEmpty)
+            .map((entry) => '${entry.key}: ${entry.value}')
+            .join(', ');
+        rows.add(_SummaryRow(vaccine.toString(), selected));
+      } else {
+        rows.add(_SummaryRow(vaccine.toString(), value?.toString() ?? ''));
+      }
+    });
+
+    return rows.isEmpty ? const [_SummaryRow('Vaccination Records', '')] : rows;
+  }
+
+  String _text(TextEditingController controller) => controller.text.trim();
+
+  String _formatAge() {
+    final values = <String>[
+      if (_text(ageYearsController).isNotEmpty) '${_text(ageYearsController)} year(s)',
+      if (_text(ageController).isNotEmpty) '${_text(ageController)} month(s)',
+      if (_text(ageDaysController).isNotEmpty) '${_text(ageDaysController)} day(s)',
+    ];
+    return values.isEmpty ? '' : values.join(', ');
+  }
+
+  String _appendUnit(String value, String unit) =>
+      value.isEmpty ? '' : '$value $unit';
+
+  String _formatBool(bool? value) {
+    if (value == null) return '';
+    return value ? 'Yes' : 'No';
+  }
+
+  String _combineValues(List<String> values) {
+    return values.where((value) => value.trim().isNotEmpty).join(' - ');
+  }
+
+  String _firstProvided(List<String> values) {
+    for (final value in values) {
+      if (value.trim().isNotEmpty) return value;
+    }
+    return '';
+  }
+
+  String _contactLine(
+    String label,
+    TextEditingController nameController,
+    TextEditingController contactController,
+  ) {
+    final name = _text(nameController);
+    final contact = _text(contactController);
+    if (name.isEmpty && contact.isEmpty) return '';
+    return '$label: ${_combineValues([name, contact])}';
+  }
+
+  String _statusFromParentValue(TextEditingController controller) {
+    final value = _text(controller);
+    return value.startsWith('N/A') ? value : 'Present';
+  }
+
+  String _formatMedicalHistory() {
+    final conditions = <String>[
+      if (_diarrhea) 'Diarrhea',
+      if (_fever) 'Fever',
+      if (_cough) 'Cough / Pneumonia',
+      if (_other) 'Other',
+    ];
+    return conditions.join(', ');
+  }
+
+  String _formatNestedData(dynamic value) {
+    if (value == null) return '';
+    if (value is Map) {
+      final entries = value.entries
+          .where((entry) =>
+              entry.value != null && entry.value.toString().trim().isNotEmpty)
+          .map((entry) => '${entry.key}: ${entry.value}')
+          .join(', ');
+      return entries;
+    }
+    if (value is Iterable) {
+      return value
+          .where((item) => item.toString().trim().isNotEmpty)
+          .join(', ');
+    }
+    return value.toString();
+  }
+
+  void _focusFirstInvalidSection() {
+    if (_purelyBreastfedError != null) {
+      _sectionTabController.animateTo(2);
+      return;
+    }
+
+    if (_oralRiskError != null || _dewormingError != null) {
+      _sectionTabController.animateTo(3);
+      return;
+    }
+
+    _sectionTabController.animateTo(0);
+  }
   // ── Save All Data ──────────────────────────────────────────────────────────
   Future<void> _saveAllData() async {
     // Run form validators — in draft mode, only the always-required fields
@@ -561,6 +987,7 @@ class _HomePageState extends State<HomePage>
     }
 
     if (!isFormValid || hasNonTextErrors) {
+      _focusFirstInvalidSection();
       _showSnackBar(
         _isDraft
             ? 'Please fill in patient name and parent contacts.'
@@ -1835,6 +2262,30 @@ class _HomePageState extends State<HomePage>
       onNavigateToPatients: () => _tabController.animateTo(2),
     );
   }
+}
+
+class _PatientSummarySection {
+  final String title;
+  final IconData icon;
+  final List<_SummaryRow> rows;
+
+  const _PatientSummarySection({
+    required this.title,
+    required this.icon,
+    required this.rows,
+  });
+}
+
+class _SummaryRow {
+  final String label;
+  final String value;
+  final bool emphasized;
+
+  const _SummaryRow(
+    this.label,
+    this.value, {
+    this.emphasized = false,
+  });
 }
 
 class _HomeSectionTabBarDelegate extends SliverPersistentHeaderDelegate {
