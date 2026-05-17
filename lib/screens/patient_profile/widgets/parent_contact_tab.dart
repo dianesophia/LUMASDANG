@@ -9,6 +9,7 @@ class ParentContactTab extends StatelessWidget {
   final bool preferSMS;
   final ValueChanged<bool?> onPhoneCallChanged;
   final ValueChanged<bool?> onSMSChanged;
+  final VoidCallback? onEditProfileTap;
 
   const ParentContactTab({
     super.key,
@@ -18,6 +19,7 @@ class ParentContactTab extends StatelessWidget {
     required this.preferSMS,
     required this.onPhoneCallChanged,
     required this.onSMSChanged,
+    this.onEditProfileTap,
   });
 
   // ─── Design Tokens (matches ProfileInfoCard) ────────────────────────────────
@@ -93,8 +95,29 @@ class ParentContactTab extends StatelessWidget {
           ProfileInfoCard(
             patient: patient,
             latestDemographic: latestDemographic,
+            onEditTap: onEditProfileTap,
           ),
           const SizedBox(height: 20),
+
+          if (onEditProfileTap != null) ...[
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: onEditProfileTap,
+                icon: const Icon(Icons.edit_outlined, size: 18),
+                label: const Text('Edit profile'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _orange,
+                  side: const BorderSide(color: _orange),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
 
           _sectionLabel('GUARDIAN INFORMATION'),
           const SizedBox(height: 8),

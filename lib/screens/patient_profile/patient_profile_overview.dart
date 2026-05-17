@@ -14,6 +14,7 @@ import 'widgets/overall_nutritional_status.dart';
 import 'widgets/vaccination_status.dart';
 import 'widgets/deworming_status.dart';
 import 'widgets/parent_contact_tab.dart';
+import 'edit_patient_demographics_screen.dart';
 import 'package:lumasdang/screens/shared/app_buttom_navbar.dart';
 import 'package:flutter/foundation.dart';
 
@@ -48,9 +49,15 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
   bool _preferPhoneCall = true;
   bool _preferSMS = false;
 
+  late Patient _patientSnapshot;
+  bool _patientUpdated = false;
+  Map<String, dynamic>? _rootDemographic;
+  Map<String, dynamic>? _rootPatientData;
+
   @override
   void initState() {
     super.initState();
+    _patientSnapshot = widget.patient;
     _currentTabIndex = widget.initialTabIndex;
 
     _tabController = TabController(length: 3, vsync: this);
@@ -62,6 +69,98 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
 
     _fetchAssessments();
     _loadContactPreferences();
+    _loadRootPatient();
+  }
+
+  bool get _canEditPatient =>
+      _patientSnapshot.docId.isNotEmpty && !_patientSnapshot.isArchived;
+
+  Map<String, dynamic>? get _effectiveDemographic {
+    if (_rootDemographic != null && _rootDemographic!.isNotEmpty) {
+      return _rootDemographic;
+    }
+    if (_assessments.isEmpty) return null;
+    final demoRaw = _assessments.last['demographic'];
+    if (demoRaw is Map<String, dynamic>) return demoRaw;
+    if (demoRaw is Map) return Map<String, dynamic>.from(demoRaw);
+    return null;
+  }
+
+  Future<void> _loadRootPatient() async {
+    if (_patientSnapshot.docId.isEmpty) return;
+
+    try {
+      final online = kIsWeb
+          ? true
+          : await ConnectivityService.instance.checkOnline();
+      if (!online) return;
+
+      final data = await FirestoreService()
+          .getBarangayPatientById(_patientSnapshot.docId);
+      if (data == null || !mounted) return;
+
+      final rawDemo = data['demographic'];
+      Map<String, dynamic>? demo;
+      if (rawDemo is Map<String, dynamic>) {
+        demo = rawDemo;
+      } else if (rawDemo is Map) {
+        demo = Map<String, dynamic>.from(rawDemo);
+      }
+
+      final rawPrefs = data['contactPreferences'];
+      Map<String, dynamic> prefs = {};
+      if (rawPrefs is Map<String, dynamic>) {
+        prefs = rawPrefs;
+      } else if (rawPrefs is Map) {
+        prefs = Map<String, dynamic>.from(rawPrefs);
+      }
+
+      setState(() {
+        _rootPatientData = data;
+        _rootDemographic = demo;
+        if (prefs.isNotEmpty) {
+          _preferPhoneCall = prefs['phoneCall'] ?? true;
+          _preferSMS = prefs['sms'] ?? false;
+        }
+      });
+    } catch (e) {
+      debugPrint('Error loading root patient: $e');
+    }
+  }
+
+  Future<void> _openEditPatient() async {
+    if (!_canEditPatient) return;
+
+    final online = kIsWeb
+        ? true
+        : await ConnectivityService.instance.checkOnline();
+    if (!online) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Connect to the internet to edit patient profile.'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+      return;
+    }
+
+    final result = await Navigator.push<Patient>(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            EditPatientDemographicsScreen(patient: _patientSnapshot),
+      ),
+    );
+
+    if (result != null && mounted) {
+      setState(() {
+        _patientSnapshot = result;
+        _patientUpdated = true;
+      });
+      await _loadRootPatient();
+    }
   }
 
   @override
@@ -191,19 +290,24 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
         return;
       }
 
+      final prefs = {
+        'phoneCall': _preferPhoneCall,
+        'sms': _preferSMS,
+      };
+
       await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .collection('homepageData')
-          .doc(widget.patient.docId)
-          .set(
-              {
-            'contactPreferences': {
-              'phoneCall': _preferPhoneCall,
-              'sms': _preferSMS
-            }
-          },
-              SetOptions(merge: true));
+          .doc(_patientSnapshot.docId)
+          .set({'contactPreferences': prefs}, SetOptions(merge: true));
+
+      if (_patientSnapshot.docId.isNotEmpty) {
+        await FirestoreService().updatePatientContactPreferencesInBarangay(
+          patientId: _patientSnapshot.docId,
+          contactPreferences: prefs,
+        );
+      }
     } catch (e) {
       debugPrint('Error saving contact preferences: $e');
     }
@@ -255,8 +359,8 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
   }
 
   bool _namesMatch(String storedFirst, String storedLast) {
-    final patientFirst = widget.patient.firstName.trim().toLowerCase();
-    final patientLast = widget.patient.lastName.trim().toLowerCase();
+    final patientFirst = _patientSnapshot.firstName.trim().toLowerCase();
+    final patientLast = _patientSnapshot.lastName.trim().toLowerCase();
     final first = storedFirst.trim().toLowerCase();
     final last = storedLast.trim().toLowerCase();
     if (first == patientFirst && last == patientLast) return true;
@@ -541,16 +645,8 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
 
   // ── Tab bodies ─────────────────────────────────────────────────────────────
   Widget _buildProfileTab() {
-    final patient = widget.patient;
-    Map<String, dynamic>? latestDemo;
-    if (_assessments.isNotEmpty) {
-      final demoRaw = _assessments.last['demographic'];
-      if (demoRaw is Map<String, dynamic>) {
-        latestDemo = demoRaw;
-      } else if (demoRaw is Map) {
-        latestDemo = Map<String, dynamic>.from(demoRaw as Map);
-      }
-    }
+    final patient = _patientSnapshot;
+    final latestDemo = _effectiveDemographic;
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
@@ -560,6 +656,7 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
           ProfileInfoCard(
             patient: patient,
             latestDemographic: latestDemo,
+            onEditTap: _canEditPatient ? _openEditPatient : null,
           ),
           const SizedBox(height: 20),
 
@@ -799,20 +896,11 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
         return _buildProfileTab();
       case 1:
         return ParentContactTab(
-          patient: widget.patient,
-          latestDemographic: _assessments.isNotEmpty
-              ? (() {
-                  final demoRaw = _assessments.last['demographic'];
-                  if (demoRaw is Map<String, dynamic>) {
-                    return demoRaw;
-                  } else if (demoRaw is Map) {
-                    return Map<String, dynamic>.from(demoRaw as Map);
-                  }
-                  return null;
-                })()
-              : null,
+          patient: _patientSnapshot,
+          latestDemographic: _effectiveDemographic,
           preferPhoneCall: _preferPhoneCall,
           preferSMS: _preferSMS,
+          onEditProfileTap: _canEditPatient ? _openEditPatient : null,
           onPhoneCallChanged: (v) {
             setState(() => _preferPhoneCall = v ?? false);
             _saveContactPreferences();
@@ -877,7 +965,10 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
               Material(
                 color: Colors.transparent,
                 child: InkWell(
-                  onTap: () => Navigator.pop(context),
+                  onTap: () => Navigator.pop(
+                    context,
+                    _patientUpdated ? _patientSnapshot : null,
+                  ),
                   borderRadius: BorderRadius.circular(50),
                   child: Container(
                     padding: const EdgeInsets.all(10),
@@ -896,7 +987,7 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  '${widget.patient.firstName} ${widget.patient.lastName}',
+                  '${_patientSnapshot.firstName} ${_patientSnapshot.lastName}',
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
@@ -1704,7 +1795,7 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
                                           letterSpacing: -0.3)),
                                   const SizedBox(height: 2),
                                   Text(
-                                    '${widget.patient.firstName} ${widget.patient.lastName}',
+                                    '${_patientSnapshot.firstName} ${_patientSnapshot.lastName}',
                                     style: const TextStyle(
                                         fontSize: 13, color: kInkMid),
                                   ),

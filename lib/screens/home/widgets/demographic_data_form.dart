@@ -377,8 +377,65 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
       _fatherPhilHealthMemberType = fPhType;
     }
 
+    final motherText = widget.motherController.text.trim();
+    if (_parentStatuses.contains(motherText) && motherText != 'Present') {
+      _selectedMotherStatus = motherText;
+      _isMotherAvailable = false;
+    } else if (motherText.isNotEmpty) {
+      _selectedMotherStatus = 'Present';
+      _isMotherAvailable = true;
+    }
+
+    final fatherText = widget.fatherController.text.trim();
+    if (_parentStatuses.contains(fatherText) && fatherText != 'Present') {
+      _selectedFatherStatus = fatherText;
+      _isFatherAvailable = false;
+    } else if (fatherText.isNotEmpty) {
+      _selectedFatherStatus = 'Present';
+      _isFatherAvailable = true;
+    }
+
+    final caregiverName = widget.caregiverNameController.text.trim();
+    if (caregiverName.isNotEmpty) {
+      _selectedCaregiverPresence = 'Yes';
+    }
+
+    final res = widget.residenceStatusController.text.trim();
+    if (res == 'Tenant' || res == 'Permanent') {
+      _residenceStatus = res;
+    }
+
+    _parseAddressIntoDropdowns(
+      widget.addressController.text.trim(),
+      isBirth: false,
+    );
+    _parseAddressIntoDropdowns(
+      widget.placeOfBirthController.text.trim(),
+      isBirth: true,
+    );
+
     _isMotherAvailable = _selectedMotherStatus == 'Present';
     _isFatherAvailable = _selectedFatherStatus == 'Present';
+  }
+
+  void _parseAddressIntoDropdowns(String addr, {required bool isBirth}) {
+    if (addr.isEmpty) return;
+    final parts = addr
+        .split(',')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+    if (parts.length >= 3) {
+      if (isBirth) {
+        birthBarangay = parts[0];
+        birthMunicipality = parts[1];
+        birthProvince = parts[2];
+      } else {
+        selectedBarangay = parts[0];
+        selectedMunicipality = parts[1];
+        selectedProvince = parts[2];
+      }
+    }
   }
 
   @override

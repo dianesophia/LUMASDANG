@@ -1674,15 +1674,19 @@ class _PatientListTabState extends State<PatientListTab> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: () {
+                      onPressed: () async {
                         Navigator.pop(context);
-                        Navigator.push(
+                        final result = await Navigator.push<Patient>(
                           context,
                           MaterialPageRoute(
                             builder: (_) => PatientProfileOverview(
                                 patient: patient),
                           ),
                         );
+                        // Patient list groups by name; refresh after profile edits.
+                        if (result != null && mounted) {
+                          await _fetchPatients();
+                        }
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF2E8B7B),

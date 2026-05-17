@@ -770,6 +770,139 @@ class FirestoreService {
     return patientRef.id;
   }
 
+  /// Fetch a single patient document from the current user's barangay.
+  Future<Map<String, dynamic>?> getBarangayPatientById(String patientId) async {
+    if (patientId.isEmpty) return null;
+
+    final user = _auth.currentUser;
+    if (user == null) return null;
+
+    final userDoc = await _firestore.collection('users').doc(user.uid).get();
+    final barangayId = userDoc.data()?['barangayId'] as String?;
+    if (barangayId == null || barangayId.isEmpty) return null;
+
+    final doc = await _firestore
+        .collection('barangays')
+        .doc(barangayId)
+        .collection('patients')
+        .doc(patientId)
+        .get();
+
+    if (!doc.exists) return null;
+
+    final data = Map<String, dynamic>.from(doc.data()!);
+    data['id'] = doc.id;
+    data['barangayId'] = barangayId;
+    return data;
+  }
+
+  /// Merge-update demographic (and optional contact prefs) on an existing barangay patient.
+  Future<void> updatePatientInBarangay({
+    required String patientId,
+    required Map<String, dynamic> demographic,
+    Map<String, dynamic>? contactPreferences,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw FirebaseAuthException(
+        code: 'no-current-user',
+        message: 'No authenticated user found',
+      );
+    }
+
+    final userDoc = await _firestore.collection('users').doc(user.uid).get();
+    final barangayId = userDoc.data()?['barangayId'] as String?;
+    if (barangayId == null || barangayId.isEmpty) {
+      throw Exception('User has no barangay assigned');
+    }
+
+    final userName = userDoc.data()?['fullName'] ??
+        userDoc.data()?['username'] ??
+        user.email ??
+        'Unknown';
+
+    final payload = <String, dynamic>{
+      'demographic': demographic,
+      'lastModifiedBy': user.uid,
+      'lastModifiedAt': FieldValue.serverTimestamp(),
+      'lastModifiedByName': userName,
+    };
+    if (contactPreferences != null) {
+      payload['contactPreferences'] = contactPreferences;
+    }
+
+    await _firestore
+        .collection('barangays')
+        .doc(barangayId)
+        .collection('patients')
+        .doc(patientId)
+        .set(payload, SetOptions(merge: true));
+
+    // Best-effort mirror to homepageData when doc id matches.
+    try {
+      final homeRef = _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('homepageData')
+          .doc(patientId);
+      final homeSnap = await homeRef.get();
+      if (homeSnap.exists) {
+        await updateHomePageData(patientId, {
+          'demographic': demographic,
+          if (contactPreferences != null)
+            'contactPreferences': contactPreferences,
+        });
+      }
+    } catch (e) {
+      print('updatePatientInBarangay: homepage mirror skipped: $e');
+    }
+  }
+
+  /// Merge contact preferences onto the barangay patient document.
+  Future<void> updatePatientContactPreferencesInBarangay({
+    required String patientId,
+    required Map<String, dynamic> contactPreferences,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    final userDoc = await _firestore.collection('users').doc(user.uid).get();
+    final barangayId = userDoc.data()?['barangayId'] as String?;
+    if (barangayId == null || barangayId.isEmpty) return;
+
+    final userName = userDoc.data()?['fullName'] ??
+        userDoc.data()?['username'] ??
+        user.email ??
+        'Unknown';
+
+    await _firestore
+        .collection('barangays')
+        .doc(barangayId)
+        .collection('patients')
+        .doc(patientId)
+        .set({
+      'contactPreferences': contactPreferences,
+      'lastModifiedBy': user.uid,
+      'lastModifiedAt': FieldValue.serverTimestamp(),
+      'lastModifiedByName': userName,
+    }, SetOptions(merge: true));
+
+    try {
+      final homeRef = _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('homepageData')
+          .doc(patientId);
+      if ((await homeRef.get()).exists) {
+        await updateHomePageData(patientId, {
+          'contactPreferences': contactPreferences,
+        });
+      }
+    } catch (e) {
+      print('updatePatientContactPreferencesInBarangay: mirror skipped: $e');
+    }
+  }
+
   /// Get all patients from user's barangay
   Future<List<Map<String, dynamic>>> getPatientsFromBarangay() async {
     final user = _auth.currentUser;

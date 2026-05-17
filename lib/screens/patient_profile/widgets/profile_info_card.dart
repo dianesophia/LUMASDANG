@@ -5,11 +5,13 @@ import '../../patient_list.dart';
 class ProfileInfoCard extends StatelessWidget {
   final Patient patient;
   final Map<String, dynamic>? latestDemographic;
+  final VoidCallback? onEditTap;
 
   const ProfileInfoCard({
     super.key,
     required this.patient,
     this.latestDemographic,
+    this.onEditTap,
   });
 
   // ─── Design Tokens ─────────────────────────────────────────────
@@ -112,6 +114,17 @@ class ProfileInfoCard extends StatelessWidget {
                     ],
                   ),
                 ),
+
+                if (onEditTap != null)
+                  IconButton(
+                    onPressed: onEditTap,
+                    icon: const Icon(Icons.edit_outlined,
+                        color: _orange, size: 22),
+                    tooltip: 'Edit patient profile',
+                    padding: const EdgeInsets.all(8),
+                    constraints:
+                        const BoxConstraints(minWidth: 40, minHeight: 40),
+                  ),
 
                 // Active pill
                 Container(
