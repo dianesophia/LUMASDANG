@@ -132,6 +132,39 @@ class _PatientListScreenState extends State<PatientListScreen>
   }
 }
 
+// ==================== FILTER MODEL ====================
+
+/// Holds all active filter state so it can be passed around cleanly.
+class _FilterState {
+  // Age range in months (null = no limit)
+  int? ageMinMonths;
+  int? ageMaxMonths;
+
+  // Sex filter: null = all, 'Male' / 'Female'
+  String? sex;
+
+  // Malnutrition type: null = all, else one of the status labels
+  String? malnutritionType;
+
+  // Screened period: null = all, 'week' or 'month'
+  String? screenedPeriod;
+
+  bool get hasActiveFilters =>
+      ageMinMonths != null ||
+      ageMaxMonths != null ||
+      sex != null ||
+      malnutritionType != null ||
+      screenedPeriod != null;
+
+  void reset() {
+    ageMinMonths = null;
+    ageMaxMonths = null;
+    sex = null;
+    malnutritionType = null;
+    screenedPeriod = null;
+  }
+}
+
 // ==================== PATIENT LIST TAB ====================
 class PatientListTab extends StatefulWidget {
   final ValueNotifier<int>? refreshTrigger;
@@ -156,6 +189,34 @@ class _PatientListTabState extends State<PatientListTab> {
   bool _selectionMode = false;
   final Set<String> _selectedDocIds = {};
   bool _deleting = false;
+
+  // ── NEW: filter state ──────────────────────────────────────────────────────
+  final _FilterState _filters = _FilterState();
+
+  // Age-group presets (months)
+  static const List<_AgePreset> _agePresets = [
+    _AgePreset('0–6 mo',   0,   6),
+    _AgePreset('7–12 mo',  7,  12),
+    _AgePreset('1–2 yrs', 13,  24),
+    _AgePreset('2–3 yrs', 25,  36),
+    _AgePreset('3–5 yrs', 37,  59),
+  ];
+
+  static const List<String> _sexOptions = ['Male', 'Female'];
+
+  static const List<String> _malnutritionOptions = [
+    'Underweight',
+    'Stunted',
+    'Overweight/Obese',
+    'At Risk',
+    'Normal',
+  ];
+
+  static const List<_PeriodOption> _periodOptions = [
+    _PeriodOption('This Week',  'week'),
+    _PeriodOption('This Month', 'month'),
+  ];
+  // ── END filter state ───────────────────────────────────────────────────────
 
   double? _extractZScore(String? raw) {
     if (raw == null || raw.isEmpty) return null;
@@ -253,7 +314,7 @@ class _PatientListTabState extends State<PatientListTab> {
     });
   }
 
-  // ── SINGLE-ROW SOFT DELETE (called from swipe or detail dialog) ────────────
+  // ── SINGLE-ROW SOFT DELETE ─────────────────────────────────────────────────
   Future<void> _confirmAndSoftDeleteSingle(Patient patient) async {
     final ok = await showDialog<bool>(
       context: context,
@@ -263,7 +324,6 @@ class _PatientListTabState extends State<PatientListTab> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Red warning header
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 24),
@@ -301,7 +361,6 @@ class _PatientListTabState extends State<PatientListTab> {
                 ],
               ),
             ),
-            // Body
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
               child: Column(
@@ -409,7 +468,6 @@ class _PatientListTabState extends State<PatientListTab> {
     }
   }
 
-  /// Core soft-delete logic for a single patient.
   Future<void> _softDeletePatient(Patient patient) async {
     final user = FirebaseAuth.instance.currentUser;
     final firestore = FirebaseFirestore.instance;
@@ -462,7 +520,6 @@ class _PatientListTabState extends State<PatientListTab> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Red warning header
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 24),
@@ -500,7 +557,6 @@ class _PatientListTabState extends State<PatientListTab> {
                 ],
               ),
             ),
-            // Body
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
               child: Column(
@@ -982,19 +1038,61 @@ class _PatientListTabState extends State<PatientListTab> {
     }
   }
 
+  // ── FILTERING ──────────────────────────────────────────────────────────────
+
+  /// Returns true when [patient.lastVisit] falls inside the current week or
+  /// month (whichever period is selected).
+  bool _passesScreenedPeriod(Patient patient) {
+    final period = _filters.screenedPeriod;
+    if (period == null) return true;
+
+    final now = DateTime.now();
+    final visit = patient.lastVisit;
+
+    if (period == 'week') {
+      // ISO week: Monday → Sunday
+      final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+      final start = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
+      final end   = start.add(const Duration(days: 7));
+      return !visit.isBefore(start) && visit.isBefore(end);
+    } else if (period == 'month') {
+      return visit.year == now.year && visit.month == now.month;
+    }
+    return true;
+  }
+
   List<Patient> get _filteredPatients {
     final base = _patients.where((p) {
+      // --- Text search ---
       final q = _searchQuery.toLowerCase();
-      return p.lastName.toLowerCase().contains(q) ||
+      final matchesSearch = p.lastName.toLowerCase().contains(q) ||
           p.firstName.toLowerCase().contains(q) ||
           p.assessmentRemarks.toLowerCase().contains(q);
+      if (!matchesSearch) return false;
+
+      // --- Malnourished-only mode (existing feature) ---
+      if (widget.showOnlyMalnourished && !_isMalnourished(p)) return false;
+
+      // --- Age filter ---
+      if (_filters.ageMinMonths != null && p.age < _filters.ageMinMonths!) return false;
+      if (_filters.ageMaxMonths != null && p.age > _filters.ageMaxMonths!) return false;
+
+      // --- Sex filter ---
+      if (_filters.sex != null &&
+          p.sex.toLowerCase() != _filters.sex!.toLowerCase()) return false;
+
+      // --- Malnutrition type filter ---
+      if (_filters.malnutritionType != null &&
+          p.assessmentRemarks.toLowerCase() !=
+              _filters.malnutritionType!.toLowerCase()) return false;
+
+      // --- Screened period filter ---
+      if (!_passesScreenedPeriod(p)) return false;
+
+      return true;
     }).toList();
 
-    final filtered = widget.showOnlyMalnourished
-        ? base.where(_isMalnourished).toList()
-        : base;
-
-    filtered.sort((a, b) {
+    base.sort((a, b) {
       final lastA = a.lastName.toLowerCase().trim();
       final lastB = b.lastName.toLowerCase().trim();
       var cmp = lastA.compareTo(lastB);
@@ -1005,12 +1103,354 @@ class _PatientListTabState extends State<PatientListTab> {
       }
       return _sortAscending ? cmp : -cmp;
     });
-    return filtered;
+    return base;
   }
 
   bool _isMalnourished(Patient p) {
     final status = p.assessmentRemarks.toLowerCase();
     return status.contains('underweight');
+  }
+
+  // ── FILTER BOTTOM SHEET ────────────────────────────────────────────────────
+  void _showFilterSheet() {
+    // Working copy so we can cancel without changing live filters.
+    final working = _FilterState()
+      ..ageMinMonths      = _filters.ageMinMonths
+      ..ageMaxMonths      = _filters.ageMaxMonths
+      ..sex               = _filters.sex
+      ..malnutritionType  = _filters.malnutritionType
+      ..screenedPeriod    = _filters.screenedPeriod;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            return Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              padding: EdgeInsets.only(
+                top: 20,
+                left: 20,
+                right: 20,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Handle bar
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Title row
+                    Row(
+                      children: [
+                        const Icon(Icons.tune_rounded,
+                            color: Color(0xFF2E8B7B), size: 20),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Filter Patients',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF1A1A1A),
+                          ),
+                        ),
+                        const Spacer(),
+                        if (working.hasActiveFilters)
+                          TextButton(
+                            onPressed: () {
+                              setSheetState(() => working.reset());
+                            },
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.redAccent,
+                              padding: EdgeInsets.zero,
+                              minimumSize: const Size(60, 32),
+                            ),
+                            child: const Text('Reset all',
+                                style: TextStyle(fontSize: 13)),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+
+                    // ── SECTION: Age Group ──────────────────────────────────
+                    _filterSectionLabel('Age Group', Icons.child_care_rounded),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _agePresets.map((preset) {
+                        final isSelected = working.ageMinMonths == preset.minMonths &&
+                            working.ageMaxMonths == preset.maxMonths;
+                        return _FilterChipWidget(
+                          label: preset.label,
+                          isSelected: isSelected,
+                          onTap: () {
+                            setSheetState(() {
+                              if (isSelected) {
+                                working.ageMinMonths = null;
+                                working.ageMaxMonths = null;
+                              } else {
+                                working.ageMinMonths = preset.minMonths;
+                                working.ageMaxMonths = preset.maxMonths;
+                              }
+                            });
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // ── SECTION: Sex ────────────────────────────────────────
+                    _filterSectionLabel('Sex', Icons.wc_rounded),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      children: _sexOptions.map((s) {
+                        final isSelected = working.sex == s;
+                        return _FilterChipWidget(
+                          label: s,
+                          icon: s == 'Male'
+                              ? Icons.male_rounded
+                              : Icons.female_rounded,
+                          isSelected: isSelected,
+                          onTap: () {
+                            setSheetState(() {
+                              working.sex = isSelected ? null : s;
+                            });
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // ── SECTION: Type of Malnutrition ───────────────────────
+                    _filterSectionLabel(
+                        'Type of Malnutrition', Icons.monitor_weight_outlined),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _malnutritionOptions.map((type) {
+                        final isSelected = working.malnutritionType == type;
+                        return _FilterChipWidget(
+                          label: type,
+                          isSelected: isSelected,
+                          selectedColor: _statusChipColor(type),
+                          onTap: () {
+                            setSheetState(() {
+                              working.malnutritionType = isSelected ? null : type;
+                            });
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // ── SECTION: Screened Period ────────────────────────────
+                    _filterSectionLabel(
+                        'Screened', Icons.calendar_month_rounded),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      children: _periodOptions.map((p) {
+                        final isSelected = working.screenedPeriod == p.value;
+                        return _FilterChipWidget(
+                          label: p.label,
+                          icon: p.value == 'week'
+                              ? Icons.view_week_outlined
+                              : Icons.calendar_today_outlined,
+                          isSelected: isSelected,
+                          onTap: () {
+                            setSheetState(() {
+                              working.screenedPeriod = isSelected ? null : p.value;
+                            });
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 28),
+
+                    // ── Apply / Cancel buttons ──────────────────────────────
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF2E8B7B),
+                              side: const BorderSide(color: Color(0xFF2E8B7B)),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                            ),
+                            child: const Text('Cancel',
+                                style: TextStyle(fontWeight: FontWeight.w600)),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 2,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              setState(() {
+                                _filters.ageMinMonths     = working.ageMinMonths;
+                                _filters.ageMaxMonths     = working.ageMaxMonths;
+                                _filters.sex              = working.sex;
+                                _filters.malnutritionType = working.malnutritionType;
+                                _filters.screenedPeriod   = working.screenedPeriod;
+                              });
+                              Navigator.pop(ctx);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF2E8B7B),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              elevation: 0,
+                            ),
+                            child: const Text('Apply Filters',
+                                style: TextStyle(fontWeight: FontWeight.w700)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _filterSectionLabel(String label, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, size: 15, color: const Color(0xFF2E8B7B)),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF333333),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Color _statusChipColor(String type) {
+    switch (type.toLowerCase()) {
+      case 'underweight':   return const Color(0xFFE53935);
+      case 'stunted':       return const Color(0xFFFF7043);
+      case 'overweight/obese': return const Color(0xFFFFA000);
+      case 'at risk':       return const Color(0xFFFF8F00);
+      case 'normal':        return const Color(0xFF43A047);
+      default:              return const Color(0xFF2E8B7B);
+    }
+  }
+
+  // ── ACTIVE FILTER SUMMARY CHIPS ────────────────────────────────────────────
+  Widget _buildActiveFilterChips() {
+    final chips = <Widget>[];
+
+    if (_filters.ageMinMonths != null || _filters.ageMaxMonths != null) {
+      final label = _agePresets.firstWhere(
+        (p) =>
+            p.minMonths == _filters.ageMinMonths &&
+            p.maxMonths == _filters.ageMaxMonths,
+        orElse: () => _AgePreset(
+          '${_filters.ageMinMonths}–${_filters.ageMaxMonths} mo',
+          _filters.ageMinMonths ?? 0,
+          _filters.ageMaxMonths ?? 59,
+        ),
+      ).label;
+      chips.add(_activeChip(label, () => setState(() {
+        _filters.ageMinMonths = null;
+        _filters.ageMaxMonths = null;
+      })));
+    }
+
+    if (_filters.sex != null) {
+      chips.add(_activeChip(_filters.sex!, () => setState(() {
+        _filters.sex = null;
+      })));
+    }
+
+    if (_filters.malnutritionType != null) {
+      chips.add(_activeChip(_filters.malnutritionType!, () => setState(() {
+        _filters.malnutritionType = null;
+      })));
+    }
+
+    if (_filters.screenedPeriod != null) {
+      final label = _periodOptions
+          .firstWhere((p) => p.value == _filters.screenedPeriod)
+          .label;
+      chips.add(_activeChip(label, () => setState(() {
+        _filters.screenedPeriod = null;
+      })));
+    }
+
+    if (chips.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(children: chips),
+      ),
+    );
+  }
+
+  Widget _activeChip(String label, VoidCallback onRemove) {
+    return Container(
+      margin: const EdgeInsets.only(right: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color(0xFF2E8B7B),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(width: 4),
+          GestureDetector(
+            onTap: onRemove,
+            child: const Icon(Icons.close_rounded,
+                size: 13, color: Colors.white),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -1072,7 +1512,9 @@ class _PatientListTabState extends State<PatientListTab> {
       child: Column(
         children: [
           _buildSearchBar(),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
+          _buildActiveFilterChips(),          // ← active filter pills
+          const SizedBox(height: 4),
           _buildTopRow(),
           if (_selectionMode) ...[
             const SizedBox(height: 8),
@@ -1107,42 +1549,96 @@ class _PatientListTabState extends State<PatientListTab> {
 
   // ── SEARCH BAR ─────────────────────────────────────────────────────────────
   Widget _buildSearchBar() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.95),
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.95),
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: TextField(
+              controller: _searchController,
+              onChanged: (v) => setState(() => _searchQuery = v),
+              style: const TextStyle(fontSize: 14, color: Colors.black87),
+              decoration: InputDecoration(
+                hintText: 'Search by name or status…',
+                hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+                prefixIcon: Icon(Icons.search_rounded,
+                    color: Colors.grey.shade400, size: 20),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: Icon(Icons.close_rounded,
+                            color: Colors.grey.shade400, size: 18),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _searchQuery = '');
+                        },
+                      )
+                    : null,
+                border: InputBorder.none,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              ),
+            ),
           ),
-        ],
-      ),
-      child: TextField(
-        controller: _searchController,
-        onChanged: (v) => setState(() => _searchQuery = v),
-        style: const TextStyle(fontSize: 14, color: Colors.black87),
-        decoration: InputDecoration(
-          hintText: 'Search by name or status…',
-          hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
-          prefixIcon: Icon(Icons.search_rounded,
-              color: Colors.grey.shade400, size: 20),
-          suffixIcon: _searchQuery.isNotEmpty
-              ? IconButton(
-                  icon: Icon(Icons.close_rounded,
-                      color: Colors.grey.shade400, size: 18),
-                  onPressed: () {
-                    _searchController.clear();
-                    setState(() => _searchQuery = '');
-                  },
-                )
-              : null,
-          border: InputBorder.none,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         ),
-      ),
+        const SizedBox(width: 8),
+
+        // ── Filter button ─────────────────────────────────────────────────
+        GestureDetector(
+          onTap: _showFilterSheet,
+          child: Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: _filters.hasActiveFilters
+                  ? const Color(0xFF2E8B7B)
+                  : Colors.white.withOpacity(0.95),
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Icon(
+                  Icons.tune_rounded,
+                  size: 20,
+                  color: _filters.hasActiveFilters
+                      ? Colors.white
+                      : const Color(0xFF2E8B7B),
+                ),
+                if (_filters.hasActiveFilters)
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Colors.amber,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -1271,7 +1767,7 @@ class _PatientListTabState extends State<PatientListTab> {
                   color: Colors.white, size: 14),
               const SizedBox(width: 6),
               Text(
-                '${_filteredPatients.length} Patients',
+                '${_filteredPatients.length} Patient${_filteredPatients.length == 1 ? '' : 's'}',
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 13,
@@ -1383,21 +1879,49 @@ class _PatientListTabState extends State<PatientListTab> {
 
   // ── PATIENT LIST ───────────────────────────────────────────────────────────
   Widget _buildPatientList() {
+    final patients = _filteredPatients;
+    if (patients.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.filter_list_off_rounded,
+                  size: 36, color: Colors.white.withOpacity(0.5)),
+              const SizedBox(height: 12),
+              Text(
+                'No patients match the selected filters.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.7),
+                  fontSize: 13,
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextButton(
+                onPressed: () => setState(() => _filters.reset()),
+                child: const Text('Clear Filters',
+                    style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     return ListView.builder(
       padding: const EdgeInsets.symmetric(vertical: 6),
-      itemCount: _filteredPatients.length,
+      itemCount: patients.length,
       itemBuilder: (context, index) =>
-          _buildPatientRow(_filteredPatients[index], index),
+          _buildPatientRow(patients[index], index),
     );
   }
 
-  // ── PATIENT ROW (with swipe-to-delete) ────────────────────────────────────
+  // ── PATIENT ROW ────────────────────────────────────────────────────────────
   Widget _buildPatientRow(Patient patient, int index) {
     final isSelected = _selectedDocIds.contains(patient.docId);
     final statusColor = getStatusColor(patient.assessmentRemarks);
 
-    // Wrap in Dismissible only when NOT in selection mode, so swipe
-    // doesn't fight with the multi-select long-press gesture.
     final rowContent = Container(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
@@ -1434,7 +1958,6 @@ class _PatientListTabState extends State<PatientListTab> {
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
             child: Row(
               children: [
-                // Checkbox / avatar
                 if (_selectionMode)
                   SizedBox(
                     width: 20,
@@ -1569,13 +2092,11 @@ class _PatientListTabState extends State<PatientListTab> {
       ),
     );
 
-    // In selection mode skip Dismissible to avoid gesture conflicts.
     if (_selectionMode) return rowContent;
 
     return Dismissible(
       key: ValueKey(patient.docId),
       direction: DismissDirection.endToStart,
-      // Show red delete background while swiping
       background: Container(
         margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: BoxDecoration(
@@ -1600,10 +2121,8 @@ class _PatientListTabState extends State<PatientListTab> {
           ],
         ),
       ),
-      // Intercept the dismiss and show confirmation instead of auto-removing
       confirmDismiss: (_) async {
         await _confirmAndSoftDeleteSingle(patient);
-        // Always return false — we handle list refresh ourselves inside the method.
         return false;
       },
       child: rowContent,
@@ -1750,7 +2269,6 @@ class _PatientListTabState extends State<PatientListTab> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Header strip
             Container(
               padding: const EdgeInsets.all(20),
               decoration: const BoxDecoration(
@@ -1825,21 +2343,14 @@ class _PatientListTabState extends State<PatientListTab> {
               ),
             ),
 
-            // Details
             Padding(
               padding: const EdgeInsets.all(20),
               child: Column(
                 children: [
-                  _detailRow(
-                    Icons.cake_outlined,
-                    'Age',
-                    '${patient.age} months old',
-                  ),
-                  _detailRow(
-                    Icons.calendar_today_outlined,
-                    'Last Visit',
-                    '${patient.lastVisit.month}/${patient.lastVisit.day}/${patient.lastVisit.year}',
-                  ),
+                  _detailRow(Icons.cake_outlined, 'Age',
+                      '${patient.age} months old'),
+                  _detailRow(Icons.calendar_today_outlined, 'Last Visit',
+                      '${patient.lastVisit.month}/${patient.lastVisit.day}/${patient.lastVisit.year}'),
                   if (patient.visitDate.isNotEmpty)
                     _detailRow(Icons.event_outlined, 'Visit Date',
                         patient.visitDate),
@@ -1853,11 +2364,8 @@ class _PatientListTabState extends State<PatientListTab> {
                         ? '—'
                         : patient.guardianContact,
                   ),
-                  _detailRow(
-                    Icons.person_outline_rounded,
-                    'Added by',
-                    patient.createdBy,
-                  ),
+                  _detailRow(Icons.person_outline_rounded, 'Added by',
+                      patient.createdBy),
                   if (patient.nextFollowUpDate != null)
                     _detailRow(
                       Icons.event_available_outlined,
@@ -1865,21 +2373,16 @@ class _PatientListTabState extends State<PatientListTab> {
                       '${patient.nextFollowUpDate!.month}/${patient.nextFollowUpDate!.day}/${patient.nextFollowUpDate!.year}',
                     ),
                   if (patient.followUpNotes.isNotEmpty)
-                    _detailRow(
-                      Icons.notes_outlined,
-                      'Notes',
-                      patient.followUpNotes,
-                    ),
+                    _detailRow(Icons.notes_outlined, 'Notes',
+                        patient.followUpNotes),
                 ],
               ),
             ),
 
-            // Actions — 2 rows: [Follow-up | View Profile] then [Delete | Close]
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
               child: Column(
                 children: [
-                  // Primary actions
                   Row(
                     children: [
                       Expanded(
@@ -1893,10 +2396,8 @@ class _PatientListTabState extends State<PatientListTab> {
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             elevation: 0,
                           ),
-                          child: const Text(
-                            'Follow-up',
-                            style: TextStyle(fontWeight: FontWeight.w700),
-                          ),
+                          child: const Text('Follow-up',
+                              style: TextStyle(fontWeight: FontWeight.w700)),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -1924,59 +2425,47 @@ class _PatientListTabState extends State<PatientListTab> {
                             elevation: 0,
                           ),
                           child: const Text('View Profile',
-                              style:
-                                  TextStyle(fontWeight: FontWeight.w700)),
+                              style: TextStyle(fontWeight: FontWeight.w700)),
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 10),
-                  // Secondary actions
                   Row(
                     children: [
-                      // Delete button
                       Expanded(
                         child: OutlinedButton.icon(
                           onPressed: () async {
-                            // Close the detail dialog first, then show
-                            // the delete confirmation on the list screen.
                             Navigator.pop(context);
                             await _confirmAndSoftDeleteSingle(patient);
                           },
-                          icon: const Icon(
-                              Icons.delete_outline_rounded,
+                          icon: const Icon(Icons.delete_outline_rounded,
                               size: 16),
                           label: const Text('Delete',
-                              style:
-                                  TextStyle(fontWeight: FontWeight.w600)),
+                              style: TextStyle(fontWeight: FontWeight.w600)),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: Colors.redAccent,
                             side: const BorderSide(
                                 color: Colors.redAccent, width: 1),
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12)),
-                            padding:
-                                const EdgeInsets.symmetric(vertical: 12),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
                           ),
                         ),
                       ),
                       const SizedBox(width: 12),
-                      // Close button
                       Expanded(
                         child: OutlinedButton(
                           onPressed: () => Navigator.pop(context),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: const Color(0xFF2E8B7B),
-                            side: const BorderSide(
-                                color: Color(0xFF2E8B7B)),
+                            side: const BorderSide(color: Color(0xFF2E8B7B)),
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12)),
-                            padding:
-                                const EdgeInsets.symmetric(vertical: 12),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
                           ),
                           child: const Text('Close',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.w600)),
+                              style: TextStyle(fontWeight: FontWeight.w600)),
                         ),
                       ),
                     ],
@@ -2072,8 +2561,7 @@ class _PatientListTabState extends State<PatientListTab> {
                     controller: notesController,
                     maxLines: 3,
                     decoration: const InputDecoration(
-                      labelText:
-                          'Notes for health worker (optional)',
+                      labelText: 'Notes for health worker (optional)',
                       border: OutlineInputBorder(),
                     ),
                   ),
@@ -2127,7 +2615,6 @@ class _PatientListTabState extends State<PatientListTab> {
       }
 
       DocumentReference targetRef;
-
       if (patient.barangayId.isNotEmpty) {
         targetRef = firestore
             .collection('barangays')
@@ -2178,6 +2665,76 @@ class _PatientListTabState extends State<PatientListTab> {
       }
     }
   }
+}
+
+// ==================== HELPER WIDGETS & MODELS ====================
+
+/// A single selectable chip used inside the filter sheet.
+class _FilterChipWidget extends StatelessWidget {
+  final String label;
+  final IconData? icon;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final Color? selectedColor;
+
+  const _FilterChipWidget({
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+    this.icon,
+    this.selectedColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final activeColor = selectedColor ?? const Color(0xFF2E8B7B);
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? activeColor : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? activeColor : Colors.grey.shade300,
+            width: 1.2,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 13,
+                  color: isSelected ? Colors.white : Colors.grey.shade600),
+              const SizedBox(width: 5),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: isSelected ? Colors.white : Colors.grey.shade700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AgePreset {
+  final String label;
+  final int minMonths;
+  final int maxMonths;
+  const _AgePreset(this.label, this.minMonths, this.maxMonths);
+}
+
+class _PeriodOption {
+  final String label;
+  final String value;
+  const _PeriodOption(this.label, this.value);
 }
 
 /// Standalone screen that shows only malnourished / underweight patients.
