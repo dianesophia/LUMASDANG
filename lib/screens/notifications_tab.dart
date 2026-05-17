@@ -4,7 +4,6 @@ import '../services/firestore_service.dart';
 import '../services/local_db_service.dart';
 import '../services/connectivity_service.dart';
 import '../screens/calendar_events_page.dart';
-import '../screens/patient_list.dart';
 import 'package:flutter/foundation.dart';
 
 class NotificationsTab extends StatefulWidget {

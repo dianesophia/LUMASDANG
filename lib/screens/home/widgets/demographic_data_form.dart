@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:lumasdang/services/car_address_validator.dart';
+
 
 class DemographicDataForm extends StatefulWidget {
   final TextEditingController firstNameController;
@@ -44,6 +46,7 @@ class DemographicDataForm extends StatefulWidget {
   final TextEditingController fatherPhilHealthNumberController;
   final TextEditingController fatherPhilHealthMemberTypeController;
   final TextEditingController extensionNameController;
+  final TextEditingController streetController;
 
   final bool? belongsToIpGroup;
   final String? ipEthnicity;
@@ -53,6 +56,7 @@ class DemographicDataForm extends StatefulWidget {
   final ValueChanged<String?>? onIpEthnicityChanged;
   final ValueChanged<bool?>? onIsFourPsMemberChanged;
   final ValueChanged<bool?>? onHasDisabilityChanged;
+  
 
   final bool isDraft;
 
@@ -94,6 +98,7 @@ class DemographicDataForm extends StatefulWidget {
     required this.fatherPhilHealthNumberController,
     required this.fatherPhilHealthMemberTypeController,
     required this.extensionNameController,
+    required this.streetController,
     this.belongsToIpGroup,
     this.ipEthnicity,
     this.isFourPsMember,
@@ -107,6 +112,7 @@ class DemographicDataForm extends StatefulWidget {
 
   @override
   State<DemographicDataForm> createState() => _DemographicDataFormState();
+  
 }
 
 class _DemographicDataFormState extends State<DemographicDataForm> {
@@ -192,132 +198,140 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
     'No',
   ];
 
-   final Map<String, List<String>> carLocations = {
-    "Abra": [
-      "Bangued",
-      "Boliney",
-      "Bucay",
-      "Bucloc",
-      "Daguioman",
-      "Danglas",
-      "Dolores",
-      "La Paz",
-      "Lacub",
-      "Lagangilang",
-      "Lagayan",
-      "Langiden",
-      "Licuan-Baay",
-      "Luba",
-      "Malibcong",
-      "Manabo",
-      "Peñarrubia",
-      "Pidigan",
-      "Pilar",
-      "Sallapadan",
-      "San Isidro",
-      "San Juan",
-      "San Quintin",
-      "Tayum",
-      "Tineg",
-      "Tubo",
-      "Villaviciosa",
-    ],
-    "Apayao": [
-      "Calanasan",
-      "Conner",
-      "Flora",
-      "Kabugao",
-      "Luna",
-      "Pudtol",
-      "Santa Marcela",
-    ],
-    "Benguet": [
-      "Atok",
-      "Bakun",
-      "Bokod",
-      "Buguias",
-      "Itogon",
-      "Kabayan",
-      "Kapangan",
-      "Kibungan",
-      "La Trinidad",
-      "Mankayan",
-      "Sablan",
-      "Tuba",
-      "Tublay",
-    ],
-    "Ifugao": [
-      "Aguinaldo",
-      "Alfonso Lista",
-      "Asipulo",
-      "Banaue",
-      "Hingyon",
-      "Hungduan",
-      "Kiangan",
-      "Lagawe",
-      "Lamut",
-      "Mayoyao",
-      "Tinoc",
-    ],
-    "Kalinga": [
-      "Balbalan",
-      "Lubuagan",
-      "Pasil",
-      "Pinukpuk",
-      "Rizal",
-      "Tanudan",
-      "Tinglayan",
-      "Tabuk City",
-    ],
-    "Mountain Province": [
-      "Barlig",
-      "Bauko",
-      "Besao",
-      "Bontoc",
-      "Natonin",
-      "Paracelis",
-      "Sabangan",
-      "Sadanga",
-      "Sagada",
-      "Tadian",
-    ],
-  };
+  Map<String, List<String>> get carLocations =>
+    CARAddressValidator.municipalitiesByProvince;
+
+List<String> _barangaysFor(String? municipality) {
+  if (municipality == null || municipality.isEmpty) return [];
+  return CARAddressValidator.getBarangaysForMunicipality(municipality);
+}
+
+  //  final Map<String, List<String>> carLocations = {
+  //   "Abra": [
+  //     "Bangued",
+  //     "Boliney",
+  //     "Bucay",
+  //     "Bucloc",
+  //     "Daguioman",
+  //     "Danglas",
+  //     "Dolores",
+  //     "La Paz",
+  //     "Lacub",
+  //     "Lagangilang",
+  //     "Lagayan",
+  //     "Langiden",
+  //     "Licuan-Baay",
+  //     "Luba",
+  //     "Malibcong",
+  //     "Manabo",
+  //     "Peñarrubia",
+  //     "Pidigan",
+  //     "Pilar",
+  //     "Sallapadan",
+  //     "San Isidro",
+  //     "San Juan",
+  //     "San Quintin",
+  //     "Tayum",
+  //     "Tineg",
+  //     "Tubo",
+  //     "Villaviciosa",
+  //   ],
+  //   "Apayao": [
+  //     "Calanasan",
+  //     "Conner",
+  //     "Flora",
+  //     "Kabugao",
+  //     "Luna",
+  //     "Pudtol",
+  //     "Santa Marcela",
+  //   ],
+  //   "Benguet": [
+  //     "Atok",
+  //     "Bakun",
+  //     "Bokod",
+  //     "Buguias",
+  //     "Itogon",
+  //     "Kabayan",
+  //     "Kapangan",
+  //     "Kibungan",
+  //     "La Trinidad",
+  //     "Mankayan",
+  //     "Sablan",
+  //     "Tuba",
+  //     "Tublay",
+  //   ],
+  //   "Ifugao": [
+  //     "Aguinaldo",
+  //     "Alfonso Lista",
+  //     "Asipulo",
+  //     "Banaue",
+  //     "Hingyon",
+  //     "Hungduan",
+  //     "Kiangan",
+  //     "Lagawe",
+  //     "Lamut",
+  //     "Mayoyao",
+  //     "Tinoc",
+  //   ],
+  //   "Kalinga": [
+  //     "Balbalan",
+  //     "Lubuagan",
+  //     "Pasil",
+  //     "Pinukpuk",
+  //     "Rizal",
+  //     "Tanudan",
+  //     "Tinglayan",
+  //     "Tabuk City",
+  //   ],
+  //   "Mountain Province": [
+  //     "Barlig",
+  //     "Bauko",
+  //     "Besao",
+  //     "Bontoc",
+  //     "Natonin",
+  //     "Paracelis",
+  //     "Sabangan",
+  //     "Sadanga",
+  //     "Sagada",
+  //     "Tadian",
+  //   ],
+  // };
 
   /// Sample barangays
-  final List<String> barangays = [
-    "Barangay 1",
-    "Barangay 2",
-    "Barangay 3",
-    "Poblacion",
-    "San Jose",
-  ];
+  // final List<String> barangays = [
+  //   "Barangay 1",
+  //   "Barangay 2",
+  //   "Barangay 3",
+  //   "Poblacion",
+  //   "San Jose",
+  // ];
 
-  final Map<String, List<String>> barangayData = {
-  "La Trinidad": [
-    "Alapang",
-    "Alno",
-    "Ambiong",
-    "Bahong",
-    "Balili",
-    "Beckel",
-    "Betag",
-    "Bineng",
-    "Cruz",
-    "Lubas",
-    "Pico",
-    "Poblacion",
-    "Puguis",
-    "Shilan",
-    "Tawang",
-    "Wangal",
-  ],
+//   final Map<String, List<String>> barangayData = {
+//   "La Trinidad": [
+//     "Alapang",
+//     "Alno",
+//     "Ambiong",
+//     "Bahong",
+//     "Balili",
+//     "Beckel",
+//     "Betag",
+//     "Bineng",
+//     "Cruz",
+//     "Lubas",
+//     "Pico",
+//     "Poblacion",
+//     "Puguis",
+//     "Shilan",
+//     "Tawang",
+//     "Wangal",
+//   ],
 
-  "Baguio": [
-    "Session Road",
-    "Irisan",
-    "Burnham",
-  ],
-};
+//   "Baguio": [
+//     "Session Road",
+//     "Irisan",
+//     "Burnham",
+//   ],
+// };
 
   @override
   void initState() {
@@ -405,37 +419,15 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
       _residenceStatus = res;
     }
 
-    _parseAddressIntoDropdowns(
-      widget.addressController.text.trim(),
-      isBirth: false,
-    );
-    _parseAddressIntoDropdowns(
-      widget.placeOfBirthController.text.trim(),
-      isBirth: true,
-    );
-
-    _isMotherAvailable = _selectedMotherStatus == 'Present';
+    // _parseAddressIntoDropdowns(
+    //   widget.addressController.text.trim(),
+    //   isBirth: false,
+    // );
+    // _parseAddressIntoDropdowns(
+    //   widget.placeOfBirthController.text.trim(),
+    //   isBirth: true,
+    // );
     _isFatherAvailable = _selectedFatherStatus == 'Present';
-  }
-
-  void _parseAddressIntoDropdowns(String addr, {required bool isBirth}) {
-    if (addr.isEmpty) return;
-    final parts = addr
-        .split(',')
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .toList();
-    if (parts.length >= 3) {
-      if (isBirth) {
-        birthBarangay = parts[0];
-        birthMunicipality = parts[1];
-        birthProvince = parts[2];
-      } else {
-        selectedBarangay = parts[0];
-        selectedMunicipality = parts[1];
-        selectedProvince = parts[2];
-      }
-    }
   }
 
   @override
@@ -475,29 +467,53 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
     return null;
   }
 
-  String _formatAddress(String? province, String? municipality, String? barangay) {
-    final parts = <String>[];
-    if (barangay != null && barangay.isNotEmpty) parts.add(barangay);
-    if (municipality != null && municipality.isNotEmpty) parts.add(municipality);
-    if (province != null && province.isNotEmpty) parts.add(province);
-    return parts.join(', ');
-  }
+  // String _formatAddress(String? province, String? municipality, String? barangay) {
+  //   final parts = <String>[];
+  //   if (barangay != null && barangay.isNotEmpty) parts.add(barangay);
+  //   if (municipality != null && municipality.isNotEmpty) parts.add(municipality);
+  //   if (province != null && province.isNotEmpty) parts.add(province);
+  //   return parts.join(', ');
+  // }
 
-  void _updateAddressController() {
-    widget.addressController.text = _formatAddress(
-      selectedProvince,
-      selectedMunicipality,
-      selectedBarangay,
-    );
-  }
+  // void _updateAddressController() {
+  //   widget.addressController.text = _formatAddress(
+  //     selectedProvince,
+  //     selectedMunicipality,
+  //     selectedBarangay,
+  //   );
+  // }
 
-  void _updatePlaceOfBirthController() {
-    widget.placeOfBirthController.text = _formatAddress(
-      birthProvince,
-      birthMunicipality,
-      birthBarangay,
-    );
-  }
+  // void _updatePlaceOfBirthController() {
+  //   widget.placeOfBirthController.text = _formatAddress(
+  //     birthProvince,
+  //     birthMunicipality,
+  //     birthBarangay,
+  //   );
+  // }
+
+
+String _formatAddress(
+  String? street,
+  String? barangay,
+  String? municipality,
+  String? province,
+) {
+  final parts = <String>[];
+  if (street != null && street.isNotEmpty) parts.add(street);
+  if (barangay != null && barangay.isNotEmpty) parts.add(barangay);
+  if (municipality != null && municipality.isNotEmpty) parts.add(municipality);
+  if (province != null && province.isNotEmpty) parts.add(province);
+  return parts.join(', ');
+}
+
+void _updateAddressController() {
+  widget.addressController.text = _formatAddress(
+    widget.streetController.text.trim(),
+    selectedBarangay,
+    selectedMunicipality,
+    selectedProvince,   
+  );
+}
 
   // ── Date picker ────────────────────────────────────────────────────────────
   Future<void> _pickDate(BuildContext context) async {
@@ -1362,7 +1378,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
         ),
 
         const SizedBox(height: 12),
-
+/*
         _buildDropdown(
           label: "Province",
           value: selectedProvince,
@@ -1382,49 +1398,121 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
             });
           },
         ),
+*/
 
-        const SizedBox(height: 12),
+        /// 
 
-        _buildDropdown(
-          label: "Municipality / City",
-          value: selectedMunicipality,
-          items: selectedProvince == null
-              ? []
-              : carLocations[selectedProvince]!,
-          onChanged: (value) {
-            setState(() {
-              selectedMunicipality = value;
-              selectedBarangay = null;
-              _updateAddressController();
-              if (sameAsAddress) {
-                birthProvince = selectedProvince;
-                birthMunicipality = selectedMunicipality;
-                birthBarangay = selectedBarangay;
-                _updatePlaceOfBirthController();
-              }
-            });
-          },
-        ),
+const SizedBox(height: 12),
 
-        const SizedBox(height: 12),
+_buildField(
+  label: "HOUSE NO. / STREET",
+  controller: widget.streetController,
+  icon: Icons.signpost_outlined,
+  hint: 'e.g. 123 Rizal St.',
+),
 
-        _buildDropdown(
-          label: "Barangay",
-          value: selectedBarangay,
-          items: barangays,
-          onChanged: (value) {
-            setState(() {
-              selectedBarangay = value;
-              _updateAddressController();
-              if (sameAsAddress) {
-                birthProvince = selectedProvince;
-                birthMunicipality = selectedMunicipality;
-                birthBarangay = selectedBarangay;
-                _updatePlaceOfBirthController();
-              }
-            });
-          },
-        ),
+const SizedBox(height: 12),
+
+_buildDropdown(
+  label: "PROVINCE",
+  value: selectedProvince,
+  items: carLocations.keys.toList(),
+  onChanged: (value) {
+    setState(() {
+      selectedProvince = value;
+      selectedMunicipality = null;
+      selectedBarangay = null;
+      _updateAddressController();
+      if (sameAsAddress) {
+        birthProvince = selectedProvince;
+        birthMunicipality = null;
+        birthBarangay = null;
+        //_updatePlaceOfBirthController();
+      }
+    });
+  },
+),
+
+const SizedBox(height: 12),
+
+_buildDropdown(
+  label: "MUNICIPALITY / CITY",
+  value: selectedMunicipality,
+  items: selectedProvince == null ? [] : carLocations[selectedProvince]!,
+  onChanged: (value) {
+    setState(() {
+      selectedMunicipality = value;
+      selectedBarangay = null;
+      _updateAddressController();
+      if (sameAsAddress) {
+        birthMunicipality = selectedMunicipality;
+        birthBarangay = null;
+        //_updatePlaceOfBirthController();
+      }
+    });
+  },
+),
+
+const SizedBox(height: 12),
+
+_buildDropdown(
+  label: "BARANGAY",
+  value: selectedBarangay,
+  items: _barangaysFor(selectedMunicipality),
+  onChanged: (value) {
+    setState(() {
+      selectedBarangay = value;
+      _updateAddressController();
+      if (sameAsAddress) {
+        birthBarangay = selectedBarangay;
+        //_updatePlaceOfBirthController();
+      }
+    });
+  },
+),
+
+        // const SizedBox(height: 12),
+
+        // _buildDropdown(
+        //   label: "Municipality / City",
+        //   value: selectedMunicipality,
+        //   items: selectedProvince == null
+        //       ? []
+        //       : carLocations[selectedProvince]!,
+        //   onChanged: (value) {
+        //     setState(() {
+        //       selectedMunicipality = value;
+        //       selectedBarangay = null;
+        //       _updateAddressController();
+        //       if (sameAsAddress) {
+        //         birthProvince = selectedProvince;
+        //         birthMunicipality = selectedMunicipality;
+        //         birthBarangay = selectedBarangay;
+        //         _updatePlaceOfBirthController();
+        //       }
+        //     });
+        //   },
+        // ),
+
+        // const SizedBox(height: 12),
+
+        // _buildDropdown(
+        //   label: "Barangay",
+        //   value: selectedBarangay,
+        //   items: barangays,
+        //   onChanged: (value) {
+        //     setState(() {
+        //       selectedBarangay = value;
+        //       _updateAddressController();
+        //       if (sameAsAddress) {
+        //         birthProvince = selectedProvince;
+        //         birthMunicipality = selectedMunicipality;
+        //         birthBarangay = selectedBarangay;
+        //         _updatePlaceOfBirthController();
+        //       }
+        //     });
+        //   },
+        // ),
 
         const SizedBox(height: 20),
 
@@ -1441,7 +1529,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                 birthProvince = selectedProvince;
                 birthMunicipality = selectedMunicipality;
                 birthBarangay = selectedBarangay;
-                _updatePlaceOfBirthController();
+                //_updatePlaceOfBirthController();
               }
             });
           },
@@ -1450,67 +1538,122 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
         const SizedBox(height: 20),
 
         /// PLACE OF BIRTH
-        const Text(
-          "PLACE OF BIRTH",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        // const Text(
+        //   "PLACE OF BIRTH",
+        //   style: TextStyle(
+        //     fontWeight: FontWeight.bold,
+        //   ),
+        // ),
 
-        const SizedBox(height: 12),
+        // const SizedBox(height: 12),
 
-        _buildDropdown(
-          label: "Province",
-          value: birthProvince,
-          items: carLocations.keys.toList(),
-          onChanged: sameAsAddress
-              ? null
-              : (value) {
-                  setState(() {
-                    birthProvince = value;
-                    birthMunicipality = null;
-                    birthBarangay = null;
-                    _updatePlaceOfBirthController();
-                  });
-                },
-        ),
+        // _buildDropdown(
+        //   label: "Province",
+        //   value: birthProvince,
+        //   items: carLocations.keys.toList(),
+        //   onChanged: sameAsAddress
+        //       ? null
+        //       : (value) {
+        //           setState(() {
+        //             birthProvince = value;
+        //             birthMunicipality = null;
+        //             birthBarangay = null;
+        //             _updatePlaceOfBirthController();
+        //           });
+        //         },
+        // ),
 
-        const SizedBox(height: 12),
+        // const SizedBox(height: 12),
 
-        _buildDropdown(
-          label: "Municipality / City",
-          value: birthMunicipality,
-          items: birthProvince == null
-              ? []
-              : carLocations[birthProvince]!,
-          onChanged: sameAsAddress
-              ? null
-              : (value) {
-                  setState(() {
-                    birthMunicipality = value;
-                    birthBarangay = null;
-                    _updatePlaceOfBirthController();
-                  });
-                },
-        ),
+        // _buildDropdown(
+        //   label: "Municipality / City",
+        //   value: birthMunicipality,
+        //   items: birthProvince == null
+        //       ? []
+        //       : carLocations[birthProvince]!,
+        //   onChanged: sameAsAddress
+        //       ? null
+        //       : (value) {
+        //           setState(() {
+        //             birthMunicipality = value;
+        //             birthBarangay = null;
+        //             _updatePlaceOfBirthController();
+        //           });
+        //         },
+        // ),
 
-        const SizedBox(height: 12),
+        // const SizedBox(height: 12),
 
-        _buildDropdown(
-          label: "Barangay",
-          value: birthBarangay,
-          items: barangays,
-          onChanged: sameAsAddress
-              ? null
-              : (value) {
-                  setState(() {
-                    birthBarangay = value;
-                    _updatePlaceOfBirthController();
-                  });
-                },
-        ),
+        // _buildDropdown(
+        //   label: "Barangay",
+        //   value: birthBarangay,
+        //   items: barangays,
+        //   onChanged: sameAsAddress
+        //       ? null
+        //       : (value) {
+        //           setState(() {
+        //             birthBarangay = value;
+        //             _updatePlaceOfBirthController();
+        //           });
+        //         },
+        // ),
    
-  
+  /// PLACE OF BIRTH
+const Text(
+  "PLACE OF BIRTH",
+  style: TextStyle(fontWeight: FontWeight.bold),
+),
+
+const SizedBox(height: 12),
+
+_buildDropdown(
+  label: "PROVINCE",
+  value: birthProvince,
+  items: carLocations.keys.toList(),
+  onChanged: sameAsAddress
+      ? null
+      : (value) {
+          setState(() {
+            birthProvince = value;
+            birthMunicipality = null;
+            birthBarangay = null;
+           // _updatePlaceOfBirthController();
+          });
+        },
+),
+
+const SizedBox(height: 12),
+
+_buildDropdown(
+  label: "MUNICIPALITY / CITY",
+  value: birthMunicipality,
+  items: birthProvince == null ? [] : carLocations[birthProvince]!,
+  onChanged: sameAsAddress
+      ? null
+      : (value) {
+          setState(() {
+            birthMunicipality = value;
+            birthBarangay = null;
+            //_updatePlaceOfBirthController();
+          });
+        },
+),
+
+const SizedBox(height: 12),
+
+_buildDropdown(
+  label: "BARANGAY",
+  value: birthBarangay,
+  items: _barangaysFor(birthMunicipality),
+  onChanged: sameAsAddress
+      ? null
+      : (value) {
+          setState(() {
+            birthBarangay = value;
+           // _updatePlaceOfBirthController();
+          });
+        },
+),
 
               _buildLabelRow('STATUS OF RESIDENCE'),
               Row(

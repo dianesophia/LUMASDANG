@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:lumasdang/screens/calendar_events_page.dart';
-import 'package:lumasdang/services/connectivity_service.dart';
 
 class UpcomingEvents extends StatefulWidget {
   const UpcomingEvents({super.key});

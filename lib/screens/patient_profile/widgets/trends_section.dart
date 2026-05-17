@@ -14,7 +14,6 @@ class TrendsSection extends StatelessWidget {
   static const Color _orange      = Color(0xFFF08030);
   static const Color _orangeLight = Color(0xFFF5A962);
   static const Color _surface     = Color(0xFFFFFFFF);
-  static const Color _surfaceDim  = Color(0xFFFAFAFA);
   static const Color _border      = Color(0xFFE8E8ED);
   static const Color _ink         = Color(0xFF1C1C1E);
   static const Color _inkMid      = Color(0xFF6C6C70);
@@ -25,7 +24,6 @@ class TrendsSection extends StatelessWidget {
   static const Color _colorMuac   = Color(0xFFF5A962);
 
   static const double _r  = 18;
-  static const double _ri = 12;
 
   static List<BoxShadow> get _shadow => [
         BoxShadow(color: Colors.black.withOpacity(0.07), blurRadius: 20, offset: const Offset(0, 6)),

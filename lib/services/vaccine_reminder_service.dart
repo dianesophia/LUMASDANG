@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 /// Handles saving vaccination next-dose reminders to Firestore and
@@ -36,7 +35,7 @@ class VaccineReminderService {
     final batch = _db.batch();
 
     for (final entry in vaccinationData.entries) {
-      final vaccine   = entry.key as String;
+      final vaccine   = entry.key;
       final doseMap   = entry.value as Map<String, dynamic>?;
       if (doseMap == null) continue;
 

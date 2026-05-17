@@ -40,6 +40,7 @@ class DemographicFormControllers {
   final motherPhilHealthMemberTypeController = TextEditingController();
   final fatherPhilHealthNumberController = TextEditingController();
   final fatherPhilHealthMemberTypeController = TextEditingController();
+  final TextEditingController streetController = TextEditingController();
 
   bool? belongsToIpGroup;
   String? ipEthnicity;
@@ -83,6 +84,7 @@ class DemographicFormControllers {
     motherPhilHealthMemberTypeController.dispose();
     fatherPhilHealthNumberController.dispose();
     fatherPhilHealthMemberTypeController.dispose();
+    streetController.dispose();
   }
 }
 
@@ -187,7 +189,10 @@ class DemographicFormBinder {
       c.hasDisability =
           disability.toLowerCase() == 'yes' || disability.toLowerCase() == 'true';
     }
+
+    
   }
+  
 
   static Map<String, dynamic> buildDemographicMap(DemographicFormControllers c) {
     return {
@@ -233,6 +238,7 @@ class DemographicFormBinder {
       'caregiverReligion': c.caregiverReligionController.text.trim(),
       'isFourPsMember': c.isFourPsMember,
       'fourPsHouseholdId': c.fourPsHouseholdIdController.text.trim(),
+     // 'street': controllers.streetController.text.trim(),
     };
   }
 

@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'vaccine_dose_selector.dart';
 
 // ── Column definition ─────────────────────────────────────────────────────────
 class _AgeCol {
@@ -83,24 +80,6 @@ const Map<String, List<String>> kVaccineDoseLabels = {
   'Meningococcal': ['See annotations'],
   'Cholera':       ['See annotations'],
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Computes the dose label to store in Firestore for a given vaccine.
-// We look at all columns that have a recorded dose, count how many are ticked,
-// and return the corresponding label from kVaccineDoseLabels.
-// ─────────────────────────────────────────────────────────────────────────────
-String _computeDoseLabel(String vaccineName, Map<String, String?> doses) {
-  final labels = kVaccineDoseLabels[vaccineName] ?? [];
-  if (labels.isEmpty) return 'Pending';
-
-  // Count how many column slots have a dose recorded
-  final count = doses.values.where((d) => d != null).length;
-  if (count == 0) return 'Pending';
-
-  // Return the label matching the count (clamped to last label)
-  final idx = (count - 1).clamp(0, labels.length - 1);
-  return labels[idx];
-}
 
 class VaccinationForm extends StatefulWidget {
   final String? patientId;
@@ -230,37 +209,7 @@ class _VaccinationFormState extends State<VaccinationForm> {
   final Map<String, Map<String, TextEditingController>> _dateControllers = {};
   final Map<String, String>                             _nextDoseDates   = {};
   final Set<String>                                     _expandedRows    = {};
-  bool _saving = false;
 
-  // ── Firestore helpers ──────────────────────────────────────────────────────
-  String get _patientKey {
-    final f = (widget.firstName ?? '').trim().toLowerCase();
-    final l = (widget.lastName  ?? '').trim().toLowerCase();
-    return '${f}_$l';
-  }
-
-  DocumentReference? get _firestoreRef {
-    if (widget.useSharedStorage) {
-      final pid = widget.patientId;
-      final bid = widget.barangayId;
-      if (pid == null || pid.isEmpty || bid == null || bid.isEmpty) return null;
-      return FirebaseFirestore.instance
-          .collection('barangays')
-          .doc(bid)
-          .collection('patients')
-          .doc(pid)
-          .collection('vaccination')
-          .doc('record');
-    } else {
-      final uid = FirebaseAuth.instance.currentUser?.uid;
-      if (uid == null || uid.isEmpty) return null;
-      return FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .collection('vaccinationStatus')
-          .doc(_patientKey);
-    }
-  }
 
   @override
   void initState() {
@@ -362,100 +311,6 @@ class _VaccinationFormState extends State<VaccinationForm> {
       data[name] = map;
     }
     widget.onDataChanged!(data);
-  }
-
-  // ── Save to Firestore ──────────────────────────────────────────────────────
-  // Writes the same schema that VaccinationStatusSection reads:
-  //   { 'hepatitisB': '2nd dose', 'bcg': '1st dose', … }
-  // plus date fields and metadata.
-  Future<void> _saveToFirestore() async {
-    final ref = _firestoreRef;
-    if (ref == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Cannot save: missing patient or user info.'),
-        backgroundColor: Colors.redAccent,
-      ));
-      return;
-    }
-
-    setState(() => _saving = true);
-
-    try {
-      final now         = DateTime.now();
-      final currentUser = FirebaseAuth.instance.currentUser;
-      String userName   = 'Unknown';
-
-      if (currentUser != null) {
-        final userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(currentUser.uid)
-            .get();
-        userName = userDoc.data()?['fullName'] ??
-            userDoc.data()?['username'] ??
-            currentUser.email ??
-            'Unknown';
-      }
-
-      // Build the payload in the schema VaccinationStatusSection expects
-      final payload = <String, dynamic>{
-        'firstName':          widget.firstName ?? '',
-        'lastName':           widget.lastName  ?? '',
-        'lastReviewDate':     Timestamp.fromDate(now),
-        'updatedAt':          Timestamp.fromDate(now),
-        'lastModifiedBy':     currentUser?.uid ?? '',
-        'lastModifiedByName': userName,
-      };
-
-      for (final name in _vaccineNames) {
-        final firestoreKey = kVaccineNameToKey[name];
-        if (firestoreKey == null) continue;
-
-        // Derive the current dose label
-        final doseLabel = _computeDoseLabel(name, _doses[name]!);
-        payload[firestoreKey] = doseLabel;
-
-        // Also persist per-column dates under a nested 'dates' map
-        // (used for next-dose calculation when re-loading the form)
-        final dateMap = <String, String>{};
-        for (final colKey in (_schedule[name]?.keys ?? <String>[])) {
-          final date = _dateControllers[name]?[colKey]?.text.trim();
-          if (date != null && date.isNotEmpty) {
-            dateMap[colKey] = date;
-          }
-        }
-        if (dateMap.isNotEmpty) {
-          payload['${firestoreKey}_dates'] = dateMap;
-        }
-
-        // Next dose date
-        final nd = _nextDoseDates[name];
-        if (nd != null) {
-          payload['${firestoreKey}_nextDose'] = nd;
-        }
-      }
-
-      await ref.set(payload, SetOptions(merge: true));
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: const Text('Vaccination record saved.'),
-          backgroundColor: const Color(0xFFF08030),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12)),
-        ));
-      }
-    } catch (e) {
-      debugPrint('Error saving vaccination form: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Failed to save: $e'),
-          backgroundColor: Colors.redAccent,
-        ));
-      }
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
   }
 
   // ── Date picker ────────────────────────────────────────────────────────────

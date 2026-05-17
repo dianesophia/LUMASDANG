@@ -1,5 +1,3 @@
-import 'dart:io';
-import 'dart:convert';
 import 'package:flutter/material.dart';
 // import 'package:image_picker/image_picker.dart';
 import '../../services/firestore_service.dart';
@@ -28,7 +26,6 @@ class _EditProfileState extends State<EditProfile> {
   bool _obscurePassword = true;
   // String? _profilePicturePath;
   String? _originalEmail;
-  int _displayNameLength = 0;
   int _emailLength = 0;
 
   @override
@@ -37,7 +34,6 @@ class _EditProfileState extends State<EditProfile> {
     _loadUserProfile();
 
     _displayNameController.addListener(() {
-      setState(() => _displayNameLength = _displayNameController.text.length);
     });
 
     _emailController.addListener(() {
@@ -68,7 +64,6 @@ class _EditProfileState extends State<EditProfile> {
             _emailController.text = profile['email'] ?? user.email ?? '';
             _originalEmail = user.email;
             // _profilePicturePath = profile['profilePicture'];
-            _displayNameLength = _displayNameController.text.length;
             _emailLength = _emailController.text.length;
           });
         }
@@ -124,18 +119,7 @@ class _EditProfileState extends State<EditProfile> {
   //   }
   // }
 
-  void _showErrorSnackBar(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.redAccent,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.all(16),
-      ),
-    );
-  }
+
 
   String? _validateInputs() {
     final displayName = _displayNameController.text.trim();

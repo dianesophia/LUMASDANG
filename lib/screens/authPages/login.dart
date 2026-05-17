@@ -8,7 +8,6 @@ import '../../services/connectivity_service.dart';
 import '../../services/local_db_service.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../services/BiometricAuthService.dart';
-import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 
 class LoginPage extends StatefulWidget {

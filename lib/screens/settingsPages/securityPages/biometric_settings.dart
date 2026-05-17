@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:local_auth/local_auth.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../services/BiometricAuthService.dart';
 
 class BiometricSettingsPage extends StatefulWidget {

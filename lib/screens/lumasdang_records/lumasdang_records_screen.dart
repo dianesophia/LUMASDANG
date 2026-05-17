@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
@@ -27,7 +25,7 @@ class _LumasdangRecordsScreenState extends State<LumasdangRecordsScreen> {
     try {
       if (kIsWeb) {
         final webResult = await LumasdangRecordsService.generateExcelBytes();
-        await triggerLumasdangDownload(webResult.bytes as Uint8List, webResult.fileName);
+        await triggerLumasdangDownload(webResult.bytes, webResult.fileName);
         if (mounted) {
           ScaffoldMessenger.of(this.context).showSnackBar(
             const SnackBar(

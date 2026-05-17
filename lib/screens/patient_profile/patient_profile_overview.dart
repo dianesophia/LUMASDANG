@@ -15,7 +15,6 @@ import 'widgets/vaccination_status.dart';
 import 'widgets/deworming_status.dart';
 import 'widgets/parent_contact_tab.dart';
 import 'edit_patient_demographics_screen.dart';
-import 'package:lumasdang/screens/shared/app_buttom_navbar.dart';
 import 'package:flutter/foundation.dart';
 
 class PatientProfileOverview extends StatefulWidget {
@@ -52,7 +51,6 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
   late Patient _patientSnapshot;
   bool _patientUpdated = false;
   Map<String, dynamic>? _rootDemographic;
-  Map<String, dynamic>? _rootPatientData;
 
   @override
   void initState() {
@@ -116,7 +114,6 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
       }
 
       setState(() {
-        _rootPatientData = data;
         _rootDemographic = demo;
         if (prefs.isNotEmpty) {
           _preferPhoneCall = prefs['phoneCall'] ?? true;
@@ -471,7 +468,7 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
           if (rawData is Map<String, dynamic>) {
             data = rawData;
           } else if (rawData is Map) {
-            data = Map<String, dynamic>.from(rawData as Map);
+            data = Map<String, dynamic>.from(rawData);
           }
           if (data == null) continue;
           final demographic = data['demographic'] ?? {};
@@ -1520,7 +1517,7 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
                                         await firestore
                                             .updateAssessmentInBarangayPatient(
                                           patientId: patient.docId,
-                                          assessmentId: assessmentId!,
+                                          assessmentId: assessmentId,
                                           updatedData: {
                                             'deworming': deworming
                                           },

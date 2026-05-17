@@ -59,7 +59,7 @@ class LocalCalendarService {
     final List<CalEvent> result = [];
     for (final item in raw) {
       if (item is Map) {
-        final map = Map<String, dynamic>.from(item as Map);
+        final map = Map<String, dynamic>.from(item);
         final dateStr = map['date']?.toString() ?? '';
         final date = DateTime.tryParse(dateStr) ?? DateTime.now();
         result.add(
@@ -86,7 +86,7 @@ class LocalCalendarService {
     final List<Map<String, dynamic>> list = [];
     if (raw is List) {
       for (final item in raw) {
-        if (item is Map) list.add(Map<String, dynamic>.from(item as Map));
+        if (item is Map) list.add(Map<String, dynamic>.from(item));
       }
     }
     list.add(op);
@@ -149,7 +149,7 @@ class LocalCalendarService {
     final pending = <Map<String, dynamic>>[];
     for (final item in raw) {
       if (item is Map) {
-        pending.add(Map<String, dynamic>.from(item as Map));
+        pending.add(Map<String, dynamic>.from(item));
       }
     }
 
@@ -163,7 +163,7 @@ class LocalCalendarService {
       String? id = op['id'] as String?;
       final dataRaw = op['data'];
       final Map<String, dynamic>? data =
-          dataRaw is Map ? Map<String, dynamic>.from(dataRaw as Map) : null;
+          dataRaw is Map ? Map<String, dynamic>.from(dataRaw) : null;
 
       try {
         if (type == 'add' && data != null) {

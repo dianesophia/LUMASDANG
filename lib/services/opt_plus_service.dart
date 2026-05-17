@@ -555,7 +555,6 @@ class OptPlusService {
     int sharedStringIndexOffset = 0;
     if (newStrings.isNotEmpty) {
       final sharedStringsFile = archive.findFile('xl/sharedStrings.xml');
-      final sstNs = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
       if (sharedStringsFile != null) {
         final sstDoc = XmlDocument.parse(String.fromCharCodes(sharedStringsFile.content));
         final sst = sstDoc.rootElement;

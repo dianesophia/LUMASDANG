@@ -277,6 +277,7 @@ class _EditPatientDemographicsScreenState
           ageYearsController: _controllers.ageYearsController,
           sexController: _controllers.sexController,
           bloodTypeController: _controllers.bloodTypeController,
+          addressController: _controllers.addressController,
           motherPhilHealthNumberController:
               _controllers.motherPhilHealthNumberController,
           motherPhilHealthMemberTypeController:
@@ -285,7 +286,6 @@ class _EditPatientDemographicsScreenState
               _controllers.fatherPhilHealthNumberController,
           fatherPhilHealthMemberTypeController:
               _controllers.fatherPhilHealthMemberTypeController,
-          addressController: _controllers.addressController,
           placeOfBirthController: _controllers.placeOfBirthController,
           dobController: _controllers.dobController,
           motherController: _controllers.motherController,
@@ -322,7 +322,7 @@ class _EditPatientDemographicsScreenState
               setState(() => _controllers.isFourPsMember = v),
           onHasDisabilityChanged: (v) =>
               setState(() => _controllers.hasDisability = v),
-          isDraft: false,
+          isDraft: false, streetController: _controllers.streetController,
         ),
       ),
     );

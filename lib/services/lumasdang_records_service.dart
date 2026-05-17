@@ -133,7 +133,7 @@ class LumasdangRecordsService {
     // Group by unique child (name + DOB) so we output one row per child
     final groups = <String, List<Map<String, dynamic>>>{};
     for (final p in patients) {
-      final doc = p as Map<String, dynamic>;
+      final doc = p;
       final id = doc['id'] as String?;
       if (id == null) continue;
       // Skip archived children so the Excel matches the active Patients list.
@@ -284,12 +284,12 @@ class LumasdangRecordsService {
       } else if (ipValue == false) {
         ipGroupStr = 'NO';
       } else if (ipValue is String) {
-        final v = (ipValue as String).trim().toUpperCase();
+        final v = ipValue.trim().toUpperCase();
         final base = (v == 'YES' || v == 'Y')
             ? 'YES'
             : (v == 'NO' || v == 'N')
                 ? 'NO'
-                : (ipValue as String).trim();
+                : ipValue.trim();
         ipGroupStr = base == 'YES' && ipEthnicity.isNotEmpty ? '$base - $ipEthnicity' : base;
       } else {
         ipGroupStr = '';

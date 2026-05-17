@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:lumasdang/screens/settingsPages/securityPages/biometric_settings.dart';
 import 'change_password.dart';
-import '../../../services/BiometricAuthService.dart';
 
 class MainSecurity extends StatelessWidget {
   const MainSecurity({super.key});

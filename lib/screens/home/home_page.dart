@@ -56,6 +56,7 @@ class _HomePageState extends State<HomePage>
   final TextEditingController fatherPhilHealthMemberTypeController =
       TextEditingController();
   final TextEditingController addressController = TextEditingController();
+  final TextEditingController streetController = TextEditingController();
   final TextEditingController placeOfBirthController = TextEditingController();
   final TextEditingController dobController = TextEditingController();
   final TextEditingController religionController = TextEditingController();
@@ -124,8 +125,6 @@ class _HomePageState extends State<HomePage>
   String? _selectedSex;
   String? _selectedBloodType;
   String? _residenceStatus;
-  String? _selectedMotherStatus;
-  String? _selectedFatherStatus;
   String? _selectedCaregiverPresence;
   bool _isSyncing = false;
 
@@ -1297,15 +1296,6 @@ class _HomePageState extends State<HomePage>
         _cough = false;
         _other = false;
         _medications = false;
-        _purelyBreastfed = null;
-        _purelyBreastfedError = null;
-        _belongsToIpGroup = null;
-        _ipEthnicity = null;
-        _isFourPsMember = null;
-        _hasDisability = null;
-        _selectedMotherStatus = null;
-        _selectedFatherStatus = null;
-        _selectedCaregiverPresence = null;
         _oralData = null;
         _oralRiskError = null;
         _vaccinationData = null;
@@ -1723,6 +1713,7 @@ class _HomePageState extends State<HomePage>
             fatherPhilHealthMemberTypeController:
                 fatherPhilHealthMemberTypeController,
             addressController: addressController,
+            streetController: streetController,
             placeOfBirthController: placeOfBirthController,
             dobController: dobController,
             motherController: motherController,

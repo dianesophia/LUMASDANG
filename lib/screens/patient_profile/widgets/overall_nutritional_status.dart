@@ -17,7 +17,6 @@ class OverallNutritionalStatusSection extends StatelessWidget {
   static const Color _border      = Color(0xFFE8E8ED);
   static const Color _ink         = Color(0xFF1C1C1E);
   static const Color _inkMid      = Color(0xFF6C6C70);
-  static const Color _green       = Color(0xFF34C759);
   static const Color _greenBg     = Color(0xFFEDF7F1);
   static const Color _greenText   = Color(0xFF1A7A3C);
   static const Color _red         = Color(0xFFDC2626);

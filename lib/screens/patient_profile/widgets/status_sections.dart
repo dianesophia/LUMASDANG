@@ -16,12 +16,8 @@ class StatusSections extends StatelessWidget {
   static const Color _surfaceDim  = Color(0xFFFAFAFA);
   static const Color _border      = Color(0xFFE8E8ED);
   static const Color _ink         = Color(0xFF1C1C1E);
-  static const Color _inkMid      = Color(0xFF6C6C70);
-  static const Color _green       = Color(0xFF34C759);
   static const Color _greenBg     = Color(0xFFEDF7F1);
   static const Color _greenText   = Color(0xFF1A7A3C);
-  static const Color _red         = Color(0xFFDC2626);
-  static const Color _redBg       = Color(0xFFFEF2F2);
   static const Color _amberBg     = Color(0xFFFFF6EE);
 
   static const double _r  = 18;
@@ -658,7 +654,6 @@ class _SheetShell extends StatelessWidget {
   });
 
   static const Color _orange      = Color(0xFFF08030);
-  static const Color _orangeLight = Color(0xFFF5A962);
   static const Color _border      = Color(0xFFE8E8ED);
   static const Color _ink         = Color(0xFF1C1C1E);
 
