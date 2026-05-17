@@ -15,32 +15,8 @@ import 'package:flutter/foundation.dart';
 
 // ==================== APP BOTTOM NAV BAR ====================
 
-/// A reusable bottom tab bar with the Lumasdang green gradient.
-///
-/// Basic usage — drop-in replacement for [BottomNavigationBar]:
-///
-/// ```dart
-/// Scaffold(
-///   bottomNavigationBar: AppBottomNavBar(controller: _tabController),
-///   body: ...,
-/// );
-/// ```
-///
-/// Custom tabs:
-///
-/// ```dart
-/// AppBottomNavBar(
-///   controller: _tabController,
-///   tabs: const [
-///     Tab(icon: Icon(Icons.home_outlined, size: 22), text: 'Home'),
-///     Tab(icon: Icon(Icons.info_outline,  size: 22), text: 'About'),
-///   ],
-/// )
-/// ```
 class AppBottomNavBar extends StatelessWidget {
   final TabController controller;
-
-  /// Override the default Home / Patients / Alerts tabs.
   final List<Tab>? tabs;
 
   const AppBottomNavBar({
@@ -97,14 +73,8 @@ class AppBottomNavBar extends StatelessWidget {
 }
 
 // ==================== PATIENT LIST SCREEN ====================
-// Wraps PatientListTab inside its own Scaffold so the bottom nav bar
-// is always visible when this screen is pushed directly.
-// If PatientListTab is already hosted inside a parent Scaffold that
-// provides AppBottomNavBar, you can use PatientListTab directly and
-// skip this wrapper.
 
 class PatientListScreen extends StatefulWidget {
-  /// Pass a [refreshTrigger] if you want to trigger reloads from outside.
   final ValueNotifier<int>? refreshTrigger;
 
   const PatientListScreen({super.key, this.refreshTrigger});
@@ -120,7 +90,6 @@ class _PatientListScreenState extends State<PatientListScreen>
   @override
   void initState() {
     super.initState();
-    // The tab bar has 3 tabs; "Patients" is index 1 — start there.
     _tabController = TabController(length: 3, vsync: this, initialIndex: 1);
   }
 
@@ -133,7 +102,6 @@ class _PatientListScreenState extends State<PatientListScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // Gradient background that matches the app's design language.
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -143,18 +111,15 @@ class _PatientListScreenState extends State<PatientListScreen>
           ),
         ),
         child: SafeArea(
-          bottom: false, // bottom nav bar handles its own safe area
+          bottom: false,
           child: TabBarView(
             controller: _tabController,
             physics: const NeverScrollableScrollPhysics(),
             children: [
-              // Index 0 — Home placeholder (replace with your HomeTab)
               const Center(
                 child: Text('Home', style: TextStyle(color: Colors.white, fontSize: 18)),
               ),
-              // Index 1 — Patients
               PatientListTab(refreshTrigger: widget.refreshTrigger),
-              // Index 2 — Alerts placeholder (replace with your AlertsTab)
               const Center(
                 child: Text('Alerts', style: TextStyle(color: Colors.white, fontSize: 18)),
               ),
@@ -170,7 +135,6 @@ class _PatientListScreenState extends State<PatientListScreen>
 // ==================== PATIENT LIST TAB ====================
 class PatientListTab extends StatefulWidget {
   final ValueNotifier<int>? refreshTrigger;
-  /// When true, only malnourished / underweight children are shown.
   final bool showOnlyMalnourished;
 
   const PatientListTab({
@@ -193,7 +157,6 @@ class _PatientListTabState extends State<PatientListTab> {
   final Set<String> _selectedDocIds = {};
   bool _deleting = false;
 
-  // Extracts leading z-score number from strings like "-2.5 (Stunted)" or "-2.5"
   double? _extractZScore(String? raw) {
     if (raw == null || raw.isEmpty) return null;
     final match = RegExp(r'^-?\d+(\.\d+)?').firstMatch(raw.trim());
@@ -201,15 +164,10 @@ class _PatientListTabState extends State<PatientListTab> {
     return double.tryParse(match.group(0)!);
   }
 
-  // Extracts BMI z-score from strings like "18.2 | 0.10 (Normal)".
-  // For BMI we only want the z-score part after the "|" separator.
   double? _extractBmiZScore(String? raw) {
     if (raw == null || raw.isEmpty) return null;
     final trimmed = raw.trim();
-    if (!trimmed.contains('|')) {
-      // No "|" means we only have the raw BMI value, not a z-score.
-      return null;
-    }
+    if (!trimmed.contains('|')) return null;
     final parts = trimmed.split('|');
     if (parts.length < 2) return null;
     final afterPipe = parts[1].trim();
@@ -217,6 +175,7 @@ class _PatientListTabState extends State<PatientListTab> {
     if (match == null) return null;
     return double.tryParse(match.group(0)!);
   }
+
   String _buildAssessmentRemarks(Map<String, dynamic> data, int assessmentCount) {
     if (assessmentCount == 0) return 'No assessments';
 
@@ -240,24 +199,17 @@ class _PatientListTabState extends State<PatientListTab> {
       return 'Assessment done';
     }
 
-    // Priority 1: Underweight (Weight-for-Age < -2 SD)
     if (weightForAge != null && weightForAge < -2) return 'Underweight';
-
-    // Priority 2: Stunted (Height-for-Age < -2 SD)
     if (heightForAge != null && heightForAge < -2) return 'Stunted';
-
-    // Priority 3: Overweight/Obese (Weight-for-Height > +1 SD or BMI > +2 SD)
     if ((weightForHeight != null && weightForHeight > 1) ||
         (bmi != null && bmi > 2)) return 'Overweight/Obese';
 
-    // Priority 4: At Risk (any indicator -2 to -1 SD)
     final atRisk = (weightForAge != null && weightForAge >= -2 && weightForAge < -1) ||
         (heightForAge != null && heightForAge >= -2 && heightForAge < -1) ||
         (weightForHeight != null && weightForHeight >= -2 && weightForHeight < -1) ||
         (bmi != null && bmi >= -2 && bmi < -1);
     if (atRisk) return 'At Risk';
 
-    // Priority 5: Normal
     return 'Normal';
   }
 
@@ -289,7 +241,6 @@ class _PatientListTabState extends State<PatientListTab> {
     });
   }
 
-  // ── SELECT ALL / DESELECT ALL ──────────────────────────────────────────────
   void _toggleSelectAll() {
     setState(() {
       final allVisibleIds = _filteredPatients.map((p) => p.docId).toSet();
@@ -302,38 +253,345 @@ class _PatientListTabState extends State<PatientListTab> {
     });
   }
 
-  Future<void> _confirmAndSoftDelete() async {
-    if (_selectedDocIds.isEmpty) return;
-    final count = _selectedDocIds.length;
+  // ── SINGLE-ROW SOFT DELETE (called from swipe or detail dialog) ────────────
+  Future<void> _confirmAndSoftDeleteSingle(Patient patient) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Delete Selected?',
-            style: TextStyle(fontWeight: FontWeight.w700)),
-        content: Text(
-          'Soft-delete $count patient record(s)? '
-          'They will be hidden from the list but can be restored later.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel',
-                style: TextStyle(color: Color(0xFF2E8B7B))),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.redAccent,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-              elevation: 0,
+        contentPadding: EdgeInsets.zero,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Red warning header
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              decoration: const BoxDecoration(
+                color: Color(0xFFFFEDED),
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
+                ),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: Colors.redAccent.withOpacity(0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.delete_outline_rounded,
+                      color: Colors.redAccent,
+                      size: 28,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Delete Patient Record?',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                      color: Color(0xFF1A1A1A),
+                    ),
+                  ),
+                ],
+              ),
             ),
-            child: const Text('Delete'),
-          ),
-        ],
+            // Body
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+              child: Column(
+                children: [
+                  RichText(
+                    textAlign: TextAlign.center,
+                    text: TextSpan(
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF444444),
+                        height: 1.5,
+                      ),
+                      children: [
+                        const TextSpan(text: 'The record for '),
+                        TextSpan(
+                          text: '${patient.firstName} ${patient.lastName}',
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        const TextSpan(
+                          text: ' will be hidden from the patient list. '
+                              'It can be restored later from the archived records.',
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF2E8B7B),
+                            side: const BorderSide(color: Color(0xFF2E8B7B)),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          child: const Text('Cancel',
+                              style: TextStyle(fontWeight: FontWeight.w600)),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () => Navigator.pop(ctx, true),
+                          icon: const Icon(Icons.delete_outline_rounded, size: 16),
+                          label: const Text('Delete',
+                              style: TextStyle(fontWeight: FontWeight.w700)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.redAccent,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            elevation: 0,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
+
+    if (ok != true || !mounted) return;
+
+    setState(() => _deleting = true);
+    try {
+      await _softDeletePatient(patient);
+      if (mounted) {
+        await _fetchPatients();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                '${patient.firstName} ${patient.lastName} has been deleted.'),
+            backgroundColor: const Color(0xFF2E8B7B),
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Delete failed: $e'),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _deleting = false);
+    }
+  }
+
+  /// Core soft-delete logic for a single patient.
+  Future<void> _softDeletePatient(Patient patient) async {
+    final user = FirebaseAuth.instance.currentUser;
+    final firestore = FirebaseFirestore.instance;
+    final deletedBy = user?.email ?? user?.uid ?? 'unknown';
+
+    if (patient.barangayId.isNotEmpty) {
+      final ref = firestore
+          .collection('barangays')
+          .doc(patient.barangayId)
+          .collection('patients')
+          .doc(patient.docId);
+      final snap = await ref.get();
+      if (snap.exists) {
+        await ref.update({
+          'isDeleted': true,
+          'deletedAt': FieldValue.serverTimestamp(),
+          'deletedBy': deletedBy,
+        });
+        return;
+      }
+    }
+
+    if (user != null) {
+      final ref = firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('homepageData')
+          .doc(patient.docId);
+      final snap = await ref.get();
+      if (snap.exists) {
+        await ref.update({
+          'isDeleted': true,
+          'deletedAt': FieldValue.serverTimestamp(),
+          'deletedBy': deletedBy,
+        });
+      }
+    }
+  }
+
+  // ── BULK SOFT DELETE ───────────────────────────────────────────────────────
+  Future<void> _confirmAndSoftDelete() async {
+    if (_selectedDocIds.isEmpty) return;
+    final count = _selectedDocIds.length;
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        contentPadding: EdgeInsets.zero,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Red warning header
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              decoration: const BoxDecoration(
+                color: Color(0xFFFFEDED),
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
+                ),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: Colors.redAccent.withOpacity(0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.delete_sweep_rounded,
+                      color: Colors.redAccent,
+                      size: 28,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Delete $count Record${count > 1 ? 's' : ''}?',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                      color: Color(0xFF1A1A1A),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Body
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+              child: Column(
+                children: [
+                  Text(
+                    '$count patient record${count > 1 ? 's' : ''} will be hidden '
+                    'from the patient list. They can be restored later from the '
+                    'archived records.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF444444),
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                          color: Colors.orange.withOpacity(0.3), width: 1),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.info_outline_rounded,
+                            size: 14, color: Colors.orange.shade700),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            'This action can be undone from Archived Records.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.orange.shade700,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF2E8B7B),
+                            side: const BorderSide(color: Color(0xFF2E8B7B)),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          child: const Text('Cancel',
+                              style: TextStyle(fontWeight: FontWeight.w600)),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () => Navigator.pop(ctx, true),
+                          icon: const Icon(Icons.delete_sweep_rounded, size: 16),
+                          label: Text(
+                            'Delete $count',
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.redAccent,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            elevation: 0,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
     if (ok != true || !mounted) return;
     setState(() => _deleting = true);
     try {
@@ -343,12 +601,9 @@ class _PatientListTabState extends State<PatientListTab> {
       final batch = firestore.batch();
       var hasWrites = false;
 
-      // Iterate all patients so that even ones currently filtered out
-      // are still soft-deleted when selected.
       for (final patient in _patients) {
         if (!_selectedDocIds.contains(patient.docId)) continue;
 
-        // First try barangay-shared patient document.
         if (patient.barangayId.isNotEmpty) {
           final barangayRef = firestore
               .collection('barangays')
@@ -368,7 +623,6 @@ class _PatientListTabState extends State<PatientListTab> {
           }
         }
 
-        // Fallback: if no barangay patient doc, try user's homepageData copy.
         if (user != null) {
           final homeRef = firestore
               .collection('users')
@@ -388,9 +642,8 @@ class _PatientListTabState extends State<PatientListTab> {
         }
       }
 
-      if (hasWrites) {
-        await batch.commit();
-      }
+      if (hasWrites) await batch.commit();
+
       if (mounted) {
         _exitSelectionMode();
         await _fetchPatients();
@@ -428,10 +681,8 @@ class _PatientListTabState extends State<PatientListTab> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       await LocalDbService.instance.init();
-      //final online = await ConnectivityService.instance.
       final online = kIsWeb ? true : await ConnectivityService.instance.checkOnline();
 
-      // Offline or offline-authenticated session: build patient list from local homepageData
       if (!online || LocalDbService.instance.offlineAuthenticated || user == null) {
         final records =
             await LocalDbService.instance.getAllRecords(includeDeleted: false);
@@ -470,14 +721,11 @@ class _PatientListTabState extends State<PatientListTab> {
             final recordsForPatient = entry.value;
             final assessmentCount = recordsForPatient.length;
 
-            // Sort by created/modified time descending
             recordsForPatient.sort((a, b) {
               final tsA = (a['lastModified'] as String?) ??
-                  (a['createdAt'] as String?) ??
-                  '';
+                  (a['createdAt'] as String?) ?? '';
               final tsB = (b['lastModified'] as String?) ??
-                  (b['createdAt'] as String?) ??
-                  '';
+                  (b['createdAt'] as String?) ?? '';
               final dA = DateTime.tryParse(tsA) ?? DateTime(1970);
               final dB = DateTime.tryParse(tsB) ?? DateTime(1970);
               return dB.compareTo(dA);
@@ -496,18 +744,15 @@ class _PatientListTabState extends State<PatientListTab> {
 
             final createdAtStr =
                 mostRecent['lastModified'] as String? ??
-                mostRecent['createdAt'] as String? ??
-                '';
+                mostRecent['createdAt'] as String? ?? '';
             final lastVisit =
                 DateTime.tryParse(createdAtStr) ?? DateTime.now();
             final assessmentRemarks =
                 _buildAssessmentRemarks(mostRecent, assessmentCount);
 
-            // Try to approximate age in months from demographic; fall back to parsed "age" field.
             final ageMonths =
                 ageInMonthsFromDemographic(demographic) ??
-                int.tryParse(demographic['age']?.toString() ?? '0') ??
-                0;
+                int.tryParse(demographic['age']?.toString() ?? '0') ?? 0;
 
             return Patient(
               firstName: demographic['firstName'] ?? '',
@@ -516,8 +761,7 @@ class _PatientListTabState extends State<PatientListTab> {
               assessmentRemarks: assessmentRemarks,
               lastVisit: lastVisit,
               guardianContact: demographic['fatherContact'] ??
-                  demographic['motherContact'] ??
-                  '',
+                  demographic['motherContact'] ?? '',
               avatarColor: const Color(0xFF2E8B7B),
               address: demographic['address'] ?? '',
               dateOfBirth: demographic['dateOfBirth'] ?? '',
@@ -529,8 +773,8 @@ class _PatientListTabState extends State<PatientListTab> {
               fatherContact: demographic['fatherContact'] ?? '',
               createdBy: mostRecent['createdByName'] ?? 'Unknown',
               barangayId: '',
-              visitDate: mostRecent['visitDate'] ?? '',   // ← ADD
-              visitTime: mostRecent['visitTime'] ?? '',   // ← ADD
+              visitDate: mostRecent['visitDate'] ?? '',
+              visitTime: mostRecent['visitTime'] ?? '',
               nextFollowUpDate: null,
               followUpNotes: (mostRecent['followUpNotes'] as String?) ?? '',
             );
@@ -540,7 +784,6 @@ class _PatientListTabState extends State<PatientListTab> {
         return;
       }
 
-      // Online: use barangay-shared patients from Firestore (existing behavior)
       final userDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
@@ -559,7 +802,6 @@ class _PatientListTabState extends State<PatientListTab> {
           .orderBy('createdAt', descending: true)
           .get();
 
-      // Auto-archive: mark patients aged 60+ months (5 years) as archived (if enabled in settings)
       final archivedDocIds = <String>{};
       final archiveBatch = FirebaseFirestore.instance.batch();
       var hasArchiveUpdates = false;
@@ -605,7 +847,6 @@ class _PatientListTabState extends State<PatientListTab> {
         }
       }
 
-      // Build patients from barangay shared collection
       final List<Patient> barangayPatients = patientGroups.entries.map((entry) {
         final docs = entry.value;
         final assessmentCount = docs.length;
@@ -627,8 +868,7 @@ class _PatientListTabState extends State<PatientListTab> {
             _buildAssessmentRemarks(data, assessmentCount);
 
         final ageMonths = ageInMonthsFromDemographic(demographic) ??
-            int.tryParse(demographic['age']?.toString() ?? '0') ??
-            0;
+            int.tryParse(demographic['age']?.toString() ?? '0') ?? 0;
 
         final nextFollowUpTs = data['nextFollowUpDate'] as Timestamp?;
         final followUpNotes = data['followUpNotes'] as String? ?? '';
@@ -640,8 +880,7 @@ class _PatientListTabState extends State<PatientListTab> {
           assessmentRemarks: assessmentRemarks,
           lastVisit: createdAt?.toDate() ?? DateTime.now(),
           guardianContact: demographic['fatherContact'] ??
-              demographic['motherContact'] ??
-              '',
+              demographic['motherContact'] ?? '',
           avatarColor: const Color(0xFF2E8B7B),
           address: demographic['address'] ?? '',
           dateOfBirth: demographic['dateOfBirth'] ?? '',
@@ -653,14 +892,13 @@ class _PatientListTabState extends State<PatientListTab> {
           fatherContact: demographic['fatherContact'] ?? '',
           createdBy: data['createdByName'] ?? 'Unknown',
           barangayId: barangayId,
-          visitDate: data['visitDate'] ?? '',   // ← THIS WAS MISSING
+          visitDate: data['visitDate'] ?? '',
           visitTime: data['visitTime'] ?? '',
           nextFollowUpDate: nextFollowUpTs?.toDate(),
           followUpNotes: followUpNotes,
         );
       }).toList();
 
-      // Also include any homepageData-only patients (e.g., historical or offline-created)
       final homeSnapshot = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
@@ -690,15 +928,9 @@ class _PatientListTabState extends State<PatientListTab> {
         final nextFollowUpTs = data['nextFollowUpDate'] as Timestamp?;
         final followUpNotes = data['followUpNotes'] as String? ?? '';
         final ageMonths = ageInMonthsFromDemographic(demographic) ??
-            int.tryParse(demographic['age']?.toString() ?? '0') ??
-            0;
+            int.tryParse(demographic['age']?.toString() ?? '0') ?? 0;
 
-        // If auto-archive is enabled, do not surface 5+ year olds (60+ months)
-        // from homepageData into the active patient list. They should appear
-        // only in the Archived (5+ yrs) screen.
-        if (autoArchiveEnabled && ageMonths >= 60) {
-          continue;
-        }
+        if (autoArchiveEnabled && ageMonths >= 60) continue;
 
         extraPatients.add(
           Patient(
@@ -708,8 +940,7 @@ class _PatientListTabState extends State<PatientListTab> {
             assessmentRemarks: assessmentRemarks,
             lastVisit: createdAt?.toDate() ?? DateTime.now(),
             guardianContact: demographic['fatherContact'] ??
-                demographic['motherContact'] ??
-                '',
+                demographic['motherContact'] ?? '',
             avatarColor: const Color(0xFF2E8B7B),
             address: demographic['address'] ?? '',
             dateOfBirth: demographic['dateOfBirth'] ?? '',
@@ -721,8 +952,8 @@ class _PatientListTabState extends State<PatientListTab> {
             fatherContact: demographic['fatherContact'] ?? '',
             createdBy: data['createdByName'] ?? 'Unknown',
             barangayId: barangayId,
-            visitDate: data['visitDate'] ?? '',   // ← ADD
-            visitTime: data['visitTime'] ?? '',   // ← ADD
+            visitDate: data['visitDate'] ?? '',
+            visitTime: data['visitTime'] ?? '',
             nextFollowUpDate: nextFollowUpTs?.toDate(),
             followUpNotes: followUpNotes,
           ),
@@ -764,7 +995,6 @@ class _PatientListTabState extends State<PatientListTab> {
         : base;
 
     filtered.sort((a, b) {
-      // Case-insensitive A–Z by last name, then first name
       final lastA = a.lastName.toLowerCase().trim();
       final lastB = b.lastName.toLowerCase().trim();
       var cmp = lastA.compareTo(lastB);
@@ -780,7 +1010,6 @@ class _PatientListTabState extends State<PatientListTab> {
 
   bool _isMalnourished(Patient p) {
     final status = p.assessmentRemarks.toLowerCase();
-    // For the dedicated Malnourished list we only show Underweight children.
     return status.contains('underweight');
   }
 
@@ -928,7 +1157,6 @@ class _PatientListTabState extends State<PatientListTab> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Lumasdang Records button
               ElevatedButton.icon(
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const LumasdangRecordsScreen()),
@@ -947,7 +1175,6 @@ class _PatientListTabState extends State<PatientListTab> {
                 ),
               ),
               const SizedBox(width: 8),
-              // Malnourished / Underweight list screen button
               ElevatedButton.icon(
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute(
@@ -957,8 +1184,7 @@ class _PatientListTabState extends State<PatientListTab> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white,
                   foregroundColor: const Color(0xFFB23A48),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12)),
                   elevation: 2,
@@ -970,7 +1196,6 @@ class _PatientListTabState extends State<PatientListTab> {
                 ),
               ),
               const SizedBox(width: 8),
-              // Archived (5+ yrs) button
               ElevatedButton.icon(
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const ArchivedPatientsScreen()),
@@ -978,8 +1203,7 @@ class _PatientListTabState extends State<PatientListTab> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white,
                   foregroundColor: const Color(0xFF2E8B7B),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12)),
                   elevation: 2,
@@ -995,8 +1219,8 @@ class _PatientListTabState extends State<PatientListTab> {
                 GestureDetector(
                   onTap: _toggleSelectAll,
                   child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 7),
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(20),
@@ -1032,10 +1256,8 @@ class _PatientListTabState extends State<PatientListTab> {
           ),
         ),
         const SizedBox(height: 8),
-        // Patient count under the buttons
         Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
           decoration: BoxDecoration(
             color: Colors.white.withOpacity(0.2),
             borderRadius: BorderRadius.circular(20),
@@ -1067,8 +1289,7 @@ class _PatientListTabState extends State<PatientListTab> {
   Widget _buildSelectionBar() {
     final count = _selectedDocIds.length;
     return Container(
-      padding:
-          const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
@@ -1111,8 +1332,7 @@ class _PatientListTabState extends State<PatientListTab> {
                     )
                   : const Icon(Icons.delete_outline_rounded, size: 16),
               label: Text(_deleting ? 'Deleting…' : 'Delete'),
-              style:
-                  TextButton.styleFrom(foregroundColor: Colors.redAccent),
+              style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
             ),
           TextButton(
             onPressed: _deleting ? null : _exitSelectionMode,
@@ -1127,8 +1347,7 @@ class _PatientListTabState extends State<PatientListTab> {
   // ── TABLE HEADER ───────────────────────────────────────────────────────────
   Widget _buildTableHeader() {
     return Container(
-      padding:
-          const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.12),
       ),
@@ -1172,11 +1391,14 @@ class _PatientListTabState extends State<PatientListTab> {
     );
   }
 
+  // ── PATIENT ROW (with swipe-to-delete) ────────────────────────────────────
   Widget _buildPatientRow(Patient patient, int index) {
     final isSelected = _selectedDocIds.contains(patient.docId);
     final statusColor = getStatusColor(patient.assessmentRemarks);
 
-    return Container(
+    // Wrap in Dismissible only when NOT in selection mode, so swipe
+    // doesn't fight with the multi-select long-press gesture.
+    final rowContent = Container(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: isSelected
@@ -1185,8 +1407,7 @@ class _PatientListTabState extends State<PatientListTab> {
         borderRadius: BorderRadius.circular(12),
         border: isSelected
             ? Border.all(
-                color: const Color(0xFF2E8B7B).withOpacity(0.4),
-                width: 1.5)
+                color: const Color(0xFF2E8B7B).withOpacity(0.4), width: 1.5)
             : null,
         boxShadow: [
           BoxShadow(
@@ -1210,8 +1431,7 @@ class _PatientListTabState extends State<PatientListTab> {
               : _showPatientDetails(patient),
           borderRadius: BorderRadius.circular(12),
           child: Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
             child: Row(
               children: [
                 // Checkbox / avatar
@@ -1223,8 +1443,7 @@ class _PatientListTabState extends State<PatientListTab> {
                       value: isSelected,
                       onChanged: (_) => _toggleSelection(patient),
                       activeColor: const Color(0xFF2E8B7B),
-                      materialTapTargetSize:
-                          MaterialTapTargetSize.shrinkWrap,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(4)),
                     ),
@@ -1234,8 +1453,7 @@ class _PatientListTabState extends State<PatientListTab> {
                     width: 28,
                     height: 28,
                     decoration: BoxDecoration(
-                      color:
-                          const Color(0xFF2E8B7B).withOpacity(0.12),
+                      color: const Color(0xFF2E8B7B).withOpacity(0.12),
                       shape: BoxShape.circle,
                     ),
                     child: ClipOval(
@@ -1253,7 +1471,6 @@ class _PatientListTabState extends State<PatientListTab> {
                   ),
                 const SizedBox(width: 8),
 
-                // Last name
                 Expanded(
                   flex: 2,
                   child: Text(
@@ -1267,7 +1484,6 @@ class _PatientListTabState extends State<PatientListTab> {
                   ),
                 ),
 
-                // First name
                 Expanded(
                   flex: 2,
                   child: Text(
@@ -1278,7 +1494,6 @@ class _PatientListTabState extends State<PatientListTab> {
                   ),
                 ),
 
-                // Age
                 Expanded(
                   flex: 1,
                   child: Text(
@@ -1289,7 +1504,6 @@ class _PatientListTabState extends State<PatientListTab> {
                   ),
                 ),
 
-                // Status badge
                 Expanded(
                   flex: 2,
                   child: Center(
@@ -1300,8 +1514,7 @@ class _PatientListTabState extends State<PatientListTab> {
                         color: statusColor.withOpacity(0.12),
                         borderRadius: BorderRadius.circular(6),
                         border: Border.all(
-                            color: statusColor.withOpacity(0.3),
-                            width: 0.8),
+                            color: statusColor.withOpacity(0.3), width: 0.8),
                       ),
                       child: Text(
                         patient.assessmentRemarks,
@@ -1318,7 +1531,6 @@ class _PatientListTabState extends State<PatientListTab> {
                   ),
                 ),
 
-                // Last visit
                 Expanded(
                   flex: 2,
                   child: Text(
@@ -1331,7 +1543,6 @@ class _PatientListTabState extends State<PatientListTab> {
                   ),
                 ),
 
-                // Contact icons
                 Expanded(
                   flex: 2,
                   child: Row(
@@ -1340,17 +1551,13 @@ class _PatientListTabState extends State<PatientListTab> {
                       _contactIcon(
                         Icons.phone_rounded,
                         const Color(0xFF2E8B7B),
-                        _selectionMode
-                            ? () {}
-                            : () => _handleCall(patient),
+                        _selectionMode ? () {} : () => _handleCall(patient),
                       ),
                       const SizedBox(width: 4),
                       _contactIcon(
                         Icons.sms_rounded,
                         const Color(0xFFF5A962),
-                        _selectionMode
-                            ? () {}
-                            : () => _handleMessage(patient),
+                        _selectionMode ? () {} : () => _handleMessage(patient),
                       ),
                     ],
                   ),
@@ -1361,10 +1568,49 @@ class _PatientListTabState extends State<PatientListTab> {
         ),
       ),
     );
+
+    // In selection mode skip Dismissible to avoid gesture conflicts.
+    if (_selectionMode) return rowContent;
+
+    return Dismissible(
+      key: ValueKey(patient.docId),
+      direction: DismissDirection.endToStart,
+      // Show red delete background while swiping
+      background: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: Colors.redAccent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            Icon(Icons.delete_outline_rounded, color: Colors.white, size: 22),
+            SizedBox(height: 4),
+            Text(
+              'Delete',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+      // Intercept the dismiss and show confirmation instead of auto-removing
+      confirmDismiss: (_) async {
+        await _confirmAndSoftDeleteSingle(patient);
+        // Always return false — we handle list refresh ourselves inside the method.
+        return false;
+      },
+      child: rowContent,
+    );
   }
 
-  Widget _contactIcon(
-      IconData icon, Color color, VoidCallback onTap) {
+  Widget _contactIcon(IconData icon, Color color, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -1386,8 +1632,7 @@ class _PatientListTabState extends State<PatientListTab> {
       child: GestureDetector(
         onTap: () => setState(() => _sortAscending = !_sortAscending),
         child: Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
             color: Colors.white.withOpacity(0.9),
             borderRadius: BorderRadius.circular(12),
@@ -1466,8 +1711,7 @@ class _PatientListTabState extends State<PatientListTab> {
     if (number.isEmpty) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content:
-              const Text('No guardian contact number to message'),
+          content: const Text('No guardian contact number to message'),
           backgroundColor: Colors.orange.shade700,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
@@ -1592,16 +1836,16 @@ class _PatientListTabState extends State<PatientListTab> {
                     '${patient.age} months old',
                   ),
                   _detailRow(
-                      Icons.calendar_today_outlined,
-                      'Last Visit',
-                      '${patient.lastVisit.month}/${patient.lastVisit.day}/${patient.lastVisit.year}'),
-                  // ── ADD THESE TWO ──────────────────────────────────────
+                    Icons.calendar_today_outlined,
+                    'Last Visit',
+                    '${patient.lastVisit.month}/${patient.lastVisit.day}/${patient.lastVisit.year}',
+                  ),
                   if (patient.visitDate.isNotEmpty)
-                    _detailRow(Icons.event_outlined, 'Visit Date', patient.visitDate),
+                    _detailRow(Icons.event_outlined, 'Visit Date',
+                        patient.visitDate),
                   if (patient.visitTime.isNotEmpty)
-                    _detailRow(Icons.schedule_outlined, 'Visit Time', patient.visitTime),
-                  // ───────────────────────────────────────────────────────
-                    
+                    _detailRow(Icons.schedule_outlined, 'Visit Time',
+                        patient.visitTime),
                   _detailRow(
                     Icons.phone_outlined,
                     'Contact',
@@ -1630,77 +1874,112 @@ class _PatientListTabState extends State<PatientListTab> {
               ),
             ),
 
-            // Actions
+            // Actions — 2 rows: [Follow-up | View Profile] then [Delete | Close]
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-              child: Row(
+              child: Column(
                 children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF2E8B7B),
-                        side: const BorderSide(
-                            color: Color(0xFF2E8B7B)),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                        padding: const EdgeInsets.symmetric(
-                            vertical: 12),
-                      ),
-                      child: const Text('Close',
-                          style:
-                              TextStyle(fontWeight: FontWeight.w600)),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () => _openFollowUpDialog(patient),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2E8B7B),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                        padding:
-                            const EdgeInsets.symmetric(vertical: 12),
-                        elevation: 0,
-                      ),
-                      child: const Text(
-                        'Follow-up',
-                        style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        Navigator.pop(context);
-                        final result = await Navigator.push<Patient>(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => PatientProfileOverview(
-                                patient: patient),
+                  // Primary actions
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () => _openFollowUpDialog(patient),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2E8B7B),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            elevation: 0,
                           ),
-                        );
-                        // Patient list groups by name; refresh after profile edits.
-                        if (result != null && mounted) {
-                          await _fetchPatients();
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2E8B7B),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                        padding: const EdgeInsets.symmetric(
-                            vertical: 12),
-                        elevation: 0,
+                          child: const Text(
+                            'Follow-up',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
                       ),
-                      child: const Text('View Profile',
-                          style: TextStyle(
-                              fontWeight: FontWeight.w700)),
-                    ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            Navigator.pop(context);
+                            final result = await Navigator.push<Patient>(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    PatientProfileOverview(patient: patient),
+                              ),
+                            );
+                            if (result != null && mounted) {
+                              await _fetchPatients();
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2E8B7B),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            elevation: 0,
+                          ),
+                          child: const Text('View Profile',
+                              style:
+                                  TextStyle(fontWeight: FontWeight.w700)),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  // Secondary actions
+                  Row(
+                    children: [
+                      // Delete button
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            // Close the detail dialog first, then show
+                            // the delete confirmation on the list screen.
+                            Navigator.pop(context);
+                            await _confirmAndSoftDeleteSingle(patient);
+                          },
+                          icon: const Icon(
+                              Icons.delete_outline_rounded,
+                              size: 16),
+                          label: const Text('Delete',
+                              style:
+                                  TextStyle(fontWeight: FontWeight.w600)),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.redAccent,
+                            side: const BorderSide(
+                                color: Colors.redAccent, width: 1),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                            padding:
+                                const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      // Close button
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF2E8B7B),
+                            side: const BorderSide(
+                                color: Color(0xFF2E8B7B)),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                            padding:
+                                const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          child: const Text('Close',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w600)),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -1741,9 +2020,10 @@ class _PatientListTabState extends State<PatientListTab> {
   }
 
   Future<void> _openFollowUpDialog(Patient patient) async {
-    DateTime selectedDate =
-        patient.nextFollowUpDate ?? DateTime.now().add(const Duration(days: 30));
-    final notesController = TextEditingController(text: patient.followUpNotes);
+    DateTime selectedDate = patient.nextFollowUpDate ??
+        DateTime.now().add(const Duration(days: 30));
+    final notesController =
+        TextEditingController(text: patient.followUpNotes);
 
     final result = await showDialog<bool>(
       context: context,
@@ -1779,12 +2059,11 @@ class _PatientListTabState extends State<PatientListTab> {
                         context: ctx,
                         initialDate: selectedDate,
                         firstDate: now,
-                        lastDate: now.add(const Duration(days: 365 * 3)),
+                        lastDate:
+                            now.add(const Duration(days: 365 * 3)),
                       );
                       if (picked != null) {
-                        setStateDialog(() {
-                          selectedDate = picked;
-                        });
+                        setStateDialog(() => selectedDate = picked);
                       }
                     },
                   ),
@@ -1793,7 +2072,8 @@ class _PatientListTabState extends State<PatientListTab> {
                     controller: notesController,
                     maxLines: 3,
                     decoration: const InputDecoration(
-                      labelText: 'Notes for health worker (optional)',
+                      labelText:
+                          'Notes for health worker (optional)',
                       border: OutlineInputBorder(),
                     ),
                   ),
@@ -1848,7 +2128,6 @@ class _PatientListTabState extends State<PatientListTab> {
 
       DocumentReference targetRef;
 
-      // Prefer barangay-shared patient document when available.
       if (patient.barangayId.isNotEmpty) {
         targetRef = firestore
             .collection('barangays')
@@ -1856,7 +2135,6 @@ class _PatientListTabState extends State<PatientListTab> {
             .collection('patients')
             .doc(patient.docId);
       } else {
-        // Fallback: user's homepageData copy.
         targetRef = firestore
             .collection('users')
             .doc(user.uid)
@@ -1873,9 +2151,7 @@ class _PatientListTabState extends State<PatientListTab> {
       await _fetchPatients();
 
       if (mounted) {
-        // Close the patient details dialog after a successful save.
         Navigator.of(context).pop();
-
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Follow-up saved successfully'),
@@ -1953,12 +2229,8 @@ class Patient {
   final String createdBy;
   final String barangayId;
   final bool isArchived;
-  final String visitDate;   // ← ADD
+  final String visitDate;
   final String visitTime;
-  
-  
-
-  
   final DateTime? nextFollowUpDate;
   final String followUpNotes;
 
@@ -1981,7 +2253,7 @@ class Patient {
     this.createdBy = 'Unknown',
     this.barangayId = '',
     this.isArchived = false,
-    this.visitDate = '',    // ← ADD
+    this.visitDate = '',
     this.visitTime = '',
     this.nextFollowUpDate,
     this.followUpNotes = '',
