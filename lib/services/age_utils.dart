@@ -1,6 +1,7 @@
+import 'package:intl/intl.dart';
+
 /// Shared utilities for computing age in months from patient demographic data.
 /// Used for auto-archiving patients at 60 months (5 years).
-library;
 
 /// Parses common date string formats (MM-DD-YYYY, MM/DD/YYYY, YYYY-MM-DD, ISO).
 DateTime? parseDate(String? s) {
@@ -24,6 +25,20 @@ DateTime? parseDate(String? s) {
     }
   }
   return null;
+}
+
+String formatDateForStorage(DateTime date) {
+  return DateFormat('yyyy-MM-dd').format(date.toLocal());
+}
+
+String formatDateForDisplay(DateTime date) {
+  return DateFormat('MM/dd/yyyy').format(date.toLocal());
+}
+
+String formatDateStringForDisplay(String? source) {
+  if (source == null || source.trim().isEmpty) return '';
+  final parsed = parseDate(source.trim());
+  return parsed != null ? formatDateForDisplay(parsed) : source.trim();
 }
 
 /// Age in months between two dates.

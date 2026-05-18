@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:lumasdang/services/car_address_validator.dart';
 
-
 class DemographicDataForm extends StatefulWidget {
   final TextEditingController firstNameController;
   final TextEditingController middleNameController;
@@ -56,7 +55,6 @@ class DemographicDataForm extends StatefulWidget {
   final ValueChanged<String?>? onIpEthnicityChanged;
   final ValueChanged<bool?>? onIsFourPsMemberChanged;
   final ValueChanged<bool?>? onHasDisabilityChanged;
-  
 
   final bool isDraft;
 
@@ -112,7 +110,6 @@ class DemographicDataForm extends StatefulWidget {
 
   @override
   State<DemographicDataForm> createState() => _DemographicDataFormState();
-  
 }
 
 class _DemographicDataFormState extends State<DemographicDataForm> {
@@ -149,10 +146,46 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
   String? birthBarangay;
 
   static const _birthWeightOptions = [
-    '1.0', '1.1', '1.2', '1.3', '1.4', '1.5', '1.6', '1.7', '1.8', '1.9',
-    '2.0', '2.1', '2.2', '2.3', '2.4', '2.5', '2.6', '2.7', '2.8', '2.9',
-    '3.0', '3.1', '3.2', '3.3', '3.4', '3.5', '3.6', '3.7', '3.8', '3.9',
-    '4.0', '4.1', '4.2', '4.3', '4.4', '4.5', '4.6', '4.7', '4.8', '4.9',
+    '1.0',
+    '1.1',
+    '1.2',
+    '1.3',
+    '1.4',
+    '1.5',
+    '1.6',
+    '1.7',
+    '1.8',
+    '1.9',
+    '2.0',
+    '2.1',
+    '2.2',
+    '2.3',
+    '2.4',
+    '2.5',
+    '2.6',
+    '2.7',
+    '2.8',
+    '2.9',
+    '3.0',
+    '3.1',
+    '3.2',
+    '3.3',
+    '3.4',
+    '3.5',
+    '3.6',
+    '3.7',
+    '3.8',
+    '3.9',
+    '4.0',
+    '4.1',
+    '4.2',
+    '4.3',
+    '4.4',
+    '4.5',
+    '4.6',
+    '4.7',
+    '4.8',
+    '4.9',
     '5.0',
   ];
 
@@ -193,18 +226,15 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
     'N/A (Absent)',
   ];
 
-  static const _caregiverOptions = [
-    'Yes',
-    'No',
-  ];
+  static const _caregiverOptions = ['Yes', 'No'];
 
   Map<String, List<String>> get carLocations =>
-    CARAddressValidator.municipalitiesByProvince;
+      CARAddressValidator.municipalitiesByProvince;
 
-List<String> _barangaysFor(String? municipality) {
-  if (municipality == null || municipality.isEmpty) return [];
-  return CARAddressValidator.getBarangaysForMunicipality(municipality);
-}
+  List<String> _barangaysFor(String? municipality) {
+    if (municipality == null || municipality.isEmpty) return [];
+    return CARAddressValidator.getBarangaysForMunicipality(municipality);
+  }
 
   //  final Map<String, List<String>> carLocations = {
   //   "Abra": [
@@ -306,32 +336,32 @@ List<String> _barangaysFor(String? municipality) {
   //   "San Jose",
   // ];
 
-//   final Map<String, List<String>> barangayData = {
-//   "La Trinidad": [
-//     "Alapang",
-//     "Alno",
-//     "Ambiong",
-//     "Bahong",
-//     "Balili",
-//     "Beckel",
-//     "Betag",
-//     "Bineng",
-//     "Cruz",
-//     "Lubas",
-//     "Pico",
-//     "Poblacion",
-//     "Puguis",
-//     "Shilan",
-//     "Tawang",
-//     "Wangal",
-//   ],
+  //   final Map<String, List<String>> barangayData = {
+  //   "La Trinidad": [
+  //     "Alapang",
+  //     "Alno",
+  //     "Ambiong",
+  //     "Bahong",
+  //     "Balili",
+  //     "Beckel",
+  //     "Betag",
+  //     "Bineng",
+  //     "Cruz",
+  //     "Lubas",
+  //     "Pico",
+  //     "Poblacion",
+  //     "Puguis",
+  //     "Shilan",
+  //     "Tawang",
+  //     "Wangal",
+  //   ],
 
-//   "Baguio": [
-//     "Session Road",
-//     "Irisan",
-//     "Burnham",
-//   ],
-// };
+  //   "Baguio": [
+  //     "Session Road",
+  //     "Irisan",
+  //     "Burnham",
+  //   ],
+  // };
 
   @override
   void initState() {
@@ -362,7 +392,8 @@ List<String> _barangaysFor(String? municipality) {
 
     // Seed birth weight selection if already set
     final birthWeightText = widget.birthWeightController.text.trim();
-    if (birthWeightText.isNotEmpty && _birthWeightOptions.contains(birthWeightText)) {
+    if (birthWeightText.isNotEmpty &&
+        _birthWeightOptions.contains(birthWeightText)) {
       _selectedBirthWeight = birthWeightText;
     }
 
@@ -491,29 +522,29 @@ List<String> _barangaysFor(String? municipality) {
   //   );
   // }
 
+  String _formatAddress(
+    String? street,
+    String? barangay,
+    String? municipality,
+    String? province,
+  ) {
+    final parts = <String>[];
+    if (street != null && street.isNotEmpty) parts.add(street);
+    if (barangay != null && barangay.isNotEmpty) parts.add(barangay);
+    if (municipality != null && municipality.isNotEmpty)
+      parts.add(municipality);
+    if (province != null && province.isNotEmpty) parts.add(province);
+    return parts.join(', ');
+  }
 
-String _formatAddress(
-  String? street,
-  String? barangay,
-  String? municipality,
-  String? province,
-) {
-  final parts = <String>[];
-  if (street != null && street.isNotEmpty) parts.add(street);
-  if (barangay != null && barangay.isNotEmpty) parts.add(barangay);
-  if (municipality != null && municipality.isNotEmpty) parts.add(municipality);
-  if (province != null && province.isNotEmpty) parts.add(province);
-  return parts.join(', ');
-}
-
-void _updateAddressController() {
-  widget.addressController.text = _formatAddress(
-    widget.streetController.text.trim(),
-    selectedBarangay,
-    selectedMunicipality,
-    selectedProvince,   
-  );
-}
+  void _updateAddressController() {
+    widget.addressController.text = _formatAddress(
+      widget.streetController.text.trim(),
+      selectedBarangay,
+      selectedMunicipality,
+      selectedProvince,
+    );
+  }
 
   // ── Date picker ────────────────────────────────────────────────────────────
   Future<void> _pickDate(BuildContext context) async {
@@ -878,12 +909,16 @@ void _updateAddressController() {
     );
   }
 
-  Widget _buildLabelRow(String label, {bool isRequired = false, bool isOptional = false}) {
+  Widget _buildLabelRow(
+    String label, {
+    bool isRequired = false,
+    bool isOptional = false,
+  }) {
     String displayLabel = label;
     if (isRequired) {
       displayLabel = '$label *';
     }
-    
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Row(
@@ -897,7 +932,8 @@ void _updateAddressController() {
               letterSpacing: 0.5,
             ),
           ),
-          if (isOptional) ...[const SizedBox(width: 6),
+          if (isOptional) ...[
+            const SizedBox(width: 6),
             Text(
               '(Optional)',
               style: const TextStyle(
@@ -1022,7 +1058,8 @@ void _updateAddressController() {
                           child: Checkbox(
                             value: _middleNameNA,
                             activeColor: const Color(0xFFF5A962),
-                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
                             onChanged: (val) {
                               setState(() {
                                 _middleNameNA = val ?? false;
@@ -1037,7 +1074,10 @@ void _updateAddressController() {
                         const Flexible(
                           child: Text(
                             'N/A (no middle name)',
-                            style: TextStyle(fontSize: 12, color: Color(0xFF888888)),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF888888),
+                            ),
                           ),
                         ),
                       ],
@@ -1053,7 +1093,8 @@ void _updateAddressController() {
                           child: Checkbox(
                             value: _extensionOptional,
                             activeColor: const Color(0xFFF5A962),
-                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
                             onChanged: (val) {
                               setState(() {
                                 _extensionOptional = val ?? false;
@@ -1069,7 +1110,10 @@ void _updateAddressController() {
                         const Flexible(
                           child: Text(
                             'Extension optional',
-                            style: TextStyle(fontSize: 12, color: Color(0xFF888888)),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF888888),
+                            ),
                           ),
                         ),
                       ],
@@ -1203,12 +1247,21 @@ void _updateAddressController() {
                           if (value == null) {
                             widget.birthOrderController.clear();
                           } else if (value == '6th or later') {
-                            if (int.tryParse(widget.birthOrderController.text.trim()) == null ||
-                                int.tryParse(widget.birthOrderController.text.trim())! <= 5) {
+                            if (int.tryParse(
+                                      widget.birthOrderController.text.trim(),
+                                    ) ==
+                                    null ||
+                                int.tryParse(
+                                      widget.birthOrderController.text.trim(),
+                                    )! <=
+                                    5) {
                               widget.birthOrderController.clear();
                             }
                           } else {
-                            final numeric = value.replaceAll(RegExp(r'[^0-9]'), '');
+                            final numeric = value.replaceAll(
+                              RegExp(r'[^0-9]'),
+                              '',
+                            );
                             widget.birthOrderController.text = numeric;
                           }
                         });
@@ -1226,7 +1279,8 @@ void _updateAddressController() {
                   icon: Icons.sort_outlined,
                   hint: 'Enter 6 or higher',
                   validator: (v) {
-                    if (widget.isDraft || _selectedBirthOrder != '6th or later') {
+                    if (widget.isDraft ||
+                        _selectedBirthOrder != '6th or later') {
                       return null;
                     }
                     if (v == null || v.trim().isEmpty) {
@@ -1370,15 +1424,14 @@ void _updateAddressController() {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               /// ADDRESS
-        const Text(
-          "ADDRESS",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+              const Text(
+                "ADDRESS",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
 
-        const SizedBox(height: 12),
-/*
+              const SizedBox(height: 12),
+
+              /*
         _buildDropdown(
           label: "Province",
           value: selectedProvince,
@@ -1400,260 +1453,262 @@ void _updateAddressController() {
         ),
 */
 
-        /// 
+              ///
+              const SizedBox(height: 12),
 
-const SizedBox(height: 12),
+              _buildField(
+                label: "HOUSE NO. / STREET",
+                controller: widget.streetController,
+                icon: Icons.signpost_outlined,
+                hint: 'e.g. 123 Rizal St.',
+              ),
 
-_buildField(
-  label: "HOUSE NO. / STREET",
-  controller: widget.streetController,
-  icon: Icons.signpost_outlined,
-  hint: 'e.g. 123 Rizal St.',
-),
+              const SizedBox(height: 12),
 
-const SizedBox(height: 12),
+              _buildDropdown(
+                label: "PROVINCE",
+                value: selectedProvince,
+                items: carLocations.keys.toList(),
+                onChanged: (value) {
+                  setState(() {
+                    selectedProvince = value;
+                    selectedMunicipality = null;
+                    selectedBarangay = null;
+                    _updateAddressController();
+                    if (sameAsAddress) {
+                      birthProvince = selectedProvince;
+                      birthMunicipality = null;
+                      birthBarangay = null;
+                      //_updatePlaceOfBirthController();
+                    }
+                  });
+                },
+              ),
 
-_buildDropdown(
-  label: "PROVINCE",
-  value: selectedProvince,
-  items: carLocations.keys.toList(),
-  onChanged: (value) {
-    setState(() {
-      selectedProvince = value;
-      selectedMunicipality = null;
-      selectedBarangay = null;
-      _updateAddressController();
-      if (sameAsAddress) {
-        birthProvince = selectedProvince;
-        birthMunicipality = null;
-        birthBarangay = null;
-        //_updatePlaceOfBirthController();
-      }
-    });
-  },
-),
+              const SizedBox(height: 12),
 
-const SizedBox(height: 12),
+              _buildDropdown(
+                label: "MUNICIPALITY / CITY",
+                value: selectedMunicipality,
+                items: selectedProvince == null
+                    ? []
+                    : carLocations[selectedProvince]!,
+                onChanged: (value) {
+                  setState(() {
+                    selectedMunicipality = value;
+                    selectedBarangay = null;
+                    _updateAddressController();
+                    if (sameAsAddress) {
+                      birthMunicipality = selectedMunicipality;
+                      birthBarangay = null;
+                      //_updatePlaceOfBirthController();
+                    }
+                  });
+                },
+              ),
 
-_buildDropdown(
-  label: "MUNICIPALITY / CITY",
-  value: selectedMunicipality,
-  items: selectedProvince == null ? [] : carLocations[selectedProvince]!,
-  onChanged: (value) {
-    setState(() {
-      selectedMunicipality = value;
-      selectedBarangay = null;
-      _updateAddressController();
-      if (sameAsAddress) {
-        birthMunicipality = selectedMunicipality;
-        birthBarangay = null;
-        //_updatePlaceOfBirthController();
-      }
-    });
-  },
-),
+              const SizedBox(height: 12),
 
-const SizedBox(height: 12),
+              _buildDropdown(
+                label: "BARANGAY",
+                value: selectedBarangay,
+                items: _barangaysFor(selectedMunicipality),
+                onChanged: (value) {
+                  setState(() {
+                    selectedBarangay = value;
+                    _updateAddressController();
+                    if (sameAsAddress) {
+                      birthBarangay = selectedBarangay;
+                      //_updatePlaceOfBirthController();
+                    }
+                  });
+                },
+              ),
 
-_buildDropdown(
-  label: "BARANGAY",
-  value: selectedBarangay,
-  items: _barangaysFor(selectedMunicipality),
-  onChanged: (value) {
-    setState(() {
-      selectedBarangay = value;
-      _updateAddressController();
-      if (sameAsAddress) {
-        birthBarangay = selectedBarangay;
-        //_updatePlaceOfBirthController();
-      }
-    });
-  },
-),
+              // const SizedBox(height: 12),
 
-        // const SizedBox(height: 12),
+              // _buildDropdown(
+              //   label: "Municipality / City",
+              //   value: selectedMunicipality,
+              //   items: selectedProvince == null
+              //       ? []
+              //       : carLocations[selectedProvince]!,
+              //   onChanged: (value) {
+              //     setState(() {
+              //       selectedMunicipality = value;
+              //       selectedBarangay = null;
+              //       _updateAddressController();
+              //       if (sameAsAddress) {
+              //         birthProvince = selectedProvince;
+              //         birthMunicipality = selectedMunicipality;
+              //         birthBarangay = selectedBarangay;
+              //         _updatePlaceOfBirthController();
+              //       }
+              //     });
+              //   },
+              // ),
 
-        // _buildDropdown(
-        //   label: "Municipality / City",
-        //   value: selectedMunicipality,
-        //   items: selectedProvince == null
-        //       ? []
-        //       : carLocations[selectedProvince]!,
-        //   onChanged: (value) {
-        //     setState(() {
-        //       selectedMunicipality = value;
-        //       selectedBarangay = null;
-        //       _updateAddressController();
-        //       if (sameAsAddress) {
-        //         birthProvince = selectedProvince;
-        //         birthMunicipality = selectedMunicipality;
-        //         birthBarangay = selectedBarangay;
-        //         _updatePlaceOfBirthController();
-        //       }
-        //     });
-        //   },
-        // ),
+              // const SizedBox(height: 12),
 
-        // const SizedBox(height: 12),
+              // _buildDropdown(
+              //   label: "Barangay",
+              //   value: selectedBarangay,
+              //   items: barangays,
+              //   onChanged: (value) {
+              //     setState(() {
+              //       selectedBarangay = value;
+              //       _updateAddressController();
+              //       if (sameAsAddress) {
+              //         birthProvince = selectedProvince;
+              //         birthMunicipality = selectedMunicipality;
+              //         birthBarangay = selectedBarangay;
+              //         _updatePlaceOfBirthController();
+              //       }
+              //     });
+              //   },
+              // ),
+              const SizedBox(height: 20),
 
-        // _buildDropdown(
-        //   label: "Barangay",
-        //   value: selectedBarangay,
-        //   items: barangays,
-        //   onChanged: (value) {
-        //     setState(() {
-        //       selectedBarangay = value;
-        //       _updateAddressController();
-        //       if (sameAsAddress) {
-        //         birthProvince = selectedProvince;
-        //         birthMunicipality = selectedMunicipality;
-        //         birthBarangay = selectedBarangay;
-        //         _updatePlaceOfBirthController();
-        //       }
-        //     });
-        //   },
-        // ),
+              /// CHECKBOX
+              CheckboxListTile(
+                value: sameAsAddress,
+                title: const Text("Place of Birth is same as Address"),
+                contentPadding: EdgeInsets.zero,
+                onChanged: (value) {
+                  setState(() {
+                    sameAsAddress = value!;
 
-        const SizedBox(height: 20),
+                    if (sameAsAddress) {
+                      birthProvince = selectedProvince;
+                      birthMunicipality = selectedMunicipality;
+                      birthBarangay = selectedBarangay;
+                      //_updatePlaceOfBirthController();
+                    }
+                  });
+                },
+              ),
 
-        /// CHECKBOX
-        CheckboxListTile(
-          value: sameAsAddress,
-          title: const Text("Place of Birth is same as Address"),
-          contentPadding: EdgeInsets.zero,
-          onChanged: (value) {
-            setState(() {
-              sameAsAddress = value!;
+              const SizedBox(height: 20),
 
-              if (sameAsAddress) {
-                birthProvince = selectedProvince;
-                birthMunicipality = selectedMunicipality;
-                birthBarangay = selectedBarangay;
-                //_updatePlaceOfBirthController();
-              }
-            });
-          },
-        ),
+              /// PLACE OF BIRTH
+              // const Text(
+              //   "PLACE OF BIRTH",
+              //   style: TextStyle(
+              //     fontWeight: FontWeight.bold,
+              //   ),
+              // ),
 
-        const SizedBox(height: 20),
+              // const SizedBox(height: 12),
 
-        /// PLACE OF BIRTH
-        // const Text(
-        //   "PLACE OF BIRTH",
-        //   style: TextStyle(
-        //     fontWeight: FontWeight.bold,
-        //   ),
-        // ),
+              // _buildDropdown(
+              //   label: "Province",
+              //   value: birthProvince,
+              //   items: carLocations.keys.toList(),
+              //   onChanged: sameAsAddress
+              //       ? null
+              //       : (value) {
+              //           setState(() {
+              //             birthProvince = value;
+              //             birthMunicipality = null;
+              //             birthBarangay = null;
+              //             _updatePlaceOfBirthController();
+              //           });
+              //         },
+              // ),
 
-        // const SizedBox(height: 12),
+              // const SizedBox(height: 12),
 
-        // _buildDropdown(
-        //   label: "Province",
-        //   value: birthProvince,
-        //   items: carLocations.keys.toList(),
-        //   onChanged: sameAsAddress
-        //       ? null
-        //       : (value) {
-        //           setState(() {
-        //             birthProvince = value;
-        //             birthMunicipality = null;
-        //             birthBarangay = null;
-        //             _updatePlaceOfBirthController();
-        //           });
-        //         },
-        // ),
+              // _buildDropdown(
+              //   label: "Municipality / City",
+              //   value: birthMunicipality,
+              //   items: birthProvince == null
+              //       ? []
+              //       : carLocations[birthProvince]!,
+              //   onChanged: sameAsAddress
+              //       ? null
+              //       : (value) {
+              //           setState(() {
+              //             birthMunicipality = value;
+              //             birthBarangay = null;
+              //             _updatePlaceOfBirthController();
+              //           });
+              //         },
+              // ),
 
-        // const SizedBox(height: 12),
+              // const SizedBox(height: 12),
 
-        // _buildDropdown(
-        //   label: "Municipality / City",
-        //   value: birthMunicipality,
-        //   items: birthProvince == null
-        //       ? []
-        //       : carLocations[birthProvince]!,
-        //   onChanged: sameAsAddress
-        //       ? null
-        //       : (value) {
-        //           setState(() {
-        //             birthMunicipality = value;
-        //             birthBarangay = null;
-        //             _updatePlaceOfBirthController();
-        //           });
-        //         },
-        // ),
+              // _buildDropdown(
+              //   label: "Barangay",
+              //   value: birthBarangay,
+              //   items: barangays,
+              //   onChanged: sameAsAddress
+              //       ? null
+              //       : (value) {
+              //           setState(() {
+              //             birthBarangay = value;
+              //             _updatePlaceOfBirthController();
+              //           });
+              //         },
+              // ),
 
-        // const SizedBox(height: 12),
+              /// PLACE OF BIRTH
+              const Text(
+                "PLACE OF BIRTH",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
 
-        // _buildDropdown(
-        //   label: "Barangay",
-        //   value: birthBarangay,
-        //   items: barangays,
-        //   onChanged: sameAsAddress
-        //       ? null
-        //       : (value) {
-        //           setState(() {
-        //             birthBarangay = value;
-        //             _updatePlaceOfBirthController();
-        //           });
-        //         },
-        // ),
-   
-  /// PLACE OF BIRTH
-const Text(
-  "PLACE OF BIRTH",
-  style: TextStyle(fontWeight: FontWeight.bold),
-),
+              const SizedBox(height: 12),
 
-const SizedBox(height: 12),
+              _buildDropdown(
+                label: "PROVINCE",
+                value: birthProvince,
+                items: carLocations.keys.toList(),
+                onChanged: sameAsAddress
+                    ? null
+                    : (value) {
+                        setState(() {
+                          birthProvince = value;
+                          birthMunicipality = null;
+                          birthBarangay = null;
+                          // _updatePlaceOfBirthController();
+                        });
+                      },
+              ),
 
-_buildDropdown(
-  label: "PROVINCE",
-  value: birthProvince,
-  items: carLocations.keys.toList(),
-  onChanged: sameAsAddress
-      ? null
-      : (value) {
-          setState(() {
-            birthProvince = value;
-            birthMunicipality = null;
-            birthBarangay = null;
-           // _updatePlaceOfBirthController();
-          });
-        },
-),
+              const SizedBox(height: 12),
 
-const SizedBox(height: 12),
+              _buildDropdown(
+                label: "MUNICIPALITY / CITY",
+                value: birthMunicipality,
+                items: birthProvince == null
+                    ? []
+                    : carLocations[birthProvince]!,
+                onChanged: sameAsAddress
+                    ? null
+                    : (value) {
+                        setState(() {
+                          birthMunicipality = value;
+                          birthBarangay = null;
+                          //_updatePlaceOfBirthController();
+                        });
+                      },
+              ),
 
-_buildDropdown(
-  label: "MUNICIPALITY / CITY",
-  value: birthMunicipality,
-  items: birthProvince == null ? [] : carLocations[birthProvince]!,
-  onChanged: sameAsAddress
-      ? null
-      : (value) {
-          setState(() {
-            birthMunicipality = value;
-            birthBarangay = null;
-            //_updatePlaceOfBirthController();
-          });
-        },
-),
+              const SizedBox(height: 12),
 
-const SizedBox(height: 12),
-
-_buildDropdown(
-  label: "BARANGAY",
-  value: birthBarangay,
-  items: _barangaysFor(birthMunicipality),
-  onChanged: sameAsAddress
-      ? null
-      : (value) {
-          setState(() {
-            birthBarangay = value;
-           // _updatePlaceOfBirthController();
-          });
-        },
-),
+              _buildDropdown(
+                label: "BARANGAY",
+                value: birthBarangay,
+                items: _barangaysFor(birthMunicipality),
+                onChanged: sameAsAddress
+                    ? null
+                    : (value) {
+                        setState(() {
+                          birthBarangay = value;
+                          // _updatePlaceOfBirthController();
+                        });
+                      },
+              ),
 
               _buildLabelRow('STATUS OF RESIDENCE'),
               Row(
@@ -1713,7 +1768,8 @@ _buildDropdown(
                           _isMotherAvailable = val ?? false;
                           if (!_isMotherAvailable) {
                             _selectedMotherStatus = 'N/A (Absent)';
-                            widget.motherController.text = _selectedMotherStatus!;
+                            widget.motherController.text =
+                                _selectedMotherStatus!;
                             widget.motherContactController.clear();
                             widget.motherAgeController.clear();
                             widget.motherOccupationController.clear();
@@ -1760,19 +1816,28 @@ _buildDropdown(
                   prefixIcon: const Icon(Icons.person_outline, size: 16),
                   filled: true,
                   fillColor: const Color(0xFFFAFAFA),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 11,
+                  ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: Color(0xFFEEEEEE), width: 1.5),
+                    borderSide: const BorderSide(
+                      color: Color(0xFFEEEEEE),
+                      width: 1.5,
+                    ),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: Color(0xFFF5A962), width: 2),
+                    borderSide: const BorderSide(
+                      color: Color(0xFFF5A962),
+                      width: 2,
+                    ),
                   ),
                 ),
               ),
               const SizedBox(height: 12),
-              if (_selectedMotherStatus == 'Present') ...[    
+              if (_selectedMotherStatus == 'Present') ...[
                 _buildField(
                   label: "MOTHER'S FULL NAME *",
                   controller: widget.motherController,
@@ -1803,7 +1868,9 @@ _buildDropdown(
                       hint: '09XXXXXXXXX',
                       icon: Icons.phone_outlined,
                       enabled: _isMotherAvailable,
-                      validator: _isMotherAvailable ? _validateMotherPhone : null,
+                      validator: _isMotherAvailable
+                          ? _validateMotherPhone
+                          : null,
                     ),
                   ),
                 ],
@@ -1915,7 +1982,8 @@ _buildDropdown(
                           _isFatherAvailable = val ?? false;
                           if (!_isFatherAvailable) {
                             _selectedFatherStatus = 'N/A (Absent)';
-                            widget.fatherController.text = _selectedFatherStatus!;
+                            widget.fatherController.text =
+                                _selectedFatherStatus!;
                             widget.fatherContactController.clear();
                             widget.fatherAgeController.clear();
                             widget.fatherOccupationController.clear();
@@ -1962,19 +2030,28 @@ _buildDropdown(
                   prefixIcon: const Icon(Icons.person_outline, size: 16),
                   filled: true,
                   fillColor: const Color(0xFFFAFAFA),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 11,
+                  ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: Color(0xFFEEEEEE), width: 1.5),
+                    borderSide: const BorderSide(
+                      color: Color(0xFFEEEEEE),
+                      width: 1.5,
+                    ),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: Color(0xFFF5A962), width: 2),
+                    borderSide: const BorderSide(
+                      color: Color(0xFFF5A962),
+                      width: 2,
+                    ),
                   ),
                 ),
               ),
               const SizedBox(height: 12),
-              if (_selectedFatherStatus == 'Present') ...[         
+              if (_selectedFatherStatus == 'Present') ...[
                 _buildField(
                   label: "FATHER'S FULL NAME *",
                   controller: widget.fatherController,
@@ -2113,7 +2190,10 @@ _buildDropdown(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildLabelRow("IS CAREGIVER DIFFERENT FROM PARENTS?", isOptional: true),
+              _buildLabelRow(
+                "IS CAREGIVER DIFFERENT FROM PARENTS?",
+                isOptional: true,
+              ),
               const SizedBox(height: 5),
               DropdownButtonFormField<String>(
                 initialValue: _selectedCaregiverPresence,
@@ -2131,22 +2211,34 @@ _buildDropdown(
                     .map((s) => DropdownMenuItem(value: s, child: Text(s)))
                     .toList(),
                 decoration: InputDecoration(
-                  prefixIcon: const Icon(Icons.supervisor_account_outlined, size: 16),
+                  prefixIcon: const Icon(
+                    Icons.supervisor_account_outlined,
+                    size: 16,
+                  ),
                   filled: true,
                   fillColor: const Color(0xFFFAFAFA),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 11,
+                  ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: Color(0xFFEEEEEE), width: 1.5),
+                    borderSide: const BorderSide(
+                      color: Color(0xFFEEEEEE),
+                      width: 1.5,
+                    ),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: Color(0xFFF5A962), width: 2),
+                    borderSide: const BorderSide(
+                      color: Color(0xFFF5A962),
+                      width: 2,
+                    ),
                   ),
                 ),
               ),
               const SizedBox(height: 12),
-              if (_selectedCaregiverPresence == 'Yes') ...[              
+              if (_selectedCaregiverPresence == 'Yes') ...[
                 _buildField(
                   label: "CAREGIVER'S FULL NAME",
                   controller: widget.caregiverNameController,

@@ -8,6 +8,7 @@ import '../../services/firestore_service.dart';
 import '../../services/local_db_service.dart';
 import '../../services/connectivity_service.dart';
 import '../../services/vaccine_reminder_service.dart';
+import '../../services/age_utils.dart';
 
 import 'widgets/upcoming_events.dart';
 import 'widgets/demographic_data_form.dart';
@@ -184,6 +185,9 @@ class _HomePageState extends State<HomePage>
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
     _sectionTabController = TabController(length: 4, vsync: this);
+    if (visitDateController.text.trim().isEmpty) {
+      visitDateController.text = formatDateForDisplay(DateTime.now());
+    }
 
     LocalDbService.instance.init().then((_) async {
       final online = kIsWeb
@@ -823,7 +827,7 @@ class _HomePageState extends State<HomePage>
 
   List<_SummaryRow> _buildVaccinationRows() {
     if (_vaccinationData == null || _vaccinationData!.isEmpty) {
-      return const [_SummaryRow('Vaccination Records', '')];
+      return [const _SummaryRow('Vaccination Records', '')];
     }
 
     final rows = <_SummaryRow>[];
@@ -839,7 +843,7 @@ class _HomePageState extends State<HomePage>
       }
     });
 
-    return rows.isEmpty ? const [_SummaryRow('Vaccination Records', '')] : rows;
+    return rows.isEmpty ? [const _SummaryRow('Vaccination Records', '')] : rows;
   }
 
   String _text(TextEditingController controller) => controller.text.trim();
@@ -997,9 +1001,12 @@ class _HomePageState extends State<HomePage>
       return;
     }
 
+    final visitDateRaw = visitDateController.text.trim();
+    final visitDateParsed = parseDate(visitDateRaw);
+
     final data = {
       'isDraft': _isDraft,
-      'visitDate': visitDateController.text.trim(),
+      'visitDate': visitDateParsed != null ? formatDateForStorage(visitDateParsed) : '',
       'visitTime': visitTimeController.text.trim(),
       'demographic': {
         'firstName': firstNameController.text.trim(),
@@ -1644,7 +1651,7 @@ class _HomePageState extends State<HomePage>
                         vertical: 6,
                       ),
                       tabs: const [
-                        Tab(text: 'Basic Info'),
+                        Tab(text: 'Personal Info'),
                         Tab(text: 'Physical'),
                         Tab(text: 'Nutrition'),
                         Tab(text: 'Medical'),
@@ -2031,39 +2038,8 @@ class _HomePageState extends State<HomePage>
                       ),
                     ),
                     const SizedBox(height: 5),
-                    GestureDetector(
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: DateTime.now(),
-                          firstDate: DateTime(2020),
-                          lastDate: DateTime.now().add(const Duration(days: 1)),
-                          builder: (ctx, child) => Theme(
-                            data: Theme.of(ctx).copyWith(
-                              colorScheme: const ColorScheme.light(
-                                primary: Color(0xFFF5A962),
-                                onPrimary: Colors.white,
-                                surface: Colors.white,
-                                onSurface: Color(0xFF1A1A1A),
-                              ),
-                              textButtonTheme: TextButtonThemeData(
-                                style: TextButton.styleFrom(
-                                  foregroundColor: const Color(0xFFF5A962),
-                                ),
-                              ),
-                            ),
-                            child: child!,
-                          ),
-                        );
-                        if (picked != null) {
-                          setState(() {
-                            visitDateController.text =
-                                '${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}-${picked.year}';
-                          });
-                        }
-                      },
-                      child: AbsorbPointer(
-                        child: TextFormField(
+                    AbsorbPointer(
+                      child: TextFormField(
                           controller: visitDateController,
                           readOnly: true,
                           style: const TextStyle(
@@ -2072,7 +2048,7 @@ class _HomePageState extends State<HomePage>
                             color: Color(0xFF1A1A1A),
                           ),
                           decoration: InputDecoration(
-                            hintText: 'Tap to select',
+                            hintText: 'Auto-filled from device date',
                             hintStyle: const TextStyle(
                               fontSize: 12,
                               color: Colors.black26,
@@ -2082,18 +2058,6 @@ class _HomePageState extends State<HomePage>
                               size: 16,
                               color: Color(0xFFF5A962),
                             ),
-                            suffixIcon: visitDateController.text.isNotEmpty
-                                ? GestureDetector(
-                                    onTap: () => setState(
-                                      () => visitDateController.clear(),
-                                    ),
-                                    child: const Icon(
-                                      Icons.clear,
-                                      size: 14,
-                                      color: Colors.black38,
-                                    ),
-                                  )
-                                : null,
                             filled: true,
                             fillColor: const Color(0xFFFAFAFA),
                             contentPadding: const EdgeInsets.symmetric(
@@ -2117,7 +2081,6 @@ class _HomePageState extends State<HomePage>
                           ),
                         ),
                       ),
-                    ),
                   ],
                 ),
               ),

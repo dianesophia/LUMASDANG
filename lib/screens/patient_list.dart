@@ -13,6 +13,12 @@ import '../services/local_db_service.dart';
 import 'shared/status_color.dart';
 import 'package:flutter/foundation.dart';
 
+String _formatVisitDateDisplay(String rawDate) {
+  if (rawDate.trim().isEmpty) return '';
+  final parsed = parseDate(rawDate.trim());
+  return parsed != null ? formatDateForDisplay(parsed) : rawDate.trim();
+}
+
 // ==================== APP BOTTOM NAV BAR ====================
 
 class AppBottomNavBar extends StatelessWidget {
@@ -2353,7 +2359,7 @@ class _PatientListTabState extends State<PatientListTab> {
                       '${patient.lastVisit.month}/${patient.lastVisit.day}/${patient.lastVisit.year}'),
                   if (patient.visitDate.isNotEmpty)
                     _detailRow(Icons.event_outlined, 'Visit Date',
-                        patient.visitDate),
+                        _formatVisitDateDisplay(patient.visitDate)),
                   if (patient.visitTime.isNotEmpty)
                     _detailRow(Icons.schedule_outlined, 'Visit Time',
                         patient.visitTime),

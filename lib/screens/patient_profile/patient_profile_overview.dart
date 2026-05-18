@@ -6,6 +6,7 @@ import '../../services/anthropometric_calculator.dart';
 import '../../services/firestore_service.dart';
 import '../../services/local_db_service.dart';
 import '../../services/connectivity_service.dart';
+import '../../services/age_utils.dart';
 import 'widgets/profile_info_card.dart';
 import 'widgets/assessment_table.dart';
 import 'widgets/trends_section.dart';
@@ -1630,6 +1631,10 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
     final heightCtrl = TextEditingController();
     final muacCtrl = TextEditingController();
 
+    if (visitDateCtrl.text.trim().isEmpty) {
+      visitDateCtrl.text = formatDateForDisplay(DateTime.now());
+    }
+
     bool saving = false;
     String? errorMessage;
 
@@ -1652,6 +1657,7 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
       required IconData icon,
       TextInputType keyboardType = TextInputType.text,
       VoidCallback? onTap,
+      bool readOnly = false,
     }) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1877,33 +1883,10 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
                               ctx: ctx,
                               controller: visitDateCtrl,
                               label: 'DATE OF VISIT',
-                              hint: 'MM / DD / YYYY',
+                              hint: 'Auto-filled from device date',
                               icon: Icons.calendar_today_outlined,
-                              onTap: () async {
-                                final picked = await showDatePicker(
-                                  context: ctx,
-                                  initialDate: DateTime.now(),
-                                  firstDate: DateTime(2020),
-                                  lastDate: DateTime.now()
-                                      .add(const Duration(days: 1)),
-                                  builder: (c, child) => Theme(
-                                    data: Theme.of(c).copyWith(
-                                      colorScheme:
-                                          const ColorScheme.light(
-                                              primary: kOrange,
-                                              onPrimary: Colors.white,
-                                              surface: Colors.white),
-                                    ),
-                                    child: child!,
-                                  ),
-                                );
-                                if (picked != null) {
-                                  setSheetState(() {
-                                    visitDateCtrl.text =
-                                        '${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}-${picked.year}';
-                                  });
-                                }
-                              },
+                              onTap: null,
+                              readOnly: true,
                             ),
                           ),
                           const SizedBox(width: 10),
@@ -2159,8 +2142,14 @@ class _PatientProfileOverviewState extends State<PatientProfileOverview>
         result.weightForHeight != null &&
         result.weightForHeight!.trim().isNotEmpty;
 
+    final normalizedVisitDate = visitDate != null && visitDate.trim().isNotEmpty
+        ? parseDate(visitDate.trim())
+        : null;
+
     final data = {
-      'visitDate': visitDate ?? '',
+      'visitDate': normalizedVisitDate != null
+          ? formatDateForStorage(normalizedVisitDate)
+          : '',
       'visitTime': visitTime ?? '',
       'demographic': {
         'firstName': patient.firstName,
