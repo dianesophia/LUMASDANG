@@ -3,9 +3,14 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:lumasdang/screens/dashboard/dashboard_empty.dart';
 import 'package:lumasdang/screens/dashboard/dashboard_skeleton.dart';
+import 'package:lumasdang/models/patient_list_filter.dart';
+import 'package:lumasdang/screens/dashboard/pending_sync_card.dart';
+import 'package:lumasdang/screens/home/widgets/stats_row.dart';
+import 'package:lumasdang/screens/home/widgets/upcoming_events.dart';
 import 'package:lumasdang/services/age_utils.dart';
 import 'package:lumasdang/services/connectivity_service.dart';
 import 'package:lumasdang/services/dashboard_analytics_service.dart';
+import 'package:lumasdang/services/local_db_service.dart';
 import 'package:lumasdang/services/nutrition_status_classifier.dart';
 
 enum AssessedPeriod { today, thisWeek, thisMonth }
@@ -16,8 +21,15 @@ enum SexFilter { all, male, female }
 
 class DashboardScreen extends StatefulWidget {
   final int refreshKey;
+  final Future<void> Function()? onSyncPending;
+  final void Function(PatientListFilter filter)? onOpenPatientList;
 
-  const DashboardScreen({super.key, required this.refreshKey});
+  const DashboardScreen({
+    super.key,
+    required this.refreshKey,
+    this.onSyncPending,
+    this.onOpenPatientList,
+  });
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -39,6 +51,9 @@ class _DashboardScreenState extends State<DashboardScreen>
   NutritionCategory _category = NutritionCategory.stunting;
   SexFilter _sex = SexFilter.all;
   List<Map<String, dynamic>> _patientsInWindow = [];
+  int _pendingSyncCount = 0;
+  bool _syncing = false;
+  Map<String, int> _statusCounts = {};
 
   @override
   void initState() {
@@ -75,12 +90,18 @@ class _DashboardScreenState extends State<DashboardScreen>
         startInclusive: start,
         endExclusive: end,
       );
+      await LocalDbService.instance.init();
+      final pending = await LocalDbService.instance.getUnsyncedRecords();
+      final statusCounts =
+          await DashboardAnalyticsService.loadStatusCounts(online: online);
       if (!mounted) return;
       setState(() {
         _assessedToday = counts.today;
         _assessedWeek = counts.week;
         _assessedMonth = counts.month;
         _patientsInWindow = patients;
+        _pendingSyncCount = pending.length;
+        _statusCounts = statusCounts;
         _loading = false;
       });
     } catch (e) {
@@ -135,11 +156,11 @@ class _DashboardScreenState extends State<DashboardScreen>
   String get _assessedSubtitle {
     switch (_assessedPeriod) {
       case AssessedPeriod.today:
-        return 'New patient records created today';
+        return 'New assessments logged today in your barangay';
       case AssessedPeriod.thisWeek:
-        return 'Total from Monday through today';
+        return 'New assessments from Monday through today';
       case AssessedPeriod.thisMonth:
-        return 'Total from the 1st of this month through today';
+        return 'New assessments from the 1st of this month through today';
     }
   }
 
@@ -286,8 +307,44 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
+  Future<void> _handleSyncTap() async {
+    if (_syncing || widget.onSyncPending == null) return;
+    setState(() => _syncing = true);
+    try {
+      await widget.onSyncPending!();
+      await _reloadAll();
+    } finally {
+      if (mounted) setState(() => _syncing = false);
+    }
+  }
+
+  void _openPatients(PatientListFilter filter) {
+    widget.onOpenPatientList?.call(filter);
+  }
+
   List<Widget> _bodyCharts() {
     return [
+      StatsRow(
+        key: ValueKey('stats_${widget.refreshKey}'),
+        showTodayCard: false,
+        statusCounts: _statusCounts,
+        onStatusTap: widget.onOpenPatientList == null
+            ? null
+            : (label) => _openPatients(
+                  PatientListFilter(malnutritionType: label),
+                ),
+      ),
+      const SizedBox(height: 16),
+      PendingSyncCard(
+        pendingCount: _pendingSyncCount,
+        syncing: _syncing,
+        onSyncTap: widget.onSyncPending != null ? _handleSyncTap : null,
+      ),
+      if (_pendingSyncCount > 0) const SizedBox(height: 16),
+      _sectionTitle('Upcoming events'),
+      const SizedBox(height: 8),
+      const UpcomingEvents(),
+      const SizedBox(height: 16),
       _numberAssessedCard(),
       const SizedBox(height: 20),
       _sectionTitle('Malnutrition analytics'),
@@ -342,7 +399,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                 const SizedBox(width: 12),
                 const Expanded(
                   child: Text(
-                    'Number Assessed',
+                    'Patients Assessed',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,

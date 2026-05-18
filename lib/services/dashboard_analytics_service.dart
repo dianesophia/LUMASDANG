@@ -91,4 +91,87 @@ class DashboardAnalyticsService {
     }
     return out;
   }
+
+  static Future<Map<String, int>> loadStatusCounts({
+    required bool online,
+    FirestoreService? firestore,
+  }) async {
+    const keys = [
+      'Underweight',
+      'Overweight/Obese',
+      'Stunted',
+      'At Risk',
+      'Normal',
+    ];
+    final counts = {for (final k in keys) k: 0};
+
+    if (online) {
+      final remote = await (firestore ?? FirestoreService()).getStatusCounts();
+      for (final k in keys) {
+        counts[k] = remote[k] ?? 0;
+      }
+      return counts;
+    }
+
+    await LocalDbService.instance.init();
+    final records =
+        await LocalDbService.instance.getAllRecords(includeDeleted: false);
+
+    for (final record in records) {
+      final data = record['data'] as Map<String, dynamic>?;
+      if (data == null) continue;
+      final anthropometric =
+          data['anthropometric'] as Map<String, dynamic>? ?? {};
+
+      final wfa =
+          (anthropometric['weightForAge'] as String? ?? '').toLowerCase();
+      final hfa =
+          (anthropometric['heightForAge'] as String? ?? '').toLowerCase();
+      final wfh =
+          (anthropometric['weightForHeight'] as String? ?? '').toLowerCase();
+      final bmi = (anthropometric['bmi'] as String? ?? '').toLowerCase();
+
+      if (wfa.contains('underweight') || bmi.contains('underweight')) {
+        counts['Underweight'] = counts['Underweight']! + 1;
+      }
+      if (wfa.contains('overweight') ||
+          wfa.contains('obese') ||
+          wfh.contains('overweight') ||
+          wfh.contains('obese') ||
+          bmi.contains('overweight') ||
+          bmi.contains('obese')) {
+        counts['Overweight/Obese'] = counts['Overweight/Obese']! + 1;
+      }
+      if (hfa.contains('stunted')) {
+        counts['Stunted'] = counts['Stunted']! + 1;
+      }
+      if (wfh.contains('wasted') ||
+          wfa.contains('at risk') ||
+          bmi.contains('at risk') ||
+          wfh.contains('at risk')) {
+        counts['At Risk'] = counts['At Risk']! + 1;
+      }
+
+      final hasAny =
+          wfa.isNotEmpty || hfa.isNotEmpty || wfh.isNotEmpty || bmi.isNotEmpty;
+      if (hasAny &&
+          !wfa.contains('underweight') &&
+          !bmi.contains('underweight') &&
+          !wfa.contains('overweight') &&
+          !wfa.contains('obese') &&
+          !wfh.contains('overweight') &&
+          !wfh.contains('obese') &&
+          !bmi.contains('overweight') &&
+          !bmi.contains('obese') &&
+          !hfa.contains('stunted') &&
+          !wfh.contains('wasted') &&
+          !wfa.contains('at risk') &&
+          !bmi.contains('at risk') &&
+          !wfh.contains('at risk')) {
+        counts['Normal'] = counts['Normal']! + 1;
+      }
+    }
+
+    return counts;
+  }
 }

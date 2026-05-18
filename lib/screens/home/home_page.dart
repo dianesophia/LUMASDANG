@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lumasdang/models/patient_list_filter.dart';
 import 'package:lumasdang/screens/dashboard/dashboard_screen.dart';
 import 'package:lumasdang/screens/patient_list.dart';
 import 'package:lumasdang/screens/settingsPages/main_Settings.dart';
@@ -9,7 +10,6 @@ import '../../services/local_db_service.dart';
 import '../../services/connectivity_service.dart';
 import '../../services/vaccine_reminder_service.dart';
 
-import 'widgets/upcoming_events.dart';
 import 'widgets/demographic_data_form.dart';
 import 'widgets/anthropometric_data_form.dart';
 import 'widgets/health_status_form.dart';
@@ -150,6 +150,8 @@ class _HomePageState extends State<HomePage>
   // ── Refresh / reset keys ───────────────────────────────────────────────────
   int _dashboardRefreshKey = 0;
   final ValueNotifier<int> _patientListRefreshTrigger = ValueNotifier<int>(0);
+  final ValueNotifier<PatientListFilter?> _patientListFilterRequest =
+      ValueNotifier<PatientListFilter?>(null);
   int _demographicFormKey = 0;
   int _anthropometricFormKey = 0;
   int _dietaryFormKey = 0;
@@ -195,6 +197,7 @@ class _HomePageState extends State<HomePage>
         );
         if (synced > 0 && mounted) {
           _showSnackBar('$synced pending assessment(s) synced.');
+          setState(() => _dashboardRefreshKey++);
         }
         // Check for vaccine doses due today or overdue
         final due = await VaccineReminderService().checkAndFireDueReminders();
@@ -214,9 +217,15 @@ class _HomePageState extends State<HomePage>
         );
         if (synced > 0 && mounted) {
           _showSnackBar('$synced pending assessment(s) synced.');
+          setState(() => _dashboardRefreshKey++);
         }
       }
     });
+  }
+
+  void _openPatientListWithFilter(PatientListFilter filter) {
+    _patientListFilterRequest.value = filter;
+    _tabController.animateTo(2);
   }
 
   Future<void> _syncPendingAssessments() async {
@@ -240,6 +249,7 @@ class _HomePageState extends State<HomePage>
       );
       if (synced > 0) {
         _showSnackBar('$synced pending assessment(s) synced.');
+        setState(() => _dashboardRefreshKey++);
       } else {
         _showSnackBar('No pending assessments to sync.');
       }
@@ -1129,6 +1139,7 @@ class _HomePageState extends State<HomePage>
       } catch (e) {
         await LocalDbService.instance.saveLocalRecord(data, synced: false);
         if (!mounted) return;
+        setState(() => _dashboardRefreshKey++);
         _showSnackBar(
           'Saved locally (will sync later). Error: ${e.toString()}',
           color: Colors.orange,
@@ -1137,6 +1148,7 @@ class _HomePageState extends State<HomePage>
     } else {
       await LocalDbService.instance.saveLocalRecord(data, synced: false);
       if (!mounted) return;
+      setState(() => _dashboardRefreshKey++);
       _showSnackBar(
         _isDraft
             ? 'Draft saved locally, will sync when online.'
@@ -1335,7 +1347,11 @@ class _HomePageState extends State<HomePage>
                 child: TabBarView(
                   controller: _tabController,
                   children: [
-                    DashboardScreen(refreshKey: _dashboardRefreshKey),
+                    DashboardScreen(
+                      refreshKey: _dashboardRefreshKey,
+                      onSyncPending: _syncPendingAssessments,
+                      onOpenPatientList: _openPatientListWithFilter,
+                    ),
                     _buildAssessmentTab(),
                     _buildPatientListTab(),
                     _buildNotificationsTab(),
@@ -1580,8 +1596,6 @@ class _HomePageState extends State<HomePage>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const UpcomingEvents(),
-                        const SizedBox(height: 20),
                         _buildVisitCard(),
                       ],
                     ),
@@ -2245,7 +2259,10 @@ class _HomePageState extends State<HomePage>
   }
 
   Widget _buildPatientListTab() {
-    return PatientListTab(refreshTrigger: _patientListRefreshTrigger);
+    return PatientListTab(
+      refreshTrigger: _patientListRefreshTrigger,
+      filterRequest: _patientListFilterRequest,
+    );
   }
 
   Widget _buildNotificationsTab() {
