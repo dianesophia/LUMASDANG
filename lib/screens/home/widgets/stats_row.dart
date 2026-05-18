@@ -2,12 +2,23 @@ import 'package:flutter/material.dart';
 import '../../../services/firestore_service.dart';
 import '../../../services/local_db_service.dart';
 import '../../../services/connectivity_service.dart';
+import '../../../services/dashboard_analytics_service.dart';
 import '../../shared/status_color.dart';
 import 'package:flutter/foundation.dart';
 
 class StatsRow extends StatefulWidget {
   final VoidCallback? onTap;
-  const StatsRow({super.key, this.onTap});
+  final bool showTodayCard;
+  final Map<String, int>? statusCounts;
+  final void Function(String statusLabel)? onStatusTap;
+
+  const StatsRow({
+    super.key,
+    this.onTap,
+    this.showTodayCard = true,
+    this.statusCounts,
+    this.onStatusTap,
+  });
 
   @override
   State<StatsRow> createState() => _StatsRowState();
@@ -20,100 +31,45 @@ class _StatsRowState extends State<StatsRow> {
   @override
   void initState() {
     super.initState();
-    _todayCountFuture = _loadTodayCount();
-    _statusCountsFuture = _loadStatusCounts();
+    if (widget.showTodayCard) {
+      _todayCountFuture = _loadTodayCount();
+    }
+    if (widget.statusCounts == null) {
+      _statusCountsFuture = _loadStatusCounts();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant StatsRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.showTodayCard && !oldWidget.showTodayCard) {
+      _todayCountFuture = _loadTodayCount();
+    }
+    if (widget.statusCounts != null && oldWidget.statusCounts == null) {
+      _statusCountsFuture = Future.value(widget.statusCounts!);
+    } else if (widget.statusCounts == null && oldWidget.statusCounts != null) {
+      _statusCountsFuture = _loadStatusCounts();
+    } else if (widget.statusCounts != null &&
+        widget.statusCounts != oldWidget.statusCounts) {
+      _statusCountsFuture = Future.value(widget.statusCounts!);
+    }
   }
 
   Future<int> _loadTodayCount() async {
     await LocalDbService.instance.init();
-    //final online = await ConnectivityService.instance.checkOnline();
-    final online = kIsWeb ? true : await ConnectivityService.instance.checkOnline();
+    final online = kIsWeb
+        ? true
+        : await ConnectivityService.instance.checkOnline();
     if (online) return FirestoreService().getTodayScreenedCountFromBarangay();
     return LocalDbService.instance.getTodayScreenedCount();
   }
 
   Future<Map<String, int>> _loadStatusCounts() async {
     await LocalDbService.instance.init();
-    //final online = await ConnectivityService.instance.checkOnline();
-    final online = kIsWeb ? true : await ConnectivityService.instance.checkOnline();
-    if (online) return FirestoreService().getStatusCounts();
-
-    // Offline: compute rough status counts from locally cached homepageData
-    final records =
-        await LocalDbService.instance.getAllRecords(includeDeleted: false);
-    final counts = <String, int>{
-      'Underweight': 0,
-      'Overweight/Obese': 0,
-      'Stunted': 0,
-      'At Risk': 0,
-      'Normal': 0,
-    };
-
-    for (final record in records) {
-      final data = record['data'] as Map<String, dynamic>?;
-      if (data == null) continue;
-      final anthropometric =
-          data['anthropometric'] as Map<String, dynamic>? ?? {};
-
-      final wfa =
-          (anthropometric['weightForAge'] as String? ?? '').toLowerCase();
-      final hfa =
-          (anthropometric['heightForAge'] as String? ?? '').toLowerCase();
-      final wfh =
-          (anthropometric['weightForHeight'] as String? ?? '').toLowerCase();
-      final bmi = (anthropometric['bmi'] as String? ?? '').toLowerCase();
-
-      // Underweight (includes severely underweight)
-      if (wfa.contains('underweight') || bmi.contains('underweight')) {
-        counts['Underweight'] = counts['Underweight']! + 1;
-      }
-
-      // Overweight / Obese (includes "at risk of overweight")
-      if (wfa.contains('overweight') ||
-          wfa.contains('obese') ||
-          wfh.contains('overweight') ||
-          wfh.contains('obese') ||
-          bmi.contains('overweight') ||
-          bmi.contains('obese')) {
-        counts['Overweight/Obese'] = counts['Overweight/Obese']! + 1;
-      }
-
-      // Stunted (includes severely stunted)
-      if (hfa.contains('stunted')) {
-        counts['Stunted'] = counts['Stunted']! + 1;
-      }
-
-      // At Risk (wasted / severe wasting / at risk of overweight)
-      if (wfh.contains('wasted') ||
-          wfa.contains('at risk') ||
-          bmi.contains('at risk') ||
-          wfh.contains('at risk')) {
-        counts['At Risk'] = counts['At Risk']! + 1;
-      }
-
-      // If none of the above tags matched but we have any anthropometric data,
-      // consider the child "Normal" for offline summary purposes.
-      final hasAny =
-          wfa.isNotEmpty || hfa.isNotEmpty || wfh.isNotEmpty || bmi.isNotEmpty;
-      if (hasAny &&
-          !wfa.contains('underweight') &&
-          !bmi.contains('underweight') &&
-          !wfa.contains('overweight') &&
-          !wfa.contains('obese') &&
-          !wfh.contains('overweight') &&
-          !wfh.contains('obese') &&
-          !bmi.contains('overweight') &&
-          !bmi.contains('obese') &&
-          !hfa.contains('stunted') &&
-          !wfh.contains('wasted') &&
-          !wfa.contains('at risk') &&
-          !bmi.contains('at risk') &&
-          !wfh.contains('at risk')) {
-        counts['Normal'] = counts['Normal']! + 1;
-      }
-    }
-
-    return counts;
+    final online = kIsWeb
+        ? true
+        : await ConnectivityService.instance.checkOnline();
+    return DashboardAnalyticsService.loadStatusCounts(online: online);
   }
 
   String _formatDate(DateTime d) {
@@ -124,13 +80,142 @@ class _StatsRowState extends State<StatsRow> {
     return '${months[d.month - 1]} ${d.day}, ${d.year}';
   }
 
+  Widget _buildStatusColumn(Map<String, int> counts) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 3,
+              height: 12,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5A962),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 6),
+            const Text(
+              'Overall Status',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF444444),
+                letterSpacing: 0.3,
+              ),
+            ),
+            if (widget.onStatusTap != null) ...[
+              const Spacer(),
+              Text(
+                'Tap to view',
+                style: TextStyle(
+                  fontSize: 9,
+                  color: Colors.grey.shade600,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 8),
+        _StatusItem(
+          count: counts['Underweight'] ?? 0,
+          label: 'Underweight',
+          color: kStatusColors['Underweight']!,
+          icon: Icons.arrow_downward_rounded,
+          onTap: widget.onStatusTap != null
+              ? () => widget.onStatusTap!('Underweight')
+              : null,
+        ),
+        const SizedBox(height: 5),
+        _StatusItem(
+          count: counts['Overweight/Obese'] ?? 0,
+          label: 'Overweight/Obese',
+          color: kStatusColors['Overweight/Obese']!,
+          icon: Icons.arrow_upward_rounded,
+          onTap: widget.onStatusTap != null
+              ? () => widget.onStatusTap!('Overweight/Obese')
+              : null,
+        ),
+        const SizedBox(height: 5),
+        _StatusItem(
+          count: counts['Stunted'] ?? 0,
+          label: 'Stunted',
+          color: kStatusColors['Stunted']!,
+          icon: Icons.height_rounded,
+          onTap: widget.onStatusTap != null
+              ? () => widget.onStatusTap!('Stunted')
+              : null,
+        ),
+        const SizedBox(height: 5),
+        _StatusItem(
+          count: counts['At Risk'] ?? 0,
+          label: 'At Risk',
+          color: kStatusColors['At Risk']!,
+          icon: Icons.warning_amber_rounded,
+          onTap: widget.onStatusTap != null
+              ? () => widget.onStatusTap!('At Risk')
+              : null,
+        ),
+        const SizedBox(height: 5),
+        _StatusItem(
+          count: counts['Normal'] ?? 0,
+          label: 'Normal',
+          color: kStatusColors['Normal']!,
+          icon: Icons.check_circle_outline_rounded,
+          onTap: widget.onStatusTap != null
+              ? () => widget.onStatusTap!('Normal')
+              : null,
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (!widget.showTodayCard) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.07),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: widget.statusCounts != null
+            ? _buildStatusColumn(widget.statusCounts!)
+            : FutureBuilder<Map<String, int>>(
+                future: _statusCountsFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Color(0xFFF5A962),
+                        ),
+                      ),
+                    );
+                  }
+                  return _buildStatusColumn(snapshot.data ?? {});
+                },
+              ),
+      );
+    }
+
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // ── Left card: today's screened count ──────────────────────
           Expanded(
             flex: 5,
             child: GestureDetector(
@@ -195,9 +280,7 @@ class _StatsRowState extends State<StatsRow> {
                         ),
                       ],
                     ),
-
                     const SizedBox(height: 8),
-
                     FutureBuilder<int>(
                       future: _todayCountFuture,
                       builder: (context, snapshot) {
@@ -221,9 +304,7 @@ class _StatsRowState extends State<StatsRow> {
                         );
                       },
                     ),
-
                     const SizedBox(height: 2),
-
                     Text(
                       'Patients screened\ntoday',
                       style: TextStyle(
@@ -238,10 +319,7 @@ class _StatsRowState extends State<StatsRow> {
               ),
             ),
           ),
-
           const SizedBox(width: 10),
-
-          // ── Right card: overall status counts ──────────────────────
           Expanded(
             flex: 6,
             child: Container(
@@ -258,93 +336,27 @@ class _StatsRowState extends State<StatsRow> {
                   ),
                 ],
               ),
-              child: FutureBuilder<Map<String, int>>(
-                future: _statusCountsFuture,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState ==
-                      ConnectionState.waiting) {
-                    return const Center(
-                      child: SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Color(0xFFF5A962),
-                        ),
-                      ),
-                    );
-                  }
-
-                  final counts = snapshot.data ?? {};
-
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // Header
-                      Row(
-                        children: [
-                          Container(
-                            width: 3,
-                            height: 12,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF5A962),
-                              borderRadius: BorderRadius.circular(2),
+              child: widget.statusCounts != null
+                  ? _buildStatusColumn(widget.statusCounts!)
+                  : FutureBuilder<Map<String, int>>(
+                      future: _statusCountsFuture,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Color(0xFFF5A962),
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 6),
-                          const Text(
-                            'Overall Status',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF444444),
-                              letterSpacing: 0.3,
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 8),
-
-                      _StatusItem(
-                        count: counts['Underweight'] ?? 0,
-                        label: 'Underweight',
-                        color: kStatusColors['Underweight']!,
-                        icon: Icons.arrow_downward_rounded,
-                      ),
-                      const SizedBox(height: 5),
-                      _StatusItem(
-                        count: counts['Overweight/Obese'] ?? 0,
-                        label: 'Overweight/Obese',
-                        color: kStatusColors['Overweight/Obese']!,
-                        icon: Icons.arrow_upward_rounded,
-                      ),
-                      const SizedBox(height: 5),
-                      _StatusItem(
-                        count: counts['Stunted'] ?? 0,
-                        label: 'Stunted',
-                        color: kStatusColors['Stunted']!,
-                        icon: Icons.height_rounded,
-                      ),
-                      const SizedBox(height: 5),
-                      _StatusItem(
-                        count: counts['At Risk'] ?? 0,
-                        label: 'At Risk',
-                        color: kStatusColors['At Risk']!,
-                        icon: Icons.warning_amber_rounded,
-                      ),
-                      const SizedBox(height: 5),
-                      _StatusItem(
-                        count: counts['Normal'] ?? 0,
-                        label: 'Normal',
-                        color: kStatusColors['Normal']!,
-                        icon: Icons.check_circle_outline_rounded,
-                      ),
-                    ],
-                  );
-                },
-              ),
+                          );
+                        }
+                        return _buildStatusColumn(snapshot.data ?? {});
+                      },
+                    ),
             ),
           ),
         ],
@@ -353,29 +365,29 @@ class _StatsRowState extends State<StatsRow> {
   }
 }
 
-// ── Status item widget ────────────────────────────────────────────────────────
 class _StatusItem extends StatelessWidget {
   final int count;
   final String label;
   final Color color;
   final IconData icon;
+  final VoidCallback? onTap;
 
   const _StatusItem({
     required this.count,
     required this.label,
     required this.color,
     required this.icon,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    final content = Row(
       children: [
         Container(
           width: 6,
           height: 6,
-          decoration:
-              BoxDecoration(color: color, shape: BoxShape.circle),
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 6),
         Expanded(
@@ -390,8 +402,7 @@ class _StatusItem extends StatelessWidget {
           ),
         ),
         Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
           decoration: BoxDecoration(
             color: color.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(20),
@@ -407,7 +418,26 @@ class _StatusItem extends StatelessWidget {
             ),
           ),
         ),
+        if (onTap != null) ...[
+          const SizedBox(width: 4),
+          Icon(Icons.chevron_right_rounded,
+              size: 16, color: Colors.grey.shade500),
+        ],
       ],
+    );
+
+    if (onTap == null) return content;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 2),
+          child: content,
+        ),
+      ),
     );
   }
 }

@@ -6,10 +6,12 @@ import 'patient_profile/patient_profile_overview.dart';
 // import 'opt_plus/opt_plus_screen.dart';
 import 'lumasdang_records/lumasdang_records_screen.dart';
 import 'archived_patients_screen.dart';
+import '../models/patient_list_filter.dart';
 import '../services/age_utils.dart';
 import '../services/auto_archive_preferences.dart';
 import '../services/connectivity_service.dart';
 import '../services/local_db_service.dart';
+import '../services/nutrition_status_classifier.dart';
 import 'shared/status_color.dart';
 import 'package:flutter/foundation.dart';
 
@@ -155,12 +157,16 @@ class _FilterState {
   // Screened period: null = all, 'week' or 'month'
   String? screenedPeriod;
 
+  /// Dashboard-only categories (wasting, severe, etc.) via classifier.
+  NutritionCategory? nutritionCategory;
+
   bool get hasActiveFilters =>
       ageMinMonths != null ||
       ageMaxMonths != null ||
       sex != null ||
       malnutritionType != null ||
-      screenedPeriod != null;
+      screenedPeriod != null ||
+      nutritionCategory != null;
 
   void reset() {
     ageMinMonths = null;
@@ -168,17 +174,20 @@ class _FilterState {
     sex = null;
     malnutritionType = null;
     screenedPeriod = null;
+    nutritionCategory = null;
   }
 }
 
 // ==================== PATIENT LIST TAB ====================
 class PatientListTab extends StatefulWidget {
   final ValueNotifier<int>? refreshTrigger;
+  final ValueNotifier<PatientListFilter?>? filterRequest;
   final bool showOnlyMalnourished;
 
   const PatientListTab({
     super.key,
     this.refreshTrigger,
+    this.filterRequest,
     this.showOnlyMalnourished = false,
   });
 
@@ -285,10 +294,30 @@ class _PatientListTabState extends State<PatientListTab> {
     super.initState();
     _fetchPatients();
     widget.refreshTrigger?.addListener(_onRefreshTriggered);
+    widget.filterRequest?.addListener(_onExternalFilter);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _applyExternalFilterIfNeeded();
+    });
   }
 
   void _onRefreshTriggered() {
     if (mounted) _fetchPatients();
+  }
+
+  void _onExternalFilter() {
+    if (mounted) _applyExternalFilterIfNeeded();
+  }
+
+  void _applyExternalFilterIfNeeded() {
+    final request = widget.filterRequest?.value;
+    if (request == null) return;
+    setState(() {
+      _filters.reset();
+      _filters.malnutritionType = request.malnutritionType;
+      _filters.screenedPeriod = request.screenedPeriod;
+      _filters.sex = request.sex;
+      _filters.nutritionCategory = request.nutritionCategory;
+    });
   }
 
   void _exitSelectionMode() {
@@ -839,6 +868,7 @@ class _PatientListTabState extends State<PatientListTab> {
               visitTime: mostRecent['visitTime'] ?? '',
               nextFollowUpDate: null,
               followUpNotes: (mostRecent['followUpNotes'] as String?) ?? '',
+              classifierData: mostRecent,
             );
           }).toList();
           _loading = false;
@@ -958,6 +988,7 @@ class _PatientListTabState extends State<PatientListTab> {
           visitTime: data['visitTime'] ?? '',
           nextFollowUpDate: nextFollowUpTs?.toDate(),
           followUpNotes: followUpNotes,
+          classifierData: data,
         );
       }).toList();
 
@@ -1018,6 +1049,7 @@ class _PatientListTabState extends State<PatientListTab> {
             visitTime: data['visitTime'] ?? '',
             nextFollowUpDate: nextFollowUpTs?.toDate(),
             followUpNotes: followUpNotes,
+            classifierData: data,
           ),
         );
       }
@@ -1087,10 +1119,18 @@ class _PatientListTabState extends State<PatientListTab> {
       if (_filters.sex != null &&
           p.sex.toLowerCase() != _filters.sex!.toLowerCase()) return false;
 
-      // --- Malnutrition type filter ---
-      if (_filters.malnutritionType != null &&
+      if (_filters.nutritionCategory != null) {
+        final data = p.classifierData;
+        if (data == null) return false;
+        if (!NutritionStatusClassifier.classify(data)
+            .matchesCategory(_filters.nutritionCategory!)) {
+          return false;
+        }
+      } else if (_filters.malnutritionType != null &&
           p.assessmentRemarks.toLowerCase() !=
-              _filters.malnutritionType!.toLowerCase()) return false;
+              _filters.malnutritionType!.toLowerCase()) {
+        return false;
+      }
 
       // --- Screened period filter ---
       if (!_passesScreenedPeriod(p)) return false;
@@ -1462,6 +1502,7 @@ class _PatientListTabState extends State<PatientListTab> {
   @override
   void dispose() {
     widget.refreshTrigger?.removeListener(_onRefreshTriggered);
+    widget.filterRequest?.removeListener(_onExternalFilter);
     _searchController.dispose();
     super.dispose();
   }
@@ -2796,6 +2837,7 @@ class Patient {
   final String visitTime;
   final DateTime? nextFollowUpDate;
   final String followUpNotes;
+  final Map<String, dynamic>? classifierData;
 
   Patient({
     required this.lastName,
@@ -2820,5 +2862,6 @@ class Patient {
     this.visitTime = '',
     this.nextFollowUpDate,
     this.followUpNotes = '',
+    this.classifierData,
   });
 }
