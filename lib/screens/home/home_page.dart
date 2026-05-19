@@ -4,6 +4,7 @@ import 'package:lumasdang/screens/dashboard/dashboard_screen.dart';
 import 'package:lumasdang/screens/patient_list.dart';
 import 'package:lumasdang/screens/settingsPages/main_Settings.dart';
 import 'package:lumasdang/screens/notifications_tab.dart';
+import 'package:lumasdang/screens/shared/app_buttom_navbar.dart';
 
 import '../../services/firestore_service.dart';
 import '../../services/local_db_service.dart';
@@ -1406,7 +1407,7 @@ class _HomePageState extends State<HomePage>
   Widget build(BuildContext context) {
     super.build(context);
     return Scaffold(
-      bottomNavigationBar: _buildBottomTabBar(),
+      bottomNavigationBar: AppBottomNavBar(controller: _tabController),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -1601,62 +1602,6 @@ class _HomePageState extends State<HomePage>
   //     ),
   //   );
   // }
-
-  Widget _buildBottomTabBar() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF1F6B5F), Color(0xFF2E8B7B)],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.18),
-            blurRadius: 16,
-            offset: const Offset(0, -4),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: TabBar(
-          controller: _tabController,
-          indicator: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          indicatorSize: TabBarIndicatorSize.tab,
-          indicatorPadding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
-          dividerColor: Colors.transparent,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white.withValues(alpha: 0.45),
-          labelStyle: const TextStyle(
-            fontWeight: FontWeight.w700,
-            fontSize: 11,
-            letterSpacing: 0.2,
-          ),
-          unselectedLabelStyle: const TextStyle(fontSize: 11),
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-          tabs: const [
-            Tab(
-              icon: Icon(Icons.dashboard_rounded, size: 22),
-              text: 'Dashboard',
-            ),
-            Tab(
-              icon: Icon(Icons.assignment_rounded, size: 22),
-              text: 'Assessment',
-            ),
-            Tab(icon: Icon(Icons.people_rounded, size: 22), text: 'Patients'),
-            Tab(
-              icon: Icon(Icons.notifications_rounded, size: 22),
-              text: 'Alerts',
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _buildAssessmentTab() {
     return Column(

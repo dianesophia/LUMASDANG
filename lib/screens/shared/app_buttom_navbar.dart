@@ -34,11 +34,18 @@ class AppBottomNavBar extends StatelessWidget {
     this.tabs,
   });
 
-  static const List<Tab> _defaultTabs = [
-    Tab(icon: Icon(Icons.home_outlined,          size: 22), text: 'Home'),
-    Tab(icon: Icon(Icons.people_outline,         size: 22), text: 'Patients'),
-    Tab(icon: Icon(Icons.notifications_outlined, size: 22), text: 'Alerts'),
+  /// Main app tabs — matches [HomePage] bottom navigation.
+  static const List<Tab> mainTabs = [
+    Tab(icon: Icon(Icons.dashboard_rounded, size: 22), text: 'Dashboard'),
+    Tab(icon: Icon(Icons.assignment_rounded, size: 22), text: 'Assessment'),
+    Tab(icon: Icon(Icons.people_rounded, size: 22), text: 'Patients'),
+    Tab(
+      icon: Icon(Icons.notifications_rounded, size: 22),
+      text: 'Alerts',
+    ),
   ];
+
+  static const List<Tab> _defaultTabs = mainTabs;
 
   @override
   Widget build(BuildContext context) {
@@ -47,13 +54,13 @@ class AppBottomNavBar extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF2E8B7B), Color(0xFF5CAA7F)],
+          colors: [Color(0xFF1F6B5F), Color(0xFF2E8B7B)],
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.15),
-            blurRadius: 12,
-            offset: const Offset(0, -3),
+            color: Colors.black.withValues(alpha: 0.18),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
           ),
         ],
       ),
@@ -63,18 +70,21 @@ class AppBottomNavBar extends StatelessWidget {
           controller: controller,
           tabs: tabs ?? _defaultTabs,
           indicator: BoxDecoration(
-            color: Colors.white.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(12),
+            color: Colors.white.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(14),
           ),
           indicatorSize: TabBarIndicatorSize.tab,
-          indicatorPadding:
-              const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          indicatorPadding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
           dividerColor: Colors.transparent,
           labelColor: Colors.white,
-          unselectedLabelColor: Colors.white.withOpacity(0.55),
-          labelStyle:
-              const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
-          unselectedLabelStyle: const TextStyle(fontSize: 12),
+          unselectedLabelColor: Colors.white.withValues(alpha: 0.45),
+          labelStyle: const TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 11,
+            letterSpacing: 0.2,
+          ),
+          unselectedLabelStyle: const TextStyle(fontSize: 11),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         ),
       ),
     );
