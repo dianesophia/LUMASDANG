@@ -1410,14 +1410,14 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                 value: sameAsAddress,
                 contentPadding: EdgeInsets.zero,
                 controlAffinity: ListTileControlAffinity.leading,
-                activeColor: const Color(0xFF888888),
+                activeColor: const Color(0xFFF5A962),
                 title: const Text(
                   "Place of Birth is same as Address",
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                     fontFamily: 'Poppins',
-                    color: Color(0xFF888888),
+                    color:  Color(0xFFF5A962),
                   ),
                 ),
                 onChanged: (value) {
