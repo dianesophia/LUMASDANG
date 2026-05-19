@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:lumasdang/services/firestore_service.dart';
-import 'package:lumasdang/screens/shared/app_buttom_navbar.dart'; // ← adjust path if needed
 import 'package:lumasdang/services/local_calendar_service.dart';
 import 'package:lumasdang/services/connectivity_service.dart';
 import 'package:flutter/foundation.dart';
@@ -200,10 +199,8 @@ class CalendarEventsPage extends StatefulWidget {
   State<CalendarEventsPage> createState() => _CalendarEventsPageState();
 }
 
-// ↓ Changed SingleTickerProviderStateMixin → TickerProviderStateMixin
-//   so we can create two AnimationControllers (fade + tab).
 class _CalendarEventsPageState extends State<CalendarEventsPage>
-    with TickerProviderStateMixin {
+    with SingleTickerProviderStateMixin {
   final CalendarService _service = CalendarService();
 
   DateTime _focusedDay = DateTime.now();
@@ -211,9 +208,6 @@ class _CalendarEventsPageState extends State<CalendarEventsPage>
 
   late final AnimationController _animController;
   late final Animation<double> _fadeAnim;
-
-  // ── Bottom nav tab controller ───────────────────────────────────────────────
-  late final TabController _tabController;
 
   static const _colorOptions = [
     Color(0xFFF5A962),
@@ -244,19 +238,11 @@ class _CalendarEventsPageState extends State<CalendarEventsPage>
     _fadeAnim =
         CurvedAnimation(parent: _animController, curve: Curves.easeOut);
     _animController.forward();
-
-    _tabController = TabController(length: 3, vsync: this);
-    _tabController.addListener(() {
-      if (!_tabController.indexIsChanging) {
-        Navigator.pop(context);
-      }
-    });
   }
 
   @override
   void dispose() {
     _animController.dispose();
-    _tabController.dispose();
     super.dispose();
   }
 
@@ -298,9 +284,6 @@ class _CalendarEventsPageState extends State<CalendarEventsPage>
             grouped[_fmtKey(_selectedDay)] ?? <CalEvent>[];
 
         return Scaffold(
-          // ── BOTTOM NAV BAR ────────────────────────────────────────────────
-          bottomNavigationBar: AppBottomNavBar(controller: _tabController),
-
           floatingActionButton: FloatingActionButton(
             onPressed: () => _showEventDialog(context),
             backgroundColor: Colors.white,
