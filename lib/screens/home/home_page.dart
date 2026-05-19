@@ -187,9 +187,23 @@ class _HomePageState extends State<HomePage>
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
     _sectionTabController = TabController(length: 4, vsync: this);
-    if (visitDateController.text.trim().isEmpty) {
-      visitDateController.text = formatDateForDisplay(DateTime.now());
-    }
+    // if (visitDateController.text.trim().isEmpty) {
+    //   visitDateController.text = formatDateForDisplay(DateTime.now());
+    // }
+
+    _tabController.addListener(() {
+      if (_tabController.index == 1) {
+        // Assessment tab — refresh visit date/time to current moment
+        final now = DateTime.now();
+        visitDateController.text = formatDateForDisplay(now);
+        final hour = TimeOfDay.fromDateTime(now).hourOfPeriod == 0
+            ? 12
+            : TimeOfDay.fromDateTime(now).hourOfPeriod;
+        final minute = now.minute.toString().padLeft(2, '0');
+        final period = now.hour < 12 ? 'AM' : 'PM';
+        visitTimeController.text = '$hour:$minute $period';
+      }
+    });
 
     LocalDbService.instance.init().then((_) async {
       final online = kIsWeb
@@ -373,8 +387,10 @@ class _HomePageState extends State<HomePage>
       builder: (context) {
         return Dialog(
           backgroundColor: Colors.white,
-          insetPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 24,
+          ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(18),
           ),
@@ -489,7 +505,10 @@ class _HomePageState extends State<HomePage>
           _SummaryRow('Patient Name', patientName, emphasized: true),
           _SummaryRow('Age', _formatAge(), emphasized: true),
           _SummaryRow('Sex', _selectedSex ?? _text(sexController)),
-          _SummaryRow('Blood Type', _selectedBloodType ?? _text(bloodTypeController)),
+          _SummaryRow(
+            'Blood Type',
+            _selectedBloodType ?? _text(bloodTypeController),
+          ),
           _SummaryRow('Religion', _text(religionController)),
           _SummaryRow('4Ps Member', _formatBool(_isFourPsMember)),
           _SummaryRow('Has Disability', _formatBool(_hasDisability)),
@@ -546,7 +565,10 @@ class _HomePageState extends State<HomePage>
             'Caregiver Relationship',
             _text(caregiverRelationshipController),
           ),
-          _SummaryRow('Caregiver Ethnicity', _text(caregiverEthnicityController)),
+          _SummaryRow(
+            'Caregiver Ethnicity',
+            _text(caregiverEthnicityController),
+          ),
         ],
       ),
       _PatientSummarySection(
@@ -555,7 +577,10 @@ class _HomePageState extends State<HomePage>
         rows: [
           _SummaryRow('Date of Birth', _text(dobController)),
           _SummaryRow('Place of Birth', _text(placeOfBirthController)),
-          _SummaryRow('Birth Weight', _appendUnit(_text(birthWeightController), 'kg')),
+          _SummaryRow(
+            'Birth Weight',
+            _appendUnit(_text(birthWeightController), 'kg'),
+          ),
           _SummaryRow('Birth Order', _text(birthOrderController)),
         ],
       ),
@@ -568,9 +593,21 @@ class _HomePageState extends State<HomePage>
           _SummaryRow('Height', _appendUnit(_text(heightController), 'cm')),
           _SummaryRow('MUAC', _appendUnit(_text(muacController), 'cm')),
           _SummaryRow('BMI', _text(bmiController), emphasized: true),
-          _SummaryRow('Weight-for-Age', _text(weightForAgeController), emphasized: true),
-          _SummaryRow('Weight-for-Height', _text(weightForHeightController), emphasized: true),
-          _SummaryRow('Height-for-Age', _text(heightForAgeController), emphasized: true),
+          _SummaryRow(
+            'Weight-for-Age',
+            _text(weightForAgeController),
+            emphasized: true,
+          ),
+          _SummaryRow(
+            'Weight-for-Height',
+            _text(weightForHeightController),
+            emphasized: true,
+          ),
+          _SummaryRow(
+            'Height-for-Age',
+            _text(heightForAgeController),
+            emphasized: true,
+          ),
           _SummaryRow('Purely Breastfed', _formatBool(_purelyBreastfed)),
           _SummaryRow('CF Age', _text(cfAgeController)),
           _SummaryRow('CF Frequency', _text(cfFreqController)),
@@ -589,8 +626,14 @@ class _HomePageState extends State<HomePage>
         rows: [
           _SummaryRow('Illnesses / Conditions', _formatMedicalHistory()),
           _SummaryRow('Medications', _medications ? 'Yes' : ''),
-          _SummaryRow('Deworming', _formatNestedData(_dewormingData?['deworming'])),
-          _SummaryRow('Vitamin A', _formatNestedData(_dewormingData?['vitaminA'])),
+          _SummaryRow(
+            'Deworming',
+            _formatNestedData(_dewormingData?['deworming']),
+          ),
+          _SummaryRow(
+            'Vitamin A',
+            _formatNestedData(_dewormingData?['vitaminA']),
+          ),
           _SummaryRow('Oral Assessment', _formatNestedData(_oralData)),
           _SummaryRow('Allergies', _formatNestedData(_allergiesData)),
         ],
@@ -599,14 +642,20 @@ class _HomePageState extends State<HomePage>
         title: 'Emergency Contact',
         icon: Icons.contact_phone_outlined,
         rows: [
-          _SummaryRow('Primary Contact', _firstProvided([
-            _contactLine('Mother', motherController, motherContactController),
-            _contactLine('Father', fatherController, fatherContactController),
-          ])),
-          _SummaryRow('Caregiver', _combineValues([
-            _text(caregiverNameController),
-            _text(caregiverRelationshipController),
-          ])),
+          _SummaryRow(
+            'Primary Contact',
+            _firstProvided([
+              _contactLine('Mother', motherController, motherContactController),
+              _contactLine('Father', fatherController, fatherContactController),
+            ]),
+          ),
+          _SummaryRow(
+            'Caregiver',
+            _combineValues([
+              _text(caregiverNameController),
+              _text(caregiverRelationshipController),
+            ]),
+          ),
         ],
       ),
       _PatientSummarySection(
@@ -615,8 +664,14 @@ class _HomePageState extends State<HomePage>
         rows: [
           _SummaryRow('Visit Date', _text(visitDateController)),
           _SummaryRow('Visit Time', _text(visitTimeController)),
-          _SummaryRow('Family Planning', _formatNestedData(_familyPlanningData)),
-          _SummaryRow('Nutrition Environment', _formatNestedData(_nutritionEnvData)),
+          _SummaryRow(
+            'Family Planning',
+            _formatNestedData(_familyPlanningData),
+          ),
+          _SummaryRow(
+            'Nutrition Environment',
+            _formatNestedData(_nutritionEnvData),
+          ),
         ],
       ),
     ];
@@ -712,13 +767,16 @@ class _HomePageState extends State<HomePage>
                 ),
               ),
             )
-          else ...visibleRows.map(
-            (row) => _buildSummaryRow(
-              row.label,
-              row.value,
-              emphasized: row.emphasized,
-            ),
-          ).toList(),
+          else
+            ...visibleRows
+                .map(
+                  (row) => _buildSummaryRow(
+                    row.label,
+                    row.value,
+                    emphasized: row.emphasized,
+                  ),
+                )
+                .toList(),
         ],
       ),
     );
@@ -821,8 +879,8 @@ class _HomePageState extends State<HomePage>
                     color: isEmpty
                         ? Colors.black26
                         : emphasized
-                            ? const Color(0xFFF08030)
-                            : const Color(0xFF1A1A1A),
+                        ? const Color(0xFFF08030)
+                        : const Color(0xFF1A1A1A),
                   ),
                 ),
               ),
@@ -844,7 +902,11 @@ class _HomePageState extends State<HomePage>
     _vaccinationData!.forEach((vaccine, value) {
       if (value is Map) {
         final selected = value.entries
-            .where((entry) => entry.value != null && entry.value.toString().trim().isNotEmpty)
+            .where(
+              (entry) =>
+                  entry.value != null &&
+                  entry.value.toString().trim().isNotEmpty,
+            )
             .map((entry) => '${entry.key}: ${entry.value}')
             .join(', ');
         rows.add(_SummaryRow(vaccine.toString(), selected));
@@ -860,9 +922,11 @@ class _HomePageState extends State<HomePage>
 
   String _formatAge() {
     final values = <String>[
-      if (_text(ageYearsController).isNotEmpty) '${_text(ageYearsController)} year(s)',
+      if (_text(ageYearsController).isNotEmpty)
+        '${_text(ageYearsController)} year(s)',
       if (_text(ageController).isNotEmpty) '${_text(ageController)} month(s)',
-      if (_text(ageDaysController).isNotEmpty) '${_text(ageDaysController)} day(s)',
+      if (_text(ageDaysController).isNotEmpty)
+        '${_text(ageDaysController)} day(s)',
     ];
     return values.isEmpty ? '' : values.join(', ');
   }
@@ -916,8 +980,10 @@ class _HomePageState extends State<HomePage>
     if (value == null) return '';
     if (value is Map) {
       final entries = value.entries
-          .where((entry) =>
-              entry.value != null && entry.value.toString().trim().isNotEmpty)
+          .where(
+            (entry) =>
+                entry.value != null && entry.value.toString().trim().isNotEmpty,
+          )
           .map((entry) => '${entry.key}: ${entry.value}')
           .join(', ');
       return entries;
@@ -943,6 +1009,7 @@ class _HomePageState extends State<HomePage>
 
     _sectionTabController.animateTo(0);
   }
+
   // ── Save All Data ──────────────────────────────────────────────────────────
   Future<void> _saveAllData() async {
     // Run form validators — in draft mode, only the always-required fields
@@ -1016,7 +1083,9 @@ class _HomePageState extends State<HomePage>
 
     final data = {
       'isDraft': _isDraft,
-      'visitDate': visitDateParsed != null ? formatDateForStorage(visitDateParsed) : '',
+      'visitDate': visitDateParsed != null
+          ? formatDateForStorage(visitDateParsed)
+          : '',
       'visitTime': visitTimeController.text.trim(),
       'demographic': {
         'firstName': firstNameController.text.trim(),
@@ -1599,12 +1668,10 @@ class _HomePageState extends State<HomePage>
               return [
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(1),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildVisitCard(),
-                      ],
+                     // children: [_buildVisitCard()],
                     ),
                   ),
                 ),
@@ -1641,7 +1708,9 @@ class _HomePageState extends State<HomePage>
                       isScrollable: true,
                       tabAlignment: TabAlignment.start,
                       labelColor: Colors.white,
-                      unselectedLabelColor: Colors.white.withValues(alpha: 0.55),
+                      unselectedLabelColor: Colors.white.withValues(
+                        alpha: 0.55,
+                      ),
                       labelStyle: const TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 13,
@@ -1651,7 +1720,9 @@ class _HomePageState extends State<HomePage>
                         borderRadius: BorderRadius.circular(10),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFFF5A962).withValues(alpha: 0.4),
+                            color: const Color(
+                              0xFFF5A962,
+                            ).withValues(alpha: 0.4),
                             blurRadius: 8,
                             offset: const Offset(0, 3),
                           ),
@@ -1978,248 +2049,291 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  Widget _buildVisitCard() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFF5A962), Color(0xFFF08030)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(10),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFF5A962).withValues(alpha: 0.35),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.access_time_rounded,
-                  color: Colors.white,
-                  size: 18,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'VISIT DATE & TIME',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFFF5A962),
-                  letterSpacing: 1.1,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
+  // Widget _buildVisitCard() {
+  //   return Container(
+  //     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+  //     decoration: BoxDecoration(
+  //       color: Colors.white,
+  //       borderRadius: BorderRadius.circular(14),
+  //       boxShadow: [
+  //         BoxShadow(
+  //           color: Colors.black.withValues(alpha: 0.08),
+  //           blurRadius: 10,
+  //           offset: const Offset(0, 3),
+  //         ),
+  //       ],
+  //     ),
+  //     child: Column(
+  //       crossAxisAlignment: CrossAxisAlignment.start,
+  //       children: [
+  //         // Header
+  //         Row(
+  //           children: [
+  //             Container(
+  //               padding: const EdgeInsets.all(8),
+  //               decoration: BoxDecoration(
+  //                 gradient: const LinearGradient(
+  //                   colors: [Color(0xFFF5A962), Color(0xFFF08030)],
+  //                   begin: Alignment.topLeft,
+  //                   end: Alignment.bottomRight,
+  //                 ),
+  //                 borderRadius: BorderRadius.circular(10),
+  //                 boxShadow: [
+  //                   BoxShadow(
+  //                     color: const Color(0xFFF5A962).withValues(alpha: 0.35),
+  //                     blurRadius: 8,
+  //                     offset: const Offset(0, 3),
+  //                   ),
+  //                 ],
+  //               ),
+  //               child: const Icon(
+  //                 Icons.access_time_rounded,
+  //                 color: Colors.white,
+  //                 size: 18,
+  //               ),
+  //             ),
+  //             const SizedBox(width: 12),
+  //             const Text(
+  //               'VISIT DATE & TIME',
+  //               style: TextStyle(
+  //                 fontSize: 11,
+  //                 fontWeight: FontWeight.w800,
+  //                 color: Color(0xFFF5A962),
+  //                 letterSpacing: 1.1,
+  //               ),
+  //             ),
+  //           ],
+  //         ),
+  //         const SizedBox(height: 14),
 
-          Row(
-            children: [
-              // ── Date of Visit ───────────────────────────────────────
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'DATE OF VISIT',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFFF5A962),
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    AbsorbPointer(
-                      child: TextFormField(
-                          controller: visitDateController,
-                          readOnly: true,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFF1A1A1A),
-                          ),
-                          decoration: InputDecoration(
-                            hintText: 'Auto-filled from device date',
-                            hintStyle: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.black26,
-                            ),
-                            prefixIcon: const Icon(
-                              Icons.calendar_month_outlined,
-                              size: 16,
-                              color: Color(0xFFF5A962),
-                            ),
-                            filled: true,
-                            fillColor: const Color(0xFFFAFAFA),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 11,
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: const BorderSide(
-                                color: Color(0xFFEEEEEE),
-                                width: 1.5,
-                              ),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: const BorderSide(
-                                color: Color(0xFFF5A962),
-                                width: 2,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
+  //         Row(
+  //           children: [
+  //             // ── Date of Visit ───────────────────────────────────────
+  //             Expanded(
+  //               child: Column(
+  //                 crossAxisAlignment: CrossAxisAlignment.start,
+  //                 children: [
+  //                   const Text(
+  //                     'DATE OF VISIT',
+  //                     style: TextStyle(
+  //                       fontSize: 11,
+  //                       fontWeight: FontWeight.w700,
+  //                       color: Color(0xFFF5A962),
+  //                       letterSpacing: 0.5,
+  //                     ),
+  //                   ),
+  //                   const SizedBox(height: 5),
+  //                   AbsorbPointer(
+  //                     child: TextFormField(
+  //                       controller: visitDateController,
+  //                       readOnly: true,
+  //                       style: const TextStyle(
+  //                         fontSize: 13,
+  //                         fontWeight: FontWeight.w500,
+  //                         color: Color(0xFF1A1A1A),
+  //                       ),
+  //                       decoration: InputDecoration(
+  //                         hintText: 'Auto-filled from device date',
+  //                         hintStyle: const TextStyle(
+  //                           fontSize: 12,
+  //                           color: Colors.black26,
+  //                         ),
+  //                         prefixIcon: const Icon(
+  //                           Icons.calendar_month_outlined,
+  //                           size: 16,
+  //                           color: Color(0xFFF5A962),
+  //                         ),
+  //                         filled: true,
+  //                         fillColor: const Color(0xFFFAFAFA),
+  //                         contentPadding: const EdgeInsets.symmetric(
+  //                           horizontal: 12,
+  //                           vertical: 11,
+  //                         ),
+  //                         enabledBorder: OutlineInputBorder(
+  //                           borderRadius: BorderRadius.circular(10),
+  //                           borderSide: const BorderSide(
+  //                             color: Color(0xFFEEEEEE),
+  //                             width: 1.5,
+  //                           ),
+  //                         ),
+  //                         focusedBorder: OutlineInputBorder(
+  //                           borderRadius: BorderRadius.circular(10),
+  //                           borderSide: const BorderSide(
+  //                             color: Color(0xFFF5A962),
+  //                             width: 2,
+  //                           ),
+  //                         ),
+  //                       ),
+  //                     ),
+  //                   ),
+  //                 ],
+  //               ),
+  //             ),
 
-              const SizedBox(width: 10),
+  //             const SizedBox(width: 10),
 
-              // ── Time of Visit ────────────────────────────────────────
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'TIME OF VISIT',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFFF5A962),
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    GestureDetector(
-                      onTap: () async {
-                        final now = TimeOfDay.now();
-                        final picked = await showTimePicker(
-                          context: context,
-                          initialTime: now,
-                          builder: (ctx, child) => Theme(
-                            data: Theme.of(ctx).copyWith(
-                              colorScheme: const ColorScheme.light(
-                                primary: Color(0xFFF5A962),
-                                onPrimary: Colors.white,
-                                surface: Colors.white,
-                                onSurface: Color(0xFF1A1A1A),
-                              ),
-                              textButtonTheme: TextButtonThemeData(
-                                style: TextButton.styleFrom(
-                                  foregroundColor: const Color(0xFFF5A962),
-                                ),
-                              ),
-                            ),
-                            child: child!,
-                          ),
-                        );
-                        if (picked != null && mounted) {
-                          final hour = picked.hourOfPeriod == 0
-                              ? 12
-                              : picked.hourOfPeriod;
-                          final minute = picked.minute.toString().padLeft(
-                            2,
-                            '0',
-                          );
-                          final period = picked.period == DayPeriod.am
-                              ? 'AM'
-                              : 'PM';
-                          setState(() {
-                            visitTimeController.text = '$hour:$minute $period';
-                          });
-                        }
-                      },
-                      child: AbsorbPointer(
-                        child: TextFormField(
-                          controller: visitTimeController,
-                          readOnly: true,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFF1A1A1A),
-                          ),
-                          decoration: InputDecoration(
-                            hintText: 'Tap to select',
-                            hintStyle: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.black26,
-                            ),
-                            prefixIcon: const Icon(
-                              Icons.schedule_outlined,
-                              size: 16,
-                              color: Color(0xFFF5A962),
-                            ),
-                            suffixIcon: visitTimeController.text.isNotEmpty
-                                ? GestureDetector(
-                                    onTap: () => setState(
-                                      () => visitTimeController.clear(),
-                                    ),
-                                    child: const Icon(
-                                      Icons.clear,
-                                      size: 14,
-                                      color: Colors.black38,
-                                    ),
-                                  )
-                                : null,
-                            filled: true,
-                            fillColor: const Color(0xFFFAFAFA),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 11,
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: const BorderSide(
-                                color: Color(0xFFEEEEEE),
-                                width: 1.5,
-                              ),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: const BorderSide(
-                                color: Color(0xFFF5A962),
-                                width: 2,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+  //             // ── Time of Visit ────────────────────────────────────────
+  //             Expanded(
+  //               child: Column(
+  //                 crossAxisAlignment: CrossAxisAlignment.start,
+  //                 children: [
+  //                   const Text(
+  //                     'TIME OF VISIT',
+  //                     style: TextStyle(
+  //                       fontSize: 11,
+  //                       fontWeight: FontWeight.w700,
+  //                       color: Color(0xFFF5A962),
+  //                       letterSpacing: 0.5,
+  //                     ),
+  //                   ),
+  //                   const SizedBox(height: 5),
+  //                   // GestureDetector(
+  //                   //   onTap: () async {
+  //                   //     final now = TimeOfDay.now();
+  //                   //     final picked = await showTimePicker(
+  //                   //       context: context,
+  //                   //       initialTime: now,
+  //                   //       builder: (ctx, child) => Theme(
+  //                   //         data: Theme.of(ctx).copyWith(
+  //                   //           colorScheme: const ColorScheme.light(
+  //                   //             primary: Color(0xFFF5A962),
+  //                   //             onPrimary: Colors.white,
+  //                   //             surface: Colors.white,
+  //                   //             onSurface: Color(0xFF1A1A1A),
+  //                   //           ),
+  //                   //           textButtonTheme: TextButtonThemeData(
+  //                   //             style: TextButton.styleFrom(
+  //                   //               foregroundColor: const Color(0xFFF5A962),
+  //                   //             ),
+  //                   //           ),
+  //                   //         ),
+  //                   //         child: child!,
+  //                   //       ),
+  //                   //     );
+  //                   //     if (picked != null && mounted) {
+  //                   //       final hour = picked.hourOfPeriod == 0
+  //                   //           ? 12
+  //                   //           : picked.hourOfPeriod;
+  //                   //       final minute = picked.minute.toString().padLeft(
+  //                   //         2,
+  //                   //         '0',
+  //                   //       );
+  //                   //       final period = picked.period == DayPeriod.am
+  //                   //           ? 'AM'
+  //                   //           : 'PM';
+  //                   //       setState(() {
+  //                   //         visitTimeController.text = '$hour:$minute $period';
+  //                   //       });
+  //                   //     }
+  //                   //   },
+  //                   //   child: AbsorbPointer(
+  //                   //     child: TextFormField(
+  //                   //       controller: visitTimeController,
+  //                   //       readOnly: true,
+  //                   //       style: const TextStyle(
+  //                   //         fontSize: 13,
+  //                   //         fontWeight: FontWeight.w500,
+  //                   //         color: Color(0xFF1A1A1A),
+  //                   //       ),
+  //                   //       decoration: InputDecoration(
+  //                   //         hintText: 'Tap to select',
+  //                   //         hintStyle: const TextStyle(
+  //                   //           fontSize: 12,
+  //                   //           color: Colors.black26,
+  //                   //         ),
+  //                   //         prefixIcon: const Icon(
+  //                   //           Icons.schedule_outlined,
+  //                   //           size: 16,
+  //                   //           color: Color(0xFFF5A962),
+  //                   //         ),
+  //                   //         suffixIcon: visitTimeController.text.isNotEmpty
+  //                   //             ? GestureDetector(
+  //                   //                 onTap: () => setState(
+  //                   //                   () => visitTimeController.clear(),
+  //                   //                 ),
+  //                   //                 child: const Icon(
+  //                   //                   Icons.clear,
+  //                   //                   size: 14,
+  //                   //                   color: Colors.black38,
+  //                   //                 ),
+  //                   //               )
+  //                   //             : null,
+  //                   //         filled: true,
+  //                   //         fillColor: const Color(0xFFFAFAFA),
+  //                   //         contentPadding: const EdgeInsets.symmetric(
+  //                   //           horizontal: 12,
+  //                   //           vertical: 11,
+  //                   //         ),
+  //                   //         enabledBorder: OutlineInputBorder(
+  //                   //           borderRadius: BorderRadius.circular(10),
+  //                   //           borderSide: const BorderSide(
+  //                   //             color: Color(0xFFEEEEEE),
+  //                   //             width: 1.5,
+  //                   //           ),
+  //                   //         ),
+  //                   //         focusedBorder: OutlineInputBorder(
+  //                   //           borderRadius: BorderRadius.circular(10),
+  //                   //           borderSide: const BorderSide(
+  //                   //             color: Color(0xFFF5A962),
+  //                   //             width: 2,
+  //                   //           ),
+  //                   //         ),
+  //                   //       ),
+  //                   //     ),
+  //                   //   ),
+  //                   // ),
+  //                   AbsorbPointer(
+  //                     child: TextFormField(
+  //                       controller: visitTimeController,
+  //                       readOnly: true,
+  //                       style: const TextStyle(
+  //                         fontSize: 13,
+  //                         fontWeight: FontWeight.w500,
+  //                         color: Color(0xFF1A1A1A),
+  //                       ),
+  //                       decoration: InputDecoration(
+  //                         hintText: 'Auto-filled from device time',
+  //                         hintStyle: const TextStyle(
+  //                           fontSize: 12,
+  //                           color: Colors.black26,
+  //                         ),
+  //                         prefixIcon: const Icon(
+  //                           Icons.schedule_outlined,
+  //                           size: 16,
+  //                           color: Color(0xFFF5A962),
+  //                         ),
+  //                         filled: true,
+  //                         fillColor: const Color(0xFFFAFAFA),
+  //                         contentPadding: const EdgeInsets.symmetric(
+  //                           horizontal: 12,
+  //                           vertical: 11,
+  //                         ),
+  //                         enabledBorder: OutlineInputBorder(
+  //                           borderRadius: BorderRadius.circular(10),
+  //                           borderSide: const BorderSide(
+  //                             color: Color(0xFFEEEEEE),
+  //                             width: 1.5,
+  //                           ),
+  //                         ),
+  //                         focusedBorder: OutlineInputBorder(
+  //                           borderRadius: BorderRadius.circular(10),
+  //                           borderSide: const BorderSide(
+  //                             color: Color(0xFFF5A962),
+  //                             width: 2,
+  //                           ),
+  //                         ),
+  //                       ),
+  //                     ),
+  //                   ),
+  //                 ],
+  //               ),
+  //             ),
+  //           ],
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
 
   Widget _buildPatientListTab() {
     return PatientListTab(
@@ -2252,11 +2366,7 @@ class _SummaryRow {
   final String value;
   final bool emphasized;
 
-  const _SummaryRow(
-    this.label,
-    this.value, {
-    this.emphasized = false,
-  });
+  const _SummaryRow(this.label, this.value, {this.emphasized = false});
 }
 
 class _HomeSectionTabBarDelegate extends SliverPersistentHeaderDelegate {

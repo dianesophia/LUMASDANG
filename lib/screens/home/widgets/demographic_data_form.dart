@@ -58,6 +58,16 @@ class DemographicDataForm extends StatefulWidget {
 
   final bool isDraft;
 
+  // ── N/A toggles ────────────────────────────────────────────────────────────
+  final bool motherIsNA;
+  final ValueChanged<bool>? onMotherNAChanged;
+  final bool fatherIsNA;
+  final ValueChanged<bool>? onFatherNAChanged;
+  final bool motherPhilHealthIsNA;
+  final ValueChanged<bool>? onMotherPhilHealthNAChanged;
+  final bool fatherPhilHealthIsNA;
+  final ValueChanged<bool>? onFatherPhilHealthNAChanged;
+
   const DemographicDataForm({
     super.key,
     required this.firstNameController,
@@ -106,6 +116,14 @@ class DemographicDataForm extends StatefulWidget {
     this.onIsFourPsMemberChanged,
     this.onHasDisabilityChanged,
     this.isDraft = false,
+    this.motherIsNA = false,
+    this.onMotherNAChanged,
+    this.fatherIsNA = false,
+    this.onFatherNAChanged,
+    this.motherPhilHealthIsNA = false,
+    this.onMotherPhilHealthNAChanged,
+    this.fatherPhilHealthIsNA = false,
+    this.onFatherPhilHealthNAChanged,
   });
 
   @override
@@ -146,28 +164,80 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
   String? birthBarangay;
 
   static const _birthWeightOptions = [
-    '1.0', '1.1', '1.2', '1.3', '1.4', '1.5', '1.6', '1.7', '1.8', '1.9',
-    '2.0', '2.1', '2.2', '2.3', '2.4', '2.5', '2.6', '2.7', '2.8', '2.9',
-    '3.0', '3.1', '3.2', '3.3', '3.4', '3.5', '3.6', '3.7', '3.8', '3.9',
-    '4.0', '4.1', '4.2', '4.3', '4.4', '4.5', '4.6', '4.7', '4.8', '4.9',
+    '1.0',
+    '1.1',
+    '1.2',
+    '1.3',
+    '1.4',
+    '1.5',
+    '1.6',
+    '1.7',
+    '1.8',
+    '1.9',
+    '2.0',
+    '2.1',
+    '2.2',
+    '2.3',
+    '2.4',
+    '2.5',
+    '2.6',
+    '2.7',
+    '2.8',
+    '2.9',
+    '3.0',
+    '3.1',
+    '3.2',
+    '3.3',
+    '3.4',
+    '3.5',
+    '3.6',
+    '3.7',
+    '3.8',
+    '3.9',
+    '4.0',
+    '4.1',
+    '4.2',
+    '4.3',
+    '4.4',
+    '4.5',
+    '4.6',
+    '4.7',
+    '4.8',
+    '4.9',
     '5.0',
   ];
 
   static const _birthOrderOptions = [
-    '1st', '2nd', '3rd', '4th', '5th', '6th or later',
+    '1st',
+    '2nd',
+    '3rd',
+    '4th',
+    '5th',
+    '6th or later',
   ];
 
   static const _philHealthMemberTypes = [
-    'Member', 'Dependent', 'Indigent', 'Senior Citizen', 'PWD', 'Other',
+    'Member',
+    'Dependent',
+    'Indigent',
+    'Senior Citizen',
+    'PWD',
+    'Other',
   ];
 
   static const _bloodTypes = [
-    'A+', 'A−', 'B+', 'B−', 'AB+', 'AB−', 'O+', 'O−', 'Unknown',
+    'A+',
+    'A−',
+    'B+',
+    'B−',
+    'AB+',
+    'AB−',
+    'O+',
+    'O−',
+    'Unknown',
   ];
 
-  static const _parentStatuses = [
-    'Present', 'N/A (Deceased)', 'N/A (Unknown)', 'N/A (Absent)',
-  ];
+  static const _parentStatuses = ['Present', 'Absent'];
 
   static const _caregiverOptions = ['Yes', 'No'];
 
@@ -186,6 +256,16 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
     _ipEthnicity = widget.ipEthnicity;
     _isFourPsMember = widget.isFourPsMember;
     _hasDisability = widget.hasDisability;
+
+    // Sync N/A toggles from parent on init
+    if (widget.motherIsNA) {
+      _isMotherAvailable = false;
+      _selectedMotherStatus = 'Absent';
+    }
+    if (widget.fatherIsNA) {
+      _isFatherAvailable = false;
+      _selectedFatherStatus = 'Absent';
+    }
 
     final sexText = widget.sexController.text.trim().toLowerCase();
     if (sexText == 'male' || sexText == 'm') {
@@ -233,22 +313,26 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
       _fatherPhilHealthMemberType = fPhType;
     }
 
-    final motherText = widget.motherController.text.trim();
-    if (_parentStatuses.contains(motherText) && motherText != 'Present') {
-      _selectedMotherStatus = motherText;
-      _isMotherAvailable = false;
-    } else if (motherText.isNotEmpty) {
-      _selectedMotherStatus = 'Present';
-      _isMotherAvailable = true;
+    if (!widget.motherIsNA) {
+      final motherText = widget.motherController.text.trim();
+      if (_parentStatuses.contains(motherText) && motherText != 'Present') {
+        _selectedMotherStatus = motherText;
+        _isMotherAvailable = false;
+      } else if (motherText.isNotEmpty) {
+        _selectedMotherStatus = 'Present';
+        _isMotherAvailable = true;
+      }
     }
 
-    final fatherText = widget.fatherController.text.trim();
-    if (_parentStatuses.contains(fatherText) && fatherText != 'Present') {
-      _selectedFatherStatus = fatherText;
-      _isFatherAvailable = false;
-    } else if (fatherText.isNotEmpty) {
-      _selectedFatherStatus = 'Present';
-      _isFatherAvailable = true;
+    if (!widget.fatherIsNA) {
+      final fatherText = widget.fatherController.text.trim();
+      if (_parentStatuses.contains(fatherText) && fatherText != 'Present') {
+        _selectedFatherStatus = fatherText;
+        _isFatherAvailable = false;
+      } else if (fatherText.isNotEmpty) {
+        _selectedFatherStatus = 'Present';
+        _isFatherAvailable = true;
+      }
     }
 
     final caregiverName = widget.caregiverNameController.text.trim();
@@ -275,6 +359,19 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
     }
     if (oldWidget.hasDisability != widget.hasDisability) {
       _hasDisability = widget.hasDisability;
+    }
+    // Sync N/A toggles when parent resets the form
+    if (oldWidget.motherIsNA != widget.motherIsNA) {
+      setState(() {
+        _isMotherAvailable = !widget.motherIsNA;
+        _selectedMotherStatus = widget.motherIsNA ? 'Absent' : 'Present';
+      });
+    }
+    if (oldWidget.fatherIsNA != widget.fatherIsNA) {
+      setState(() {
+        _isFatherAvailable = !widget.fatherIsNA;
+        _selectedFatherStatus = widget.fatherIsNA ? 'Absent' : 'Present';
+      });
     }
   }
 
@@ -310,7 +407,8 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
     final parts = <String>[];
     if (street != null && street.isNotEmpty) parts.add(street);
     if (barangay != null && barangay.isNotEmpty) parts.add(barangay);
-    if (municipality != null && municipality.isNotEmpty) parts.add(municipality);
+    if (municipality != null && municipality.isNotEmpty)
+      parts.add(municipality);
     if (province != null && province.isNotEmpty) parts.add(province);
     return parts.join(', ');
   }
@@ -362,8 +460,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
       final now = DateTime.now();
       final days = now.difference(picked).inDays;
       widget.ageDaysController.text = days.clamp(0, 99999).toString();
-      final months =
-          (now.year - picked.year) * 12 + (now.month - picked.month);
+      final months = (now.year - picked.year) * 12 + (now.month - picked.month);
       widget.ageController.text = months.clamp(0, 60).toString();
       final years =
           now.year -
@@ -821,7 +918,6 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                     ),
                   ),
                   const SizedBox(width: 10),
-                  // Fixed-width container prevents pixel overflow on small screens
                   SizedBox(
                     width: 130,
                     child: _buildDropdown(
@@ -1047,15 +1143,13 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                             widget.birthOrderController.clear();
                           } else if (value == '6th or later') {
                             if (int.tryParse(
-                                          widget.birthOrderController.text
-                                              .trim(),
-                                        ) ==
-                                        null ||
-                                    int.tryParse(
-                                          widget.birthOrderController.text
-                                              .trim(),
-                                        )! <=
-                                        5) {
+                                      widget.birthOrderController.text.trim(),
+                                    ) ==
+                                    null ||
+                                int.tryParse(
+                                      widget.birthOrderController.text.trim(),
+                                    )! <=
+                                    5) {
                               widget.birthOrderController.clear();
                             }
                           } else {
@@ -1226,7 +1320,10 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
             children: [
               const Text(
                 "ADDRESS",
-                style: TextStyle(fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF888888),
+                ),
               ),
               const SizedBox(height: 12),
 
@@ -1294,13 +1391,39 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
               ),
               const SizedBox(height: 20),
 
+              // CheckboxListTile(
+              //   value: sameAsAddress,
+              //   title: const Text("Place of Birth is same as Address"),
+              //   contentPadding: EdgeInsets.zero,
+              //   onChanged: (value) {
+              //     setState(() {
+              //       sameAsAddress = value!;
+              //       if (sameAsAddress) {
+              //         birthProvince = selectedProvince;
+              //         birthMunicipality = selectedMunicipality;
+              //         birthBarangay = selectedBarangay;
+              //       }
+              //     });
+              //   },
+              // ),
               CheckboxListTile(
                 value: sameAsAddress,
-                title: const Text("Place of Birth is same as Address"),
                 contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                activeColor: const Color(0xFF888888),
+                title: const Text(
+                  "Place of Birth is same as Address",
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: 'Poppins',
+                    color: Color(0xFF888888),
+                  ),
+                ),
                 onChanged: (value) {
                   setState(() {
                     sameAsAddress = value!;
+
                     if (sameAsAddress) {
                       birthProvince = selectedProvince;
                       birthMunicipality = selectedMunicipality;
@@ -1313,7 +1436,10 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
 
               const Text(
                 "PLACE OF BIRTH",
-                style: TextStyle(fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF888888),
+                ),
               ),
               const SizedBox(height: 12),
 
@@ -1418,10 +1544,11 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                       activeColor: const Color(0xFFF5A962),
                       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       onChanged: (val) {
+                        final isAvailable = val ?? false;
                         setState(() {
-                          _isMotherAvailable = val ?? false;
+                          _isMotherAvailable = isAvailable;
                           if (!_isMotherAvailable) {
-                            _selectedMotherStatus = 'N/A (Absent)';
+                            _selectedMotherStatus = 'Absent';
                             widget.motherController.text =
                                 _selectedMotherStatus!;
                             widget.motherContactController.clear();
@@ -1435,6 +1562,8 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                             widget.motherController.clear();
                           }
                         });
+                        // Notify parent of N/A change
+                        widget.onMotherNAChanged?.call(!isAvailable);
                       },
                     ),
                   ),
@@ -1462,6 +1591,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                       widget.motherController.text = v ?? '';
                     }
                   });
+                  widget.onMotherNAChanged?.call(v != 'Present');
                 },
                 items: _parentStatuses
                     .map((s) => DropdownMenuItem(value: s, child: Text(s)))
@@ -1539,69 +1669,61 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
               ),
               const SizedBox(height: 12),
               _buildSubHeader('PHILHEALTH'),
+
               LayoutBuilder(
                 builder: (context, constraints) {
-                  final wide = constraints.maxWidth > 320;
-                  if (wide) {
-                    return Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: _buildField(
-                            label: 'PHILHEALTH NUMBER',
-                            controller:
-                                widget.motherPhilHealthNumberController,
-                            keyboardType: TextInputType.number,
-                            icon: Icons.credit_card_outlined,
-                            hint: '12-digit number',
-                            enabled: _isMotherAvailable,
-                          ),
+                  final isSmallScreen = constraints.maxWidth < 360;
+
+                  return Wrap(
+                    spacing: 8,
+                    runSpacing: 12,
+                    children: [
+                      SizedBox(
+                        width: isSmallScreen
+                            ? constraints.maxWidth
+                            : (constraints.maxWidth - 8) / 2,
+                        child: _buildField(
+                          label: 'PHILHEALTH NUMBER',
+                          controller: widget.motherPhilHealthNumberController,
+                          keyboardType: TextInputType.number,
+                          icon: Icons.credit_card_outlined,
+                          hint: '12-digit number',
+                          enabled:
+                              _isMotherAvailable &&
+                              !widget.motherPhilHealthIsNA,
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
+                      ),
+
+                      SizedBox(
+                        width: isSmallScreen
+                            ? constraints.maxWidth
+                            : (constraints.maxWidth - 8) / 2,
+                        child: MediaQuery(
+                          data: MediaQuery.of(context).copyWith(
+                            textScaler: isSmallScreen
+                                ? const TextScaler.linear(0.90)
+                                : const TextScaler.linear(1.0),
+                          ),
                           child: _buildDropdown(
                             label: 'MEMBER TYPE',
                             value: _motherPhilHealthMemberType,
                             items: _philHealthMemberTypes,
                             icon: Icons.badge_outlined,
-                            enabled: _isMotherAvailable,
+                            enabled:
+                                _isMotherAvailable &&
+                                !widget.motherPhilHealthIsNA,
                             onChanged: (v) {
                               setState(() {
                                 _motherPhilHealthMemberType = v;
-                                widget.motherPhilHealthMemberTypeController
-                                    .text = v ?? '';
+
+                                widget
+                                        .motherPhilHealthMemberTypeController
+                                        .text =
+                                    v ?? '';
                               });
                             },
                           ),
                         ),
-                      ],
-                    );
-                  }
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildField(
-                        label: 'PHILHEALTH NUMBER',
-                        controller: widget.motherPhilHealthNumberController,
-                        keyboardType: TextInputType.number,
-                        icon: Icons.credit_card_outlined,
-                        hint: '12-digit number',
-                        enabled: _isMotherAvailable,
-                      ),
-                      const SizedBox(height: 10),
-                      _buildDropdown(
-                        label: 'MEMBER TYPE',
-                        value: _motherPhilHealthMemberType,
-                        items: _philHealthMemberTypes,
-                        icon: Icons.badge_outlined,
-                        enabled: _isMotherAvailable,
-                        onChanged: (v) {
-                          setState(() {
-                            _motherPhilHealthMemberType = v;
-                            widget.motherPhilHealthMemberTypeController.text =
-                                v ?? '';
-                          });
-                        },
                       ),
                     ],
                   );
@@ -1630,10 +1752,11 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                       activeColor: const Color(0xFFF5A962),
                       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       onChanged: (val) {
+                        final isAvailable = val ?? false;
                         setState(() {
-                          _isFatherAvailable = val ?? false;
+                          _isFatherAvailable = isAvailable;
                           if (!_isFatherAvailable) {
-                            _selectedFatherStatus = 'N/A (Absent)';
+                            _selectedFatherStatus = 'Absent';
                             widget.fatherController.text =
                                 _selectedFatherStatus!;
                             widget.fatherContactController.clear();
@@ -1647,6 +1770,8 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                             widget.fatherController.clear();
                           }
                         });
+                        // Notify parent of N/A change
+                        widget.onFatherNAChanged?.call(!isAvailable);
                       },
                     ),
                   ),
@@ -1674,6 +1799,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                       widget.fatherController.text = v ?? '';
                     }
                   });
+                  widget.onFatherNAChanged?.call(v != 'Present');
                 },
                 items: _parentStatuses
                     .map((s) => DropdownMenuItem(value: s, child: Text(s)))
@@ -1759,69 +1885,61 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
               ),
               const SizedBox(height: 12),
               _buildSubHeader('PHILHEALTH'),
+
               LayoutBuilder(
                 builder: (context, constraints) {
-                  final wide = constraints.maxWidth > 320;
-                  if (wide) {
-                    return Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: _buildField(
-                            label: 'PHILHEALTH NUMBER',
-                            controller:
-                                widget.fatherPhilHealthNumberController,
-                            keyboardType: TextInputType.number,
-                            icon: Icons.credit_card_outlined,
-                            hint: '12-digit number',
-                            enabled: _isFatherAvailable,
-                          ),
+                  final isSmallScreen = constraints.maxWidth < 360;
+
+                  return Wrap(
+                    spacing: 8,
+                    runSpacing: 12,
+                    children: [
+                      SizedBox(
+                        width: isSmallScreen
+                            ? constraints.maxWidth
+                            : (constraints.maxWidth - 8) / 2,
+                        child: _buildField(
+                          label: 'PHILHEALTH NUMBER',
+                          controller: widget.fatherPhilHealthNumberController,
+                          keyboardType: TextInputType.number,
+                          icon: Icons.credit_card_outlined,
+                          hint: '12-digit number',
+                          enabled:
+                              _isFatherAvailable &&
+                              !widget.fatherPhilHealthIsNA,
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
+                      ),
+
+                      SizedBox(
+                        width: isSmallScreen
+                            ? constraints.maxWidth
+                            : (constraints.maxWidth - 8) / 2,
+                        child: MediaQuery(
+                          data: MediaQuery.of(context).copyWith(
+                            textScaler: isSmallScreen
+                                ? const TextScaler.linear(0.90)
+                                : const TextScaler.linear(1.0),
+                          ),
                           child: _buildDropdown(
                             label: 'MEMBER TYPE',
                             value: _fatherPhilHealthMemberType,
                             items: _philHealthMemberTypes,
                             icon: Icons.badge_outlined,
-                            enabled: _isFatherAvailable,
+                            enabled:
+                                _isFatherAvailable &&
+                                !widget.fatherPhilHealthIsNA,
                             onChanged: (v) {
                               setState(() {
                                 _fatherPhilHealthMemberType = v;
-                                widget.fatherPhilHealthMemberTypeController
-                                    .text = v ?? '';
+
+                                widget
+                                        .fatherPhilHealthMemberTypeController
+                                        .text =
+                                    v ?? '';
                               });
                             },
                           ),
                         ),
-                      ],
-                    );
-                  }
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildField(
-                        label: 'PHILHEALTH NUMBER',
-                        controller: widget.fatherPhilHealthNumberController,
-                        keyboardType: TextInputType.number,
-                        icon: Icons.credit_card_outlined,
-                        hint: '12-digit number',
-                        enabled: _isFatherAvailable,
-                      ),
-                      const SizedBox(height: 10),
-                      _buildDropdown(
-                        label: 'MEMBER TYPE',
-                        value: _fatherPhilHealthMemberType,
-                        items: _philHealthMemberTypes,
-                        icon: Icons.badge_outlined,
-                        enabled: _isFatherAvailable,
-                        onChanged: (v) {
-                          setState(() {
-                            _fatherPhilHealthMemberType = v;
-                            widget.fatherPhilHealthMemberTypeController.text =
-                                v ?? '';
-                          });
-                        },
                       ),
                     ],
                   );
