@@ -152,6 +152,8 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
   bool _isMotherAvailable = true;
   bool _isFatherAvailable = true;
   String? _selectedCaregiverPresence = 'No';
+  bool _motherPhilHealthIsNA = false;
+  bool _fatherPhilHealthIsNA = false;
 
   bool sameAsAddress = false;
 
@@ -1391,21 +1393,6 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
               ),
               const SizedBox(height: 20),
 
-              // CheckboxListTile(
-              //   value: sameAsAddress,
-              //   title: const Text("Place of Birth is same as Address"),
-              //   contentPadding: EdgeInsets.zero,
-              //   onChanged: (value) {
-              //     setState(() {
-              //       sameAsAddress = value!;
-              //       if (sameAsAddress) {
-              //         birthProvince = selectedProvince;
-              //         birthMunicipality = selectedMunicipality;
-              //         birthBarangay = selectedBarangay;
-              //       }
-              //     });
-              //   },
-              // ),
               CheckboxListTile(
                 value: sameAsAddress,
                 contentPadding: EdgeInsets.zero,
@@ -1417,7 +1404,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                     fontFamily: 'Poppins',
-                    color:  Color(0xFFF5A962),
+                    color: Color(0xFFF5A962),
                   ),
                 ),
                 onChanged: (value) {
@@ -1670,14 +1657,44 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
               const SizedBox(height: 12),
               _buildSubHeader('PHILHEALTH'),
 
+              const SizedBox(height: 8),
+
+              /// N/A CHECKBOX
+              Row(
+                children: [
+                  Checkbox(
+                    value: _motherPhilHealthIsNA,
+                    onChanged: (value) {
+                      setState(() {
+                        _motherPhilHealthIsNA = value ?? false;
+
+                        if (_motherPhilHealthIsNA) {
+                          widget.motherPhilHealthNumberController.clear();
+                          widget.motherPhilHealthMemberTypeController.clear();
+                          _motherPhilHealthMemberType = null;
+                        }
+                      });
+                    },
+                  ),
+                  const Text("N/A"),
+                ],
+              ),
+
+              const SizedBox(height: 12),
+
+              /// FIELDS
               LayoutBuilder(
                 builder: (context, constraints) {
                   final isSmallScreen = constraints.maxWidth < 360;
+
+                  final isDisabled =
+                      !_isMotherAvailable || _motherPhilHealthIsNA;
 
                   return Wrap(
                     spacing: 8,
                     runSpacing: 12,
                     children: [
+                      /// PHILHEALTH NUMBER
                       SizedBox(
                         width: isSmallScreen
                             ? constraints.maxWidth
@@ -1688,12 +1705,11 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                           keyboardType: TextInputType.number,
                           icon: Icons.credit_card_outlined,
                           hint: '12-digit number',
-                          enabled:
-                              _isMotherAvailable &&
-                              !widget.motherPhilHealthIsNA,
+                          enabled: !isDisabled,
                         ),
                       ),
 
+                      /// MEMBER TYPE
                       SizedBox(
                         width: isSmallScreen
                             ? constraints.maxWidth
@@ -1709,13 +1725,10 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                             value: _motherPhilHealthMemberType,
                             items: _philHealthMemberTypes,
                             icon: Icons.badge_outlined,
-                            enabled:
-                                _isMotherAvailable &&
-                                !widget.motherPhilHealthIsNA,
+                            enabled: !isDisabled,
                             onChanged: (v) {
                               setState(() {
                                 _motherPhilHealthMemberType = v;
-
                                 widget
                                         .motherPhilHealthMemberTypeController
                                         .text =
@@ -1886,14 +1899,46 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
               const SizedBox(height: 12),
               _buildSubHeader('PHILHEALTH'),
 
+              _buildSubHeader('PHILHEALTH'),
+
+              const SizedBox(height: 8),
+
+              /// N/A CHECKBOX
+              Row(
+                children: [
+                  Checkbox(
+                    value: _fatherPhilHealthIsNA,
+                    onChanged: (value) {
+                      setState(() {
+                        _fatherPhilHealthIsNA = value ?? false;
+
+                        if (_fatherPhilHealthIsNA) {
+                          widget.fatherPhilHealthNumberController.clear();
+                          widget.fatherPhilHealthMemberTypeController.clear();
+                          _fatherPhilHealthMemberType = null;
+                        }
+                      });
+                    },
+                  ),
+                  const Text("N/A"),
+                ],
+              ),
+
+              const SizedBox(height: 12),
+
+              /// FIELDS
               LayoutBuilder(
                 builder: (context, constraints) {
                   final isSmallScreen = constraints.maxWidth < 360;
+
+                  final isDisabled =
+                      !_isFatherAvailable || _fatherPhilHealthIsNA;
 
                   return Wrap(
                     spacing: 8,
                     runSpacing: 12,
                     children: [
+                      /// PHILHEALTH NUMBER
                       SizedBox(
                         width: isSmallScreen
                             ? constraints.maxWidth
@@ -1904,12 +1949,11 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                           keyboardType: TextInputType.number,
                           icon: Icons.credit_card_outlined,
                           hint: '12-digit number',
-                          enabled:
-                              _isFatherAvailable &&
-                              !widget.fatherPhilHealthIsNA,
+                          enabled: !isDisabled,
                         ),
                       ),
 
+                      /// MEMBER TYPE
                       SizedBox(
                         width: isSmallScreen
                             ? constraints.maxWidth
@@ -1925,13 +1969,10 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                             value: _fatherPhilHealthMemberType,
                             items: _philHealthMemberTypes,
                             icon: Icons.badge_outlined,
-                            enabled:
-                                _isFatherAvailable &&
-                                !widget.fatherPhilHealthIsNA,
+                            enabled: !isDisabled,
                             onChanged: (v) {
                               setState(() {
                                 _fatherPhilHealthMemberType = v;
-
                                 widget
                                         .fatherPhilHealthMemberTypeController
                                         .text =
