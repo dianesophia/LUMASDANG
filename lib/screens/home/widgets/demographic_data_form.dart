@@ -636,18 +636,35 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
     bool enabled = true,
     VoidCallback? onTap,
     int maxLines = 1,
+    bool isOptional = false,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFFF5A962),
-            letterSpacing: 0.5,
-          ),
+        Row(
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFFF5A962),
+                letterSpacing: 0.5,
+              ),
+            ),
+            if (isOptional) ...[
+              const SizedBox(width: 4),
+              const Text(
+                '(Optional)',
+                style: TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFFAAAAAA),
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+          ],
         ),
         const SizedBox(height: 5),
         TextFormField(
@@ -848,11 +865,12 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
     required String label,
     required bool? value,
     required ValueChanged<bool?> onChanged,
+    bool isOptional = false,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildLabelRow(label),
+        _buildLabelRow(label, isOptional: isOptional),
         Row(
           children: [
             _buildTogglePill('Yes', value == true, () => onChanged(true)),
@@ -910,6 +928,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                       label: 'MIDDLE NAME',
                       controller: widget.middleNameController,
                       icon: Icons.badge_outlined,
+                      isOptional: true,
                       enabled: !_middleNameNA,
                       validator: (v) {
                         if (widget.isDraft || _middleNameNA) return null;
@@ -1098,6 +1117,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                       value: _selectedBloodType,
                       items: _bloodTypes,
                       icon: Icons.bloodtype_outlined,
+                      isOptional: true,
                       onChanged: (v) {
                         setState(() {
                           _selectedBloodType = v;
@@ -1119,6 +1139,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                       value: _selectedBirthWeight,
                       items: _birthWeightOptions,
                       icon: Icons.monitor_weight_outlined,
+                      isOptional: true,
                       onChanged: (value) {
                         setState(() {
                           _selectedBirthWeight = value;
@@ -1138,6 +1159,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                       value: _selectedBirthOrder,
                       items: _birthOrderOptions,
                       icon: Icons.sort_outlined,
+                      isOptional: true,
                       onChanged: (value) {
                         setState(() {
                           _selectedBirthOrder = value;
@@ -1198,10 +1220,11 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                 controller: widget.religionController,
                 icon: Icons.church_outlined,
                 hint: 'e.g. Catholic, Islam…',
+                isOptional: true,
               ),
               const SizedBox(height: 12),
 
-              _buildLabelRow('BELONGS TO IP GROUP?'),
+              _buildLabelRow('BELONGS TO IP GROUP?', isOptional: true),
               Row(
                 children: [
                   _buildTogglePill('Yes', _belongsToIpGroup == true, () {
@@ -1222,7 +1245,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
 
               if (_belongsToIpGroup == true) ...[
                 const SizedBox(height: 10),
-                _buildLabelRow('ETHNICITY'),
+                _buildLabelRow('ETHNICITY', isOptional: true),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
@@ -1247,6 +1270,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                     controller: widget.caregiverEthnicityController,
                     icon: Icons.edit_outlined,
                     hint: 'Enter ethnicity',
+                    isOptional: true,
                   ),
                 ],
               ],
@@ -1255,6 +1279,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
               _buildYesNoRow(
                 label: 'HAS DISABILITY?',
                 value: _hasDisability,
+                isOptional: true,
                 onChanged: (v) {
                   setState(() {
                     _hasDisability = v;
@@ -1268,7 +1293,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
               ),
               if (_hasDisability == true) ...[
                 const SizedBox(height: 10),
-                _buildLabelRow('TYPE OF DISABILITY'),
+                _buildLabelRow('TYPE OF DISABILITY', isOptional: true),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
@@ -1334,6 +1359,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                 controller: widget.streetController,
                 icon: Icons.signpost_outlined,
                 hint: 'e.g. 123 Rizal St.',
+                isOptional: true,
               ),
               const SizedBox(height: 12),
 
@@ -1341,6 +1367,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                 label: "PROVINCE",
                 value: selectedProvince,
                 items: carLocations.keys.toList(),
+                isOptional: true,
                 onChanged: (value) {
                   setState(() {
                     selectedProvince = value;
@@ -1363,6 +1390,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                 items: selectedProvince == null
                     ? []
                     : carLocations[selectedProvince]!,
+                isOptional: true,
                 onChanged: (value) {
                   setState(() {
                     selectedMunicipality = value;
@@ -1381,6 +1409,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                 label: "BARANGAY",
                 value: selectedBarangay,
                 items: _barangaysFor(selectedMunicipality),
+                isOptional: true,
                 onChanged: (value) {
                   setState(() {
                     selectedBarangay = value;
@@ -1434,6 +1463,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                 label: "PROVINCE",
                 value: birthProvince,
                 items: carLocations.keys.toList(),
+                isOptional: true,
                 onChanged: sameAsAddress
                     ? null
                     : (value) {
@@ -1452,6 +1482,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                 items: birthProvince == null
                     ? []
                     : carLocations[birthProvince]!,
+                isOptional: true,
                 onChanged: sameAsAddress
                     ? null
                     : (value) {
@@ -1467,6 +1498,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                 label: "BARANGAY",
                 value: birthBarangay,
                 items: _barangaysFor(birthMunicipality),
+                isOptional: true,
                 onChanged: sameAsAddress
                     ? null
                     : (value) {
@@ -1477,7 +1509,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
               ),
               const SizedBox(height: 12),
 
-              _buildLabelRow('STATUS OF RESIDENCE'),
+              _buildLabelRow('STATUS OF RESIDENCE', isOptional: true),
               Row(
                 children: [
                   _buildTogglePill('Tenant', _residenceStatus == 'Tenant', () {
@@ -1507,6 +1539,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                 icon: Icons.timelapse_outlined,
                 hint: 'e.g. 3 years',
                 keyboardType: TextInputType.text,
+                isOptional: true,
               ),
             ],
           ),
@@ -1628,6 +1661,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                       icon: Icons.cake_outlined,
                       hint: 'Years',
                       enabled: _isMotherAvailable,
+                      isOptional: true,
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -1653,6 +1687,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                 icon: Icons.work_outline,
                 hint: 'e.g. Farmer, Teacher…',
                 enabled: _isMotherAvailable,
+                isOptional: true,
               ),
               const SizedBox(height: 12),
               _buildSubHeader('PHILHEALTH'),
@@ -1706,6 +1741,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                           icon: Icons.credit_card_outlined,
                           hint: '12-digit number',
                           enabled: !isDisabled,
+                          isOptional: true,
                         ),
                       ),
 
@@ -1726,6 +1762,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                             items: _philHealthMemberTypes,
                             icon: Icons.badge_outlined,
                             enabled: !isDisabled,
+                            isOptional: true,
                             onChanged: (v) {
                               setState(() {
                                 _motherPhilHealthMemberType = v;
@@ -1862,6 +1899,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                       icon: Icons.cake_outlined,
                       hint: 'Years',
                       enabled: _isFatherAvailable,
+                      isOptional: true,
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -1895,10 +1933,9 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                 icon: Icons.work_outline,
                 hint: 'e.g. Farmer, Driver…',
                 enabled: _isFatherAvailable,
+                isOptional: true,
               ),
               const SizedBox(height: 12),
-              _buildSubHeader('PHILHEALTH'),
-
               _buildSubHeader('PHILHEALTH'),
 
               const SizedBox(height: 8),
@@ -1950,6 +1987,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                           icon: Icons.credit_card_outlined,
                           hint: '12-digit number',
                           enabled: !isDisabled,
+                          isOptional: true,
                         ),
                       ),
 
@@ -1970,6 +2008,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                             items: _philHealthMemberTypes,
                             icon: Icons.badge_outlined,
                             enabled: !isDisabled,
+                            isOptional: true,
                             onChanged: (v) {
                               setState(() {
                                 _fatherPhilHealthMemberType = v;
@@ -2053,6 +2092,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                   controller: widget.caregiverNameController,
                   icon: Icons.person_outline,
                   hint: 'Enter caregiver name',
+                  isOptional: true,
                 ),
                 const SizedBox(height: 12),
                 Row(
@@ -2064,6 +2104,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                         keyboardType: TextInputType.number,
                         icon: Icons.cake_outlined,
                         hint: 'Years',
+                        isOptional: true,
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -2073,6 +2114,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                         controller: widget.caregiverRelationshipController,
                         icon: Icons.family_restroom_outlined,
                         hint: 'e.g. Lolo, Tita…',
+                        isOptional: true,
                       ),
                     ),
                   ],
@@ -2086,6 +2128,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                         controller: widget.caregiverEthnicityController,
                         icon: Icons.groups_outlined,
                         hint: 'e.g. Ibaloi…',
+                        isOptional: true,
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -2095,6 +2138,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                         controller: widget.caregiverReligionController,
                         icon: Icons.church_outlined,
                         hint: 'e.g. Catholic…',
+                        isOptional: true,
                       ),
                     ),
                   ],
@@ -2105,6 +2149,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
               _buildYesNoRow(
                 label: '4Ps MEMBER?',
                 value: _isFourPsMember,
+                isOptional: true,
                 onChanged: (v) {
                   setState(() => _isFourPsMember = v);
                   widget.onIsFourPsMemberChanged?.call(v);
@@ -2118,6 +2163,7 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                   icon: Icons.tag_outlined,
                   hint: 'Enter household ID',
                   keyboardType: TextInputType.number,
+                  isOptional: true,
                 ),
               ],
             ],

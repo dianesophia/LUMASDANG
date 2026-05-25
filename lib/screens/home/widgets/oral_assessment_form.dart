@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'form_field_label.dart';
 import 'yes_no_row.dart';
 
 // ── Risk level enum ───────────────────────────────────────────────────────────
@@ -442,15 +443,7 @@ class _OralAssessmentFormState extends State<OralAssessmentForm> {
                   'ORAL ASSESSMENT', Icons.medical_services_outlined),
               const SizedBox(height: 14),
 
-              const Text(
-                'RISK FACTORS',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFFF5A962),
-                  letterSpacing: 0.5,
-                ),
-              ),
+              const FormFieldLabel(label: 'RISK FACTORS', isOptional: true),
               const SizedBox(height: 8),
 
               _buildRiskCard(

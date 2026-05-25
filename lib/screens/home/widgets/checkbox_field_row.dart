@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'form_field_label.dart';
 
 class CheckboxFieldRow extends StatefulWidget {
   final String label;
   final String? hint;
   final bool initialValue;
   final ValueChanged<bool>? onChanged;
+  final bool isOptional;
 
   const CheckboxFieldRow({
     super.key,
@@ -12,6 +14,7 @@ class CheckboxFieldRow extends StatefulWidget {
     this.hint,
     this.initialValue = false,
     this.onChanged,
+    this.isOptional = false,
   });
 
   @override
@@ -47,13 +50,10 @@ class _CheckboxFieldRowState extends State<CheckboxFieldRow> {
           ),
         ),
         const SizedBox(width: 8),
-        Text(
-          widget.label,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Color(0xFF5D4037),
-          ),
+        FormFieldLabel(
+          label: widget.label,
+          isOptional: widget.isOptional,
+          color: const Color(0xFF5D4037),
         ),
         if (widget.hint != null) ...[
           const SizedBox(width: 8),

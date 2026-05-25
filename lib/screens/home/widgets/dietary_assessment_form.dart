@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'checkbox_field_row.dart';
+import 'form_field_label.dart';
 
 class DietaryAssessmentForm extends StatefulWidget {
   final int? ageInMonths;
@@ -47,19 +48,12 @@ class _DietaryAssessmentFormState extends State<DietaryAssessmentForm> {
     String? hint,
     String? Function(String?)? validator,
     IconData? icon,
+    bool isOptional = false,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFFF5A962),
-            letterSpacing: 0.5,
-          ),
-        ),
+        FormFieldLabel(label: label, isOptional: isOptional),
         const SizedBox(height: 5),
         TextFormField(
           controller: controller,
@@ -329,23 +323,37 @@ class _DietaryAssessmentFormState extends State<DietaryAssessmentForm> {
               ),
               const SizedBox(height: 12),
               const CheckboxFieldRow(
-                  label: 'Grains / Roots / Tubers', hint: 'Specify'),
-              const SizedBox(height: 8),
-              const CheckboxFieldRow(label: 'Legumes / Nuts', hint: 'Specify'),
-              const SizedBox(height: 8),
-              const CheckboxFieldRow(
-                  label: 'Dairy Products', hint: 'Specify'),
+                  label: 'Grains / Roots / Tubers',
+                  hint: 'Specify',
+                  isOptional: true),
               const SizedBox(height: 8),
               const CheckboxFieldRow(
-                  label: 'Meat / Fish / Poultry', hint: 'Specify'),
-              const SizedBox(height: 8),
-              const CheckboxFieldRow(label: 'Eggs', hint: 'Specify'),
-              const SizedBox(height: 8),
-              const CheckboxFieldRow(
-                  label: 'Vit-A Rich Fruits & Vegetables', hint: 'Specify'),
+                  label: 'Legumes / Nuts',
+                  hint: 'Specify',
+                  isOptional: true),
               const SizedBox(height: 8),
               const CheckboxFieldRow(
-                  label: 'Other Fruits & Vegetables', hint: 'Specify'),
+                  label: 'Dairy Products',
+                  hint: 'Specify',
+                  isOptional: true),
+              const SizedBox(height: 8),
+              const CheckboxFieldRow(
+                  label: 'Meat / Fish / Poultry',
+                  hint: 'Specify',
+                  isOptional: true),
+              const SizedBox(height: 8),
+              const CheckboxFieldRow(
+                  label: 'Eggs', hint: 'Specify', isOptional: true),
+              const SizedBox(height: 8),
+              const CheckboxFieldRow(
+                  label: 'Vit-A Rich Fruits & Vegetables',
+                  hint: 'Specify',
+                  isOptional: true),
+              const SizedBox(height: 8),
+              const CheckboxFieldRow(
+                  label: 'Other Fruits & Vegetables',
+                  hint: 'Specify',
+                  isOptional: true),
             ],
           ),
         ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'form_field_label.dart';
 
 class DewormingForm extends StatefulWidget {
   final ValueChanged<Map<String, dynamic>>? onSave;
@@ -145,19 +146,12 @@ class _DewormingFormState extends State<DewormingForm> {
     String? Function(String?)? validator,
     IconData? icon,
     int maxLines = 1,
+    bool isOptional = false,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFFF5A962),
-            letterSpacing: 0.5,
-          ),
-        ),
+        FormFieldLabel(label: label, isOptional: isOptional),
         const SizedBox(height: 5),
         TextFormField(
           controller: controller,
@@ -437,15 +431,7 @@ class _DewormingFormState extends State<DewormingForm> {
           const SizedBox(height: 14),
 
           // Drug Given
-          const Text(
-            'DRUG GIVEN',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFFF5A962),
-              letterSpacing: 0.5,
-            ),
-          ),
+          const FormFieldLabel(label: 'DRUG GIVEN'),
           const SizedBox(height: 6),
           Wrap(
             spacing: 10,
@@ -486,6 +472,7 @@ class _DewormingFormState extends State<DewormingForm> {
             hint: 'Describe any reactions (if none, leave blank)',
             readOnly: _isNA,
             icon: Icons.warning_amber_outlined,
+            isOptional: true,
           ),
           const SizedBox(height: 12),
 
@@ -497,6 +484,7 @@ class _DewormingFormState extends State<DewormingForm> {
             readOnly: _isNA,
             hasCalendar: true,
             icon: Icons.event_outlined,
+            isOptional: true,
             onTap: _isNA
                 ? null
                 : () => _pickDate(
@@ -589,15 +577,7 @@ class _DewormingFormState extends State<DewormingForm> {
           const SizedBox(height: 14),
 
           // Dose chips
-          const Text(
-            'DOSE',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFFF5A962),
-              letterSpacing: 0.5,
-            ),
-          ),
+          const FormFieldLabel(label: 'DOSE', isOptional: true),
           const SizedBox(height: 8),
           Wrap(
             spacing: 10,
@@ -637,6 +617,7 @@ class _DewormingFormState extends State<DewormingForm> {
             readOnly: _vitANA,
             icon: Icons.notes_outlined,
             maxLines: 2,
+            isOptional: true,
           ),
           const SizedBox(height: 12),
 
@@ -648,6 +629,7 @@ class _DewormingFormState extends State<DewormingForm> {
             readOnly: _vitANA,
             hasCalendar: true,
             icon: Icons.event_outlined,
+            isOptional: true,
             onTap: _vitANA
                 ? null
                 : () => _pickDate(

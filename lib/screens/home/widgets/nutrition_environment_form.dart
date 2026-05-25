@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'form_field_label.dart';
 
 /// Placed after DietaryAssessmentForm in home_page.dart
 class NutritionEnvironmentForm extends StatefulWidget {
@@ -100,18 +101,10 @@ class _NutritionEnvironmentFormState
     );
   }
 
-  Widget _buildSectionLabel(String label) {
+  Widget _buildSectionLabel(String label, {bool isOptional = true}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Text(
-        label,
-        style: const TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          color: Color(0xFFF5A962),
-          letterSpacing: 0.5,
-        ),
-      ),
+      child: FormFieldLabel(label: label, isOptional: isOptional),
     );
   }
 
@@ -278,6 +271,8 @@ class _NutritionEnvironmentFormState
           ),
           if (_hasBackyardGarden == true) ...[
             const SizedBox(height: 10),
+            const FormFieldLabel(label: 'WHAT DO YOU GROW?', isOptional: true),
+            const SizedBox(height: 5),
             TextFormField(
               controller: _gardenWhatController,
               onChanged: (_) => _notify(),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'form_field_label.dart';
 
 /// Allergy entry model
 class AllergyEntry {
@@ -118,17 +119,9 @@ class _AllergiesFormState extends State<AllergiesForm> {
     );
   }
 
-  Widget _buildLabel(String label) => Padding(
+  Widget _buildLabel(String label, {bool isOptional = true}) => Padding(
         padding: const EdgeInsets.only(bottom: 5),
-        child: Text(
-          label,
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFFF5A962),
-            letterSpacing: 0.5,
-          ),
-        ),
+        child: FormFieldLabel(label: label, isOptional: isOptional),
       );
 
   Widget _buildTogglePill(String label, bool selected, VoidCallback onTap,

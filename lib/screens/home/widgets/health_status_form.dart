@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'checkbox_field_row.dart';
+import 'form_field_label.dart';
 
 class HealthStatusForm extends StatelessWidget {
   final bool diarrhea;
@@ -90,14 +91,9 @@ class HealthStatusForm extends StatelessWidget {
               _buildSectionHeader(
                   'HEALTH STATUS', Icons.health_and_safety_outlined),
               const SizedBox(height: 6),
-              const Text(
-                'ILLNESSES / CONDITIONS',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFFF5A962),
-                  letterSpacing: 0.5,
-                ),
+              const FormFieldLabel(
+                label: 'ILLNESSES / CONDITIONS',
+                isOptional: true,
               ),
               const SizedBox(height: 4),
               const Text(
@@ -114,6 +110,7 @@ class HealthStatusForm extends StatelessWidget {
                 hint: 'Date of occurrence / duration',
                 initialValue: diarrhea,
                 onChanged: onDiarrheaChanged,
+                isOptional: true,
               ),
               const SizedBox(height: 8),
               CheckboxFieldRow(
@@ -121,6 +118,7 @@ class HealthStatusForm extends StatelessWidget {
                 hint: 'Date of occurrence / duration',
                 initialValue: fever,
                 onChanged: onFeverChanged,
+                isOptional: true,
               ),
               const SizedBox(height: 8),
               CheckboxFieldRow(
@@ -128,6 +126,7 @@ class HealthStatusForm extends StatelessWidget {
                 hint: 'Date of occurrence / duration',
                 initialValue: cough,
                 onChanged: onCoughChanged,
+                isOptional: true,
               ),
               const SizedBox(height: 8),
               CheckboxFieldRow(
@@ -135,6 +134,7 @@ class HealthStatusForm extends StatelessWidget {
                 hint: 'Date of occurrence / duration',
                 initialValue: other,
                 onChanged: onOtherChanged,
+                isOptional: true,
               ),
             ],
           ),
@@ -164,6 +164,7 @@ class HealthStatusForm extends StatelessWidget {
                 hint: 'Current / taken during illness',
                 initialValue: medications,
                 onChanged: onMedicationsChanged,
+                isOptional: true,
               ),
             ],
           ),

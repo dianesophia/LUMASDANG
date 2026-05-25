@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'form_field_label.dart';
 
 class FormFieldRow extends StatelessWidget {
   final String label;
@@ -8,6 +9,7 @@ class FormFieldRow extends StatelessWidget {
   final bool readOnly;
   final String? Function(String?)? validator;
   final TextInputType? keyboardType;
+  final bool isOptional;
 
   const FormFieldRow({
     super.key,
@@ -18,6 +20,7 @@ class FormFieldRow extends StatelessWidget {
     this.readOnly = false,
     this.validator,
     this.keyboardType,
+    this.isOptional = false,
   });
 
   @override
@@ -33,13 +36,10 @@ class FormFieldRow extends StatelessWidget {
               width: labelWidth,
               child: Padding(
                 padding: const EdgeInsets.only(top: 6),
-                child: Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFF5D4037),
-                  ),
+                child: FormFieldLabel(
+                  label: label,
+                  isOptional: isOptional,
+                  color: const Color(0xFF5D4037),
                 ),
               ),
             ),

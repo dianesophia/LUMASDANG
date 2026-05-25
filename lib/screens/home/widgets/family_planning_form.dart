@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'form_field_label.dart';
 
 /// Placed between HealthStatusForm and DietaryAssessmentForm in home_page.dart
 class FamilyPlanningForm extends StatefulWidget {
@@ -133,14 +134,9 @@ class _FamilyPlanningFormState extends State<FamilyPlanningForm> {
           const SizedBox(height: 14),
 
           // Currently using FP?
-          const Text(
-            'CURRENTLY USING FAMILY PLANNING?',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFFF5A962),
-              letterSpacing: 0.5,
-            ),
+          const FormFieldLabel(
+            label: 'CURRENTLY USING FAMILY PLANNING?',
+            isOptional: true,
           ),
           const SizedBox(height: 6),
           Row(
@@ -163,15 +159,7 @@ class _FamilyPlanningFormState extends State<FamilyPlanningForm> {
           // Method (shown only when Yes)
           if (_usingFamilyPlanning == true) ...[
             const SizedBox(height: 14),
-            const Text(
-              'METHOD USED',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFFF5A962),
-                letterSpacing: 0.5,
-              ),
-            ),
+            const FormFieldLabel(label: 'METHOD USED', isOptional: true),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
@@ -185,6 +173,8 @@ class _FamilyPlanningFormState extends State<FamilyPlanningForm> {
             ),
             if (_methodUsed == 'Other') ...[
               const SizedBox(height: 10),
+              const FormFieldLabel(label: 'SPECIFY METHOD', isOptional: true),
+              const SizedBox(height: 5),
               TextFormField(
                 controller: _otherMethodController,
                 onChanged: (_) => _notify(),
