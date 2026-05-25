@@ -925,14 +925,14 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                     child: _buildDropdown(
                       label: 'EXT. NAME',
                       value: _selectedExtension,
-                      items: const ['None', 'Jr.', 'Sr.', 'II', 'III', 'IV'],
+                      items: const [' ', 'Jr.', 'Sr.', 'II', 'III', 'IV'],
                       icon: Icons.badge_outlined,
                       isOptional: true,
                       enabled: !_extensionOptional,
                       onChanged: (v) {
                         setState(() {
                           _selectedExtension = v;
-                          if (v == 'None' || v == null) {
+                          if (v == ' ' || v == null) {
                             widget.extensionNameController.clear();
                             _selectedExtension = null;
                           } else {
@@ -1897,8 +1897,6 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                 enabled: _isFatherAvailable,
               ),
               const SizedBox(height: 12),
-              _buildSubHeader('PHILHEALTH'),
-
               _buildSubHeader('PHILHEALTH'),
 
               const SizedBox(height: 8),
