@@ -1345,14 +1345,16 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                "ADDRESS",
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF888888),
-                ),
-              ),
-              const SizedBox(height: 12),
+              // const Text(
+              //   "ADDRESS",
+              //   style: TextStyle(
+              //     fontWeight: FontWeight.bold,
+              //     color: Color(0xFF888888),
+              //   ),
+              // ),
+              // const SizedBox(height: 12),
+
+              _buildSubHeader('ADDRESS'),
 
               _buildField(
                 label: "HOUSE NO. / STREET",
@@ -1448,16 +1450,18 @@ class _DemographicDataFormState extends State<DemographicDataForm> {
                   });
                 },
               ),
-              const SizedBox(height: 20),
+             // const SizedBox(height: 20),
 
-              const Text(
-                "PLACE OF BIRTH",
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF888888),
-                ),
-              ),
-              const SizedBox(height: 12),
+              // const Text(
+              //   "PLACE OF BIRTH",
+              //   style: TextStyle(
+              //     fontWeight: FontWeight.bold,
+              //     color: Color(0xFF888888),
+              //   ),
+              // ),
+              // const SizedBox(height: 12),
+
+              _buildSubHeader('PLACE OF BIRTH'),
 
               _buildDropdown(
                 label: "PROVINCE",
